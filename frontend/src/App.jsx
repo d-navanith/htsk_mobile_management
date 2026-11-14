@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { api, getStoredUser } from './api';
 import { Sidebar, TopHeader } from './components/Navbar';
-import LoginModal from './components/LoginModal';
+import LoginModal, { detectPortalFromLocation, PORTAL_CONFIGS } from './components/LoginModal';
 import DashboardView from './components/DashboardView';
 import CheckingSessionView from './components/CheckingSessionView';
 import DevicesView from './components/DevicesView';
@@ -73,7 +73,14 @@ export default function App() {
   const [user, setUser] = useState(() => {
     try {
       const u = getStoredUser();
-      return u && u.role ? u : null;
+      if (!u || !u.role) return null;
+      const urlPortal = detectPortalFromLocation();
+      // Enforce strict URL-to-role isolation: if opening a different role's URL, require sign-in for that role
+      if (urlPortal && u.role !== urlPortal) {
+        api.logout();
+        return null;
+      }
+      return u;
     } catch {
       return null;
     }
@@ -81,7 +88,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [dashboardData, setDashboardData] = useState(null);
   const [permissionsList, setPermissionsList] = useState([]);
-  const [lastRolePortal, setLastRolePortal] = useState(null);
+  const [lastRolePortal, setLastRolePortal] = useState(() => detectPortalFromLocation());
   const [globalSearch, setGlobalSearch] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -147,25 +154,28 @@ export default function App() {
     setLastRolePortal(data.role);
     setUser(data);
     setActiveTab('dashboard');
-    window.location.hash = `#/${data.role.toLowerCase()}/dashboard`;
+    const portalCfg = PORTAL_CONFIGS[data.role] || PORTAL_CONFIGS.Employee;
+    try {
+      window.history.replaceState(null, '', portalCfg.path);
+    } catch {
+      window.location.hash = portalCfg.hash;
+    }
   };
 
   const handleLogout = () => {
-    const previousRole = user?.role || lastRolePortal;
+    const previousRole = user?.role || lastRolePortal || detectPortalFromLocation();
     api.logout();
     setUser(null);
     setDashboardData(null);
     setPermissionsList([]);
     setActiveTab('dashboard');
+    setLastRolePortal(previousRole);
 
-    if (previousRole === 'ITAdmin') {
-      window.location.hash = '#/login/itadmin';
-    } else if (previousRole === 'Developer') {
-      window.location.hash = '#/login/developer';
-    } else if (previousRole === 'Employee') {
-      window.location.hash = '#/login/employee';
-    } else {
-      window.location.hash = '#/portals';
+    const portalCfg = PORTAL_CONFIGS[previousRole] || PORTAL_CONFIGS.Employee;
+    try {
+      window.history.replaceState(null, '', portalCfg.path);
+    } catch {
+      window.location.hash = portalCfg.hash;
     }
   };
 

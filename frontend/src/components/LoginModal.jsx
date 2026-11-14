@@ -8,45 +8,48 @@ import {
   Terminal,
   Eye,
   EyeOff,
-  ArrowLeft,
-  ArrowRight,
   Clock,
   CheckCircle2,
-  Building2
+  Building2,
+  Globe
 } from 'lucide-react';
 
-const PORTAL_CONFIGS = {
+export const PORTAL_CONFIGS = {
   Employee: {
     role: 'Employee',
-    hash: '#/login/employee',
-    badge: 'Staff Access Portal',
+    path: '/emp',
+    hash: '#/emp',
+    subdomainExample: 'htsk-mobile-mgmt-emp.runasp.net',
+    badge: 'Employee Access Portal',
+    code: 'EMP-PORTAL',
     title: 'Employee Sign In',
     subtitle: 'Read-only access to mobile phone availability, group assignments, and checking history.',
     icon: Building2,
     accentBg: 'from-emerald-600 to-teal-700',
-    accentLight: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+    accentLight: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
     buttonClass: 'bg-emerald-600 hover:bg-emerald-500 focus-visible:outline-emerald-500 shadow-emerald-950/50',
     ringClass: 'focus:ring-emerald-500',
-    cardBorder: 'hover:border-emerald-500/60',
     features: [
       'View live availability of all company mobile phones',
       'Inspect department & employee group status',
-      'Browse historical 2-hour checking records & alerts'
+      'Browse historical 2-hour checking records & daily reports'
     ],
-    placeholderUser: 'Enter your employee username'
+    placeholderUser: 'Enter your Employee username'
   },
   ITAdmin: {
     role: 'ITAdmin',
-    hash: '#/login/itadmin',
-    badge: 'IT Operations Portal',
+    path: '/adm002',
+    hash: '#/adm002',
+    subdomainExample: 'htsk-mobile-mgmt-adm002.runasp.net',
+    badge: 'IT Admin Operations Portal',
+    code: 'ADM002-PORTAL',
     title: 'IT Admin Sign In',
     subtitle: 'Conduct mandatory 2-hour physical phone inspections, manage inventory, and handle missing incidents.',
     icon: ShieldCheck,
     accentBg: 'from-blue-600 to-indigo-700',
-    accentLight: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
+    accentLight: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
     buttonClass: 'bg-blue-600 hover:bg-blue-500 focus-visible:outline-blue-500 shadow-blue-950/50',
     ringClass: 'focus:ring-blue-500',
-    cardBorder: 'hover:border-blue-500/60',
     features: [
       'Start & complete 2-hour mobile checking sessions',
       'Register mobile devices and organize employee groups',
@@ -56,36 +59,96 @@ const PORTAL_CONFIGS = {
   },
   Developer: {
     role: 'Developer',
-    hash: '#/login/developer',
-    badge: 'System Owner Console',
+    path: '/dev001',
+    hash: '#/dev001',
+    subdomainExample: 'htsk-mobile-mgmt-dev001.runasp.net',
+    badge: 'Developer System Console',
+    code: 'DEV001-PORTAL',
     title: 'Developer Sign In',
-    subtitle: 'System administration, user account provisioning, role governance, and global configuration.',
+    subtitle: 'Full system administration, CRUD operations across all modules, role governance, and configuration.',
     icon: Terminal,
     accentBg: 'from-purple-600 to-violet-800',
-    accentLight: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
+    accentLight: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
     buttonClass: 'bg-purple-600 hover:bg-purple-500 focus-visible:outline-purple-500 shadow-purple-950/50',
     ringClass: 'focus:ring-purple-500',
-    cardBorder: 'hover:border-purple-500/60',
     features: [
-      'Create, manage, and deactivate user accounts & roles',
-      'Configure 2-hour interval & escalation thresholds',
-      'Full access to all operational & audit modules'
+      'Full CRUD control over all system modules & records',
+      'Manage user accounts, role permissions, & system settings',
+      'Audit sessions, notifications, incidents, & history'
     ],
     placeholderUser: 'Enter your Developer username'
   }
 };
 
-function getPortalFromHash(hash) {
-  const h = (hash || '').toLowerCase();
-  if (h.includes('employee')) return 'Employee';
-  if (h.includes('itadmin') || h.includes('admin')) return 'ITAdmin';
-  if (h.includes('developer') || h.includes('dev')) return 'Developer';
-  return null;
+/**
+ * Detects which isolated role login portal is requested from:
+ * 1. Hostname / Subdomain (e.g. htsk-mobile-mgmt-dev001.runasp.net, htsk-mobile-mgmt-adm002.runasp.net, htsk-mobile-mgmt-emp.runasp.net)
+ * 2. Clean URL Path on a single website (e.g. /dev001, /adm002, /emp)
+ * 3. URL Hash fallback (e.g. #/dev001, #/adm002, #/emp)
+ *
+ * Defaults to 'Employee' when visiting the root URL '/' so administrative portals (/dev001, /adm002) remain unexposed.
+ */
+export function detectPortalFromLocation() {
+  const host = (window.location.hostname || '').toLowerCase();
+  const path = (window.location.pathname || '').toLowerCase();
+  const hash = (window.location.hash || '').toLowerCase();
+  const search = (window.location.search || '').toLowerCase();
+
+  // 1. Check Subdomain / Hostname
+  if (host.includes('dev001') || host.includes('-dev') || host.startsWith('dev.')) {
+    return 'Developer';
+  }
+  if (host.includes('adm002') || host.includes('-adm') || host.includes('-admin') || host.startsWith('adm.') || host.startsWith('admin.')) {
+    return 'ITAdmin';
+  }
+  if (host.includes('-emp') || host.startsWith('emp.')) {
+    return 'Employee';
+  }
+
+  // 2. Check Clean URL Pathname (for single MonsterASP.NET website with unique role URLs)
+  if (
+    path.startsWith('/dev001') ||
+    path.startsWith('/dev-001') ||
+    path.startsWith('/developer') ||
+    path.startsWith('/login/developer')
+  ) {
+    return 'Developer';
+  }
+  if (
+    path.startsWith('/adm002') ||
+    path.startsWith('/adm-002') ||
+    path.startsWith('/itadmin') ||
+    path.startsWith('/admin') ||
+    path.startsWith('/login/itadmin')
+  ) {
+    return 'ITAdmin';
+  }
+  if (
+    path.startsWith('/emp') ||
+    path.startsWith('/employee') ||
+    path.startsWith('/login/employee')
+  ) {
+    return 'Employee';
+  }
+
+  // 3. Check Hash or Query string
+  if (hash.includes('dev001') || hash.includes('developer') || search.includes('portal=dev')) {
+    return 'Developer';
+  }
+  if (hash.includes('adm002') || hash.includes('itadmin') || search.includes('portal=adm')) {
+    return 'ITAdmin';
+  }
+  if (hash.includes('emp') || hash.includes('employee') || search.includes('portal=emp')) {
+    return 'Employee';
+  }
+
+  // Default root URL ('/') strictly to Employee portal for security isolation
+  return 'Employee';
 }
 
 export default function LoginModal({ onLogin, initialPortal = null }) {
   const [selectedPortal, setSelectedPortal] = useState(() => {
-    return getPortalFromHash(window.location.hash) || initialPortal || null;
+    return detectPortalFromLocation() || initialPortal || 'Employee';
   });
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -98,16 +161,21 @@ export default function LoginModal({ onLogin, initialPortal = null }) {
   const errorBannerRef = useRef(null);
 
   useEffect(() => {
-    const handleHashChange = () => {
-      const portal = getPortalFromHash(window.location.hash);
-      setSelectedPortal(portal);
+    const syncPortalFromUrl = () => {
+      const detected = detectPortalFromLocation();
+      setSelectedPortal(detected);
       setError('');
       setUsername('');
       setPassword('');
       setShowPassword(false);
     };
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+
+    window.addEventListener('popstate', syncPortalFromUrl);
+    window.addEventListener('hashchange', syncPortalFromUrl);
+    return () => {
+      window.removeEventListener('popstate', syncPortalFromUrl);
+      window.removeEventListener('hashchange', syncPortalFromUrl);
+    };
   }, []);
 
   useEffect(() => {
@@ -138,20 +206,6 @@ export default function LoginModal({ onLogin, initialPortal = null }) {
     return () => clearInterval(timer);
   }, []);
 
-  const choosePortal = (portalKey) => {
-    if (portalKey && PORTAL_CONFIGS[portalKey]) {
-      window.location.hash = PORTAL_CONFIGS[portalKey].hash;
-      setSelectedPortal(portalKey);
-    } else {
-      window.location.hash = '#/portals';
-      setSelectedPortal(null);
-    }
-    setError('');
-    setUsername('');
-    setPassword('');
-    setShowPassword(false);
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedPortal) return;
@@ -170,109 +224,9 @@ export default function LoginModal({ onLogin, initialPortal = null }) {
     }
   };
 
-  // --- VIEW 1: SEPARATE LOGIN PORTAL GATEWAY (Select which separate login page to open) ---
-  if (!selectedPortal) {
-    return (
-      <div className="min-h-screen bg-slate-950 text-white flex flex-col justify-between relative overflow-hidden">
-        {/* Background decorative radial glow */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-950/50 via-slate-950 to-slate-950 pointer-events-none" />
-
-        {/* Top Header */}
-        <header className="relative z-10 border-b border-slate-800/80 bg-slate-900/50 backdrop-blur-md">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-[#0f2942] rounded-xl flex items-center justify-center shadow-lg border border-slate-700">
-                <Smartphone className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <span className="font-bold text-base tracking-tight text-white">HTSK</span>
-                <span className="hidden sm:inline-block text-xs text-slate-400 ml-2 pl-2 border-l border-slate-700">
-                  HTSK Mobile Management
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-2 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800 text-xs font-mono text-slate-300">
-              <Clock className="w-3.5 h-3.5 text-amber-400" />
-              <span>{colomboTime} (Asia/Colombo)</span>
-            </div>
-          </div>
-        </header>
-
-        {/* Main Portal Selection Content */}
-        <main className="relative z-10 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-12 my-auto">
-          <div className="text-center max-w-2xl mx-auto mb-10">
-            <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 mb-3">
-              <span>Role-Segregated Authentication</span>
-            </span>
-            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
-              Select Your Dedicated Login Portal
-            </h1>
-            <p className="mt-3 text-sm text-slate-400 leading-relaxed">
-              Each role in HTSK Mobile Management authenticates through a separate, dedicated login portal with isolated permissions.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {Object.values(PORTAL_CONFIGS).map((portal) => {
-              const IconComponent = portal.icon;
-              return (
-                <div
-                  key={portal.role}
-                  className={`group bg-slate-900/90 border border-slate-800 ${portal.cardBorder} rounded-2xl p-6 flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 hover:shadow-2xl`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-5">
-                      <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${portal.accentBg} flex items-center justify-center text-white shadow-lg`}>
-                        <IconComponent className="w-6 h-6" />
-                      </div>
-                      <span className={`text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${portal.accentLight}`}>
-                        {portal.badge}
-                      </span>
-                    </div>
-
-                    <h2 className="text-xl font-bold text-white">{portal.title}</h2>
-                    <p className="mt-2 text-xs text-slate-400 leading-relaxed">
-                      {portal.subtitle}
-                    </p>
-
-                    <ul className="mt-5 space-y-2.5 border-t border-slate-800/80 pt-4">
-                      {portal.features.map((feat, idx) => (
-                        <li key={idx} className="flex items-start space-x-2 text-xs text-slate-300">
-                          <CheckCircle2 className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
-                          <span>{feat}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div className="mt-6 pt-4 border-t border-slate-800/80">
-                    <button
-                      type="button"
-                      onClick={() => choosePortal(portal.role)}
-                      className={`w-full min-h-[48px] py-2.5 px-4 rounded-xl font-semibold text-sm text-white shadow-lg flex items-center justify-center space-x-2 transition ${portal.buttonClass}`}
-                    >
-                      <span>Open {portal.title}</span>
-                      <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </main>
-
-        {/* Footer */}
-        <footer className="relative z-10 border-t border-slate-900 py-4 text-center text-xs text-slate-500">
-          HTSK Mobile Management • 2-Hour Verification Protocol • Sri Lanka Standard Time (UTC+05:30)
-        </footer>
-      </div>
-    );
-  }
-
-  // --- VIEW 2: DEDICATED SINGLE-ROLE LOGIN PAGE ---
-  const activeConfig = PORTAL_CONFIGS[selectedPortal];
+  const activeConfig = PORTAL_CONFIGS[selectedPortal] || PORTAL_CONFIGS.Employee;
   const PortalIcon = activeConfig.icon;
+  const currentUrlDisplay = `${window.location.origin}${activeConfig.path}`;
 
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col justify-between relative overflow-hidden">
@@ -281,29 +235,32 @@ export default function LoginModal({ onLogin, initialPortal = null }) {
       {/* Top Navigation Bar */}
       <header className="relative z-10 border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => choosePortal(null)}
-            className="inline-flex items-center space-x-2 text-xs font-semibold text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-800 px-3 py-2 rounded-lg border border-slate-700 transition"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to Portal Selection</span>
-          </button>
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-[#0f2942] rounded-xl flex items-center justify-center shadow-lg border border-slate-700">
+              <Smartphone className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <span className="font-bold text-base tracking-tight text-white">HTSK MOBILE MANAGEMENT</span>
+              <span className={`hidden sm:inline-block text-xs font-semibold ml-3 px-2.5 py-0.5 rounded-full border ${activeConfig.accentLight}`}>
+                {activeConfig.code}
+              </span>
+            </div>
+          </div>
 
-          <div className="flex items-center space-x-2 text-xs font-mono text-slate-400">
+          <div className="flex items-center space-x-2 text-xs font-mono text-slate-300 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800">
             <Clock className="w-3.5 h-3.5 text-amber-400" />
             <span>{colomboTime}</span>
           </div>
         </div>
       </header>
 
-      {/* Dedicated Role Sign-In Card */}
+      {/* Dedicated Single-Role Sign-In Card (Strict Role URL Isolation) */}
       <main className="relative z-10 flex-1 flex items-center justify-center px-4 py-10">
         <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
           {/* Role Banner Header */}
           <div className={`bg-gradient-to-r ${activeConfig.accentBg} p-6 text-white`}>
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider bg-black/25 px-2.5 py-1 rounded-full border border-white/15">
+              <span className="text-xs font-bold uppercase tracking-wider bg-black/25 px-3 py-1 rounded-full border border-white/15">
                 {activeConfig.badge}
               </span>
               <PortalIcon className="w-7 h-7 text-white/90" />
@@ -311,9 +268,13 @@ export default function LoginModal({ onLogin, initialPortal = null }) {
             <h1 id="portal-signin-heading" className="text-2xl font-bold mt-3">
               {activeConfig.title}
             </h1>
-            <p className="text-xs text-white/85 mt-1 leading-relaxed">
+            <p className="text-xs text-white/90 mt-1.5 leading-relaxed">
               {activeConfig.subtitle}
             </p>
+            <div className="mt-3 pt-3 border-t border-white/15 flex items-center space-x-2 text-xs font-mono text-white/90">
+              <Globe className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">{currentUrlDisplay}</span>
+            </div>
           </div>
 
           {/* Sign-In Form */}
@@ -418,13 +379,22 @@ export default function LoginModal({ onLogin, initialPortal = null }) {
                 disabled={loading}
                 className={`w-full min-h-[48px] flex items-center justify-center py-3 px-4 border border-transparent rounded-xl shadow-lg text-sm font-semibold text-white transition disabled:opacity-50 ${activeConfig.buttonClass}`}
               >
-                {loading ? 'Authenticating...' : `Sign In to ${activeConfig.badge}`}
+                {loading ? 'Authenticating...' : `Sign In as ${activeConfig.role}`}
               </button>
             </div>
 
+            <ul className="pt-4 border-t border-slate-800 space-y-2">
+              {activeConfig.features.map((feat, idx) => (
+                <li key={idx} className="flex items-start space-x-2 text-xs text-slate-400">
+                  <CheckCircle2 className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
+                  <span>{feat}</span>
+                </li>
+              ))}
+            </ul>
+
             <div className="pt-3 border-t border-slate-800 text-center">
-              <p className="text-[11px] text-slate-400">
-                Restricted to authorized <strong className="text-slate-200">{activeConfig.role}</strong> accounts only.
+              <p className="text-xs text-slate-400">
+                Isolated endpoint restricted to <strong className="text-slate-200">{activeConfig.role}</strong> accounts only.
               </p>
             </div>
           </form>
@@ -433,7 +403,7 @@ export default function LoginModal({ onLogin, initialPortal = null }) {
 
       {/* Footer */}
       <footer className="relative z-10 border-t border-slate-900 py-4 text-center text-xs text-slate-500">
-        Company Mobile Management System • Dedicated {activeConfig.badge}
+        HTSK Mobile Management • Dedicated {activeConfig.badge} • Sri Lanka Standard Time (UTC+05:30)
       </footer>
     </div>
   );

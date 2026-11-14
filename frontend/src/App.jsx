@@ -1,0 +1,311 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { api, getStoredUser } from './api';
+import { Sidebar, TopHeader } from './components/Navbar';
+import LoginModal from './components/LoginModal';
+import DashboardView from './components/DashboardView';
+import CheckingSessionView from './components/CheckingSessionView';
+import DevicesView from './components/DevicesView';
+import GroupsView from './components/GroupsView';
+import IncidentsView from './components/IncidentsView';
+import NotificationsView from './components/NotificationsView';
+import HistoryView from './components/HistoryView';
+import ReportsView from './components/ReportsView';
+import UsersView from './components/UsersView';
+import PermissionsView from './components/PermissionsView';
+import SettingsView from './components/SettingsView';
+
+class WorkspaceErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Workspace render error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-6">
+          <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 p-6 shadow-sm text-center space-y-4">
+            <h2 className="text-base font-bold text-slate-900">
+              Workspace View Reload Needed
+            </h2>
+            <p className="text-xs text-slate-500">
+              {this.state.error?.message || 'An unexpected UI error occurred.'}
+            </p>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  this.setState({ hasError: false, error: null });
+                  window.location.reload();
+                }}
+                className="px-4 py-2 bg-[#1e4e8c] text-white rounded-lg text-xs font-semibold"
+              >
+                Reload Page
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.clear();
+                  window.location.reload();
+                }}
+                className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold"
+              >
+                Reset Session
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default function App() {
+  const [user, setUser] = useState(() => {
+    try {
+      const u = getStoredUser();
+      return u && u.role ? u : null;
+    } catch {
+      return null;
+    }
+  });
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [dashboardData, setDashboardData] = useState(null);
+  const [permissionsList, setPermissionsList] = useState([]);
+  const [lastRolePortal, setLastRolePortal] = useState(null);
+  const [globalSearch, setGlobalSearch] = useState('');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const fetchDashboard = async () => {
+    if (!user) return;
+    try {
+      const data = await api.getDashboard();
+      setDashboardData(data);
+    } catch (err) {
+      console.error('Failed to load dashboard data:', err);
+    }
+  };
+
+  const fetchPermissions = async () => {
+    if (!user) return;
+    try {
+      const perms = await api.getPermissions();
+      if (Array.isArray(perms)) {
+        setPermissionsList(perms);
+      }
+    } catch (err) {
+      console.error('Failed to load permissions:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchDashboard();
+      fetchPermissions();
+    }
+  }, [user]);
+
+  // Compute map of functionKey -> boolean for the current user's role
+  const userPermissions = useMemo(() => {
+    if (!user || !Array.isArray(permissionsList) || permissionsList.length === 0) {
+      return null;
+    }
+    const role = user.role;
+    const map = {};
+    permissionsList.forEach((row) => {
+      if (!row || !row.functionKey) return;
+      if (role === 'Developer') map[row.functionKey] = Boolean(row.developer);
+      else if (role === 'ITAdmin') map[row.functionKey] = Boolean(row.itAdmin);
+      else map[row.functionKey] = Boolean(row.employee);
+    });
+    return map;
+  }, [user, permissionsList]);
+
+  // Handle automatic logout on token expiry
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      setUser(null);
+      setDashboardData(null);
+      setPermissionsList([]);
+    };
+
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
+  }, []);
+
+  const handleLogin = async (username, password, expectedRole) => {
+    const data = await api.login(username, password, expectedRole);
+    setLastRolePortal(data.role);
+    setUser(data);
+    setActiveTab('dashboard');
+    window.location.hash = `#/${data.role.toLowerCase()}/dashboard`;
+  };
+
+  const handleLogout = () => {
+    const previousRole = user?.role || lastRolePortal;
+    api.logout();
+    setUser(null);
+    setDashboardData(null);
+    setPermissionsList([]);
+    setActiveTab('dashboard');
+
+    if (previousRole === 'ITAdmin') {
+      window.location.hash = '#/login/itadmin';
+    } else if (previousRole === 'Developer') {
+      window.location.hash = '#/login/developer';
+    } else if (previousRole === 'Employee') {
+      window.location.hash = '#/login/employee';
+    } else {
+      window.location.hash = '#/portals';
+    }
+  };
+
+  const handleStartSessionFromDashboard = async () => {
+    try {
+      await api.startSession('Started from Dashboard');
+      await fetchDashboard();
+      setActiveTab('checking');
+    } catch (err) {
+      alert(err.message || 'Failed to start session');
+    }
+  };
+
+  if (!user) {
+    return (
+      <WorkspaceErrorBoundary>
+        <LoginModal onLogin={handleLogin} initialPortal={lastRolePortal} />
+      </WorkspaceErrorBoundary>
+    );
+  }
+
+  return (
+    <WorkspaceErrorBoundary>
+      <div className="min-h-screen bg-[#f8fafc] flex font-sans text-slate-800">
+        {/* Left Sidebar + Mobile Drawer + Mobile Bottom Bar */}
+        <Sidebar
+          user={user}
+          userPermissions={userPermissions}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          dashboardData={dashboardData}
+          mobileMenuOpen={mobileMenuOpen}
+          setMobileMenuOpen={setMobileMenuOpen}
+        />
+
+        {/* Right Workspace Column */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Top Workspace Header */}
+          <TopHeader
+            user={user}
+            userPermissions={userPermissions}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            dashboardData={dashboardData}
+            onLogout={handleLogout}
+            globalSearch={globalSearch}
+            setGlobalSearch={setGlobalSearch}
+            onOpenMobileMenu={() => setMobileMenuOpen(true)}
+          />
+
+          {/* Main Content Area */}
+          <main className="flex-1 max-w-[1440px] w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-20 lg:pb-8">
+            {activeTab === 'dashboard' && (
+              <DashboardView
+                dashboard={dashboardData}
+                user={user}
+                userPermissions={userPermissions}
+                onNavigateToChecking={() => setActiveTab('checking')}
+                onNavigateToIncidents={() => setActiveTab('incidents')}
+                onNavigateToGroups={() => setActiveTab('groups')}
+                onNavigateToReports={() => setActiveTab('reports')}
+                onNavigateToHistory={() => setActiveTab('history')}
+                onStartSession={handleStartSessionFromDashboard}
+              />
+            )}
+
+            {activeTab === 'checking' && (
+              <CheckingSessionView
+                user={user}
+                userPermissions={userPermissions}
+                onSessionChange={fetchDashboard}
+                onSaveAndExit={() => setActiveTab('dashboard')}
+              />
+            )}
+
+            {activeTab === 'devices' && (
+              <DevicesView
+                user={user}
+                userPermissions={userPermissions}
+                onDataChange={fetchDashboard}
+                externalSearch={globalSearch}
+              />
+            )}
+
+            {activeTab === 'groups' && (
+              <GroupsView
+                user={user}
+                userPermissions={userPermissions}
+                onDataChange={fetchDashboard}
+              />
+            )}
+
+            {activeTab === 'incidents' && (
+              <IncidentsView
+                user={user}
+                onDataChange={fetchDashboard}
+              />
+            )}
+
+            {activeTab === 'notifications' && (
+              <NotificationsView
+                user={user}
+                userPermissions={userPermissions}
+                onNotificationsChange={fetchDashboard}
+              />
+            )}
+
+            {activeTab === 'history' && (
+              <HistoryView
+                user={user}
+                userPermissions={userPermissions}
+                onDataChange={fetchDashboard}
+              />
+            )}
+
+            {activeTab === 'reports' && (
+              <ReportsView />
+            )}
+
+            {activeTab === 'users' && (user?.role === 'Developer' || userPermissions?.add_user_accounts) && (
+              <UsersView
+                user={user}
+                onNavigateToPermissions={
+                  user?.role === 'Developer'
+                    ? () => setActiveTab('permissions')
+                    : undefined
+                }
+              />
+            )}
+
+            {activeTab === 'permissions' && user?.role === 'Developer' && (
+              <PermissionsView onPermissionsChange={fetchPermissions} />
+            )}
+
+            {activeTab === 'settings' && user?.role === 'Developer' && (
+              <SettingsView onSettingsChange={fetchDashboard} />
+            )}
+          </main>
+        </div>
+      </div>
+    </WorkspaceErrorBoundary>
+  );
+}

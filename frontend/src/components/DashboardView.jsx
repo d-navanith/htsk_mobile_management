@@ -55,7 +55,7 @@ export default function DashboardView({
       : user?.role === 'ITAdmin' || user?.role === 'Developer';
 
   const sessionChecked = latestSession?.checkedCount ?? 0;
-  const sessionTotal = latestSession?.totalDevices || totalDevices || 1;
+  const sessionTotal = latestSession?.totalDevices ?? totalDevices ?? 0;
   const sessionAvail = latestSession?.availableCount ?? 0;
   const sessionMissing = latestSession?.missingCount ?? 0;
   const sessionPending = isSessionActive
@@ -65,8 +65,8 @@ export default function DashboardView({
     sessionTotal > 0 ? Math.round((sessionChecked / sessionTotal) * 100) : 0;
 
   const sessionCode = latestSession
-    ? `CHK-2026-1114-${String(latestSession.sessionId).padStart(2, '0')}`
-    : 'CHK-2026-1114-01';
+    ? `CHK-${String(latestSession.sessionId).padStart(2, '0')}`
+    : '';
 
   // Format Colombo date string for top right
   const now = new Date();
@@ -80,7 +80,7 @@ export default function DashboardView({
   });
 
   const formatShortTime = (colomboStr) => {
-    if (!colomboStr || colomboStr === '-') return '4:00 PM';
+    if (!colomboStr || colomboStr === '-') return '—';
     const parts = colomboStr.split(' ');
     if (parts.length >= 2) {
       const [hh, mm] = parts[1].split(':');
@@ -281,7 +281,9 @@ export default function DashboardView({
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-400">
-            Next scheduled check at {formatShortTime(nextSessionDueColomboTime)} · Checks are started manually
+            {nextSessionDueColomboTime
+              ? `Next scheduled check at ${formatShortTime(nextSessionDueColomboTime)} · Checks are started manually`
+              : 'Checks are started manually every 2 hours'}
           </div>
         </div>
 

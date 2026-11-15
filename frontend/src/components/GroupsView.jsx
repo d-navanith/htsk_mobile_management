@@ -3,7 +3,7 @@ import { Layers, Plus, Edit, Trash2, Smartphone, CheckCircle2, AlertTriangle } f
 import { api } from '../api';
 import GroupModal from './GroupModal';
 
-export default function GroupsView({ user, userPermissions, onDataChange }) {
+export default function GroupsView({ user, userPermissions, permissionDetails, onDataChange }) {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -11,9 +11,11 @@ export default function GroupsView({ user, userPermissions, onDataChange }) {
   const [editingGroup, setEditingGroup] = useState(null);
 
   const canEdit =
-    userPermissions?.manage_groups !== undefined
-      ? userPermissions.manage_groups
-      : user?.role === 'ITAdmin' || user?.role === 'Developer';
+    user?.role === 'Developer' ||
+    (user?.role === 'ITAdmin' && (userPermissions?.manage_groups ?? true)) ||
+    (user?.role === 'Employee' &&
+      Boolean(userPermissions?.manage_groups) &&
+      Boolean(permissionDetails?.manage_groups?.employeeCanEdit));
 
   const loadGroups = async () => {
     setLoading(true);

@@ -15,13 +15,16 @@ import { api } from '../api';
 export default function DevicesView({
   user,
   userPermissions,
+  permissionDetails,
   onDataChange,
   externalSearch = ''
 }) {
   const canEdit =
-    userPermissions?.manage_mobile_phones !== undefined
-      ? userPermissions.manage_mobile_phones
-      : user?.role === 'ITAdmin' || user?.role === 'Developer';
+    user?.role === 'Developer' ||
+    (user?.role === 'ITAdmin' && (userPermissions?.manage_mobile_phones ?? true)) ||
+    (user?.role === 'Employee' &&
+      Boolean(userPermissions?.manage_mobile_phones) &&
+      Boolean(permissionDetails?.manage_mobile_phones?.employeeCanEdit));
 
   const [allDevices, setAllDevices] = useState([]);
   const [groups, setGroups] = useState([]);

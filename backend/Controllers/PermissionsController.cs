@@ -71,11 +71,7 @@ public class PermissionsController : ControllerBase
             return BadRequest(new { message = "FunctionKey and Role are required." });
         }
 
-        var updated = await _permissionService.TogglePermissionAsync(
-            request.FunctionKey,
-            request.Role,
-            request.IsEnabled
-        );
+        var updated = await _permissionService.TogglePermissionAsync(request);
 
         if (updated == null)
         {

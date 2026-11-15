@@ -26,7 +26,7 @@ public class SettingsController : ControllerBase
     public async Task<ActionResult<List<SystemSetting>>> GetSettings()
     {
         var settings = await _db.SystemSettings
-            .Where(s => !s.SettingKey.StartsWith("Perm:"))
+            .Where(s => !s.SettingKey.StartsWith("Perm:") && !s.SettingKey.StartsWith("PermRule:"))
             .ToListAsync();
         return Ok(settings);
     }

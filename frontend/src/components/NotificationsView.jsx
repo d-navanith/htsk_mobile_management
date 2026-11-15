@@ -15,6 +15,7 @@ import { api } from '../api';
 export default function NotificationsView({
   user,
   userPermissions,
+  permissionDetails,
   onNotificationsChange
 }) {
   const [notifications, setNotifications] = useState([]);
@@ -35,10 +36,12 @@ export default function NotificationsView({
     isRead: false
   });
 
+  const notifPerm = permissionDetails?.notifications;
+
+  // Only Developer has full CRUD access to edit the Notification panel (unless Developer explicitly unlocked Employee Edit in popup)
   const canManage =
     user?.role === 'Developer' ||
-    user?.role === 'ITAdmin' ||
-    userPermissions?.notifications;
+    (user?.role === 'Employee' && Boolean(notifPerm?.employeeCanEdit));
 
   const loadNotifications = async () => {
     setLoading(true);
@@ -200,6 +203,46 @@ export default function NotificationsView({
           )}
         </div>
       </div>
+
+      {user?.role === 'Employee' && (
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+          <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3">
+            <div className="font-bold text-emerald-800 mb-1">
+              ✓ What You Can Do (Employee Access)
+            </div>
+            <ul className="space-y-1 text-emerald-900">
+              {(notifPerm?.employeeCanDo?.length
+                ? notifPerm.employeeCanDo
+                : [
+                    'View real-time missing-phone alerts and system notifications',
+                    'Filter notifications by unread status',
+                    'Mark notifications as read'
+                  ]
+              ).map((item, idx) => (
+                <li key={idx}>• {item}</li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="bg-rose-50/70 border border-rose-200 rounded-xl p-3">
+            <div className="font-bold text-rose-800 mb-1">
+              ✕ What You Cannot Do (Developer Full Access Only)
+            </div>
+            <ul className="space-y-1 text-rose-900">
+              {(notifPerm?.employeeCannotDo?.length
+                ? notifPerm.employeeCannotDo
+                : [
+                    'Cannot create new system notification alerts (Developer only)',
+                    'Cannot edit notification messages, alert types, or priority (Developer only)',
+                    'Cannot delete notifications from the notification panel (Developer only)'
+                  ]
+              ).map((item, idx) => (
+                <li key={idx}>• {item}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs font-semibold text-rose-700">

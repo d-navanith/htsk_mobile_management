@@ -137,6 +137,19 @@ export default function App() {
     return map;
   }, [user, permissionsList]);
 
+  // Compute full map of functionKey -> PermissionRowDto (including employeeCanEdit, employeeCanDo, employeeCannotDo)
+  const permissionDetails = useMemo(() => {
+    const map = {};
+    if (Array.isArray(permissionsList)) {
+      permissionsList.forEach((row) => {
+        if (row && row.functionKey) {
+          map[row.functionKey] = row;
+        }
+      });
+    }
+    return map;
+  }, [permissionsList]);
+
   // Handle automatic logout on token expiry
   useEffect(() => {
     const handleUnauthorized = () => {
@@ -246,6 +259,7 @@ export default function App() {
               <CheckingSessionView
                 user={user}
                 userPermissions={userPermissions}
+                permissionDetails={permissionDetails}
                 onSessionChange={fetchDashboard}
                 onSaveAndExit={() => setActiveTab('dashboard')}
               />
@@ -255,6 +269,7 @@ export default function App() {
               <DevicesView
                 user={user}
                 userPermissions={userPermissions}
+                permissionDetails={permissionDetails}
                 onDataChange={fetchDashboard}
                 externalSearch={globalSearch}
               />
@@ -264,6 +279,7 @@ export default function App() {
               <GroupsView
                 user={user}
                 userPermissions={userPermissions}
+                permissionDetails={permissionDetails}
                 onDataChange={fetchDashboard}
               />
             )}
@@ -271,6 +287,7 @@ export default function App() {
             {activeTab === 'incidents' && (
               <IncidentsView
                 user={user}
+                permissionDetails={permissionDetails}
                 onDataChange={fetchDashboard}
               />
             )}
@@ -279,6 +296,7 @@ export default function App() {
               <NotificationsView
                 user={user}
                 userPermissions={userPermissions}
+                permissionDetails={permissionDetails}
                 onNotificationsChange={fetchDashboard}
               />
             )}
@@ -287,6 +305,7 @@ export default function App() {
               <HistoryView
                 user={user}
                 userPermissions={userPermissions}
+                permissionDetails={permissionDetails}
                 onDataChange={fetchDashboard}
               />
             )}

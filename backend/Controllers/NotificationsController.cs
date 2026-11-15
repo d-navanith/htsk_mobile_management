@@ -15,11 +15,25 @@ public class NotificationsController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly ITimeService _timeService;
+    private readonly IPermissionService _permissionService;
 
-    public NotificationsController(AppDbContext db, ITimeService timeService)
+    public NotificationsController(AppDbContext db, ITimeService timeService, IPermissionService permissionService)
     {
         _db = db;
         _timeService = timeService;
+        _permissionService = permissionService;
+    }
+
+    private async Task<bool> CanEditNotificationsAsync()
+    {
+        if (User.IsInRole("Developer")) return true;
+        if (User.IsInRole("Employee"))
+        {
+            var perms = await _permissionService.GetAllPermissionsAsync();
+            var notifPerm = perms.FirstOrDefault(p => p.FunctionKey.Equals("notifications", StringComparison.OrdinalIgnoreCase));
+            return notifPerm != null && notifPerm.Employee && notifPerm.EmployeeCanEdit;
+        }
+        return false;
     }
 
     [HttpGet]
@@ -55,9 +69,13 @@ public class NotificationsController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Developer,ITAdmin")]
     public async Task<ActionResult<NotificationDto>> CreateNotification([FromBody] CreateNotificationRequest request)
     {
+        if (!await CanEditNotificationsAsync())
+        {
+            return StatusCode(403, new { message = "Only Developer has full access to create or edit notifications." });
+        }
+
         if (string.IsNullOrWhiteSpace(request.Message))
         {
             return BadRequest(new { message = "Notification message is required." });
@@ -92,9 +110,13 @@ public class NotificationsController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    [Authorize(Roles = "Developer,ITAdmin")]
     public async Task<ActionResult> UpdateNotification(int id, [FromBody] UpdateNotificationRequest request)
     {
+        if (!await CanEditNotificationsAsync())
+        {
+            return StatusCode(403, new { message = "Only Developer has full access to edit notifications." });
+        }
+
         var n = await _db.Notifications.FindAsync(id);
         if (n == null) return NotFound();
 
@@ -131,9 +153,13 @@ public class NotificationsController : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    [Authorize(Roles = "Developer,ITAdmin")]
     public async Task<ActionResult> DeleteNotification(int id)
     {
+        if (!await CanEditNotificationsAsync())
+        {
+            return StatusCode(403, new { message = "Only Developer has full access to delete notifications." });
+        }
+
         var n = await _db.Notifications.FindAsync(id);
         if (n == null) return NotFound();
 

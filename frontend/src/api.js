@@ -424,10 +424,10 @@ export const api = {
     });
   },
 
-  async togglePermission(functionKey, role, isEnabled) {
+  async togglePermission(functionKey, role, isEnabled, extra = {}) {
     return request('/permissions/toggle', {
       method: 'PUT',
-      body: JSON.stringify({ functionKey, role, isEnabled }),
+      body: JSON.stringify({ functionKey, role, isEnabled, ...extra }),
     });
   },
 

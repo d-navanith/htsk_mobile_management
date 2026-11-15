@@ -335,13 +335,19 @@ public record PermissionRowDto(
     bool Developer,
     bool ITAdmin,
     bool Employee,
-    string UpdatedAtColombo
+    string UpdatedAtColombo,
+    bool EmployeeCanEdit = false,
+    List<string>? EmployeeCanDo = null,
+    List<string>? EmployeeCannotDo = null
 );
 
 public record TogglePermissionRequest(
     string FunctionKey,
     string Role, // "Developer", "ITAdmin", or "Employee"
-    bool IsEnabled
+    bool IsEnabled,
+    bool? EmployeeCanEdit = null,
+    List<string>? EmployeeCanDo = null,
+    List<string>? EmployeeCannotDo = null
 );
 
 public record CreatePermissionRequest(
@@ -350,7 +356,10 @@ public record CreatePermissionRequest(
     string? Description,
     bool Developer = true,
     bool ITAdmin = true,
-    bool Employee = false
+    bool Employee = false,
+    bool EmployeeCanEdit = false,
+    List<string>? EmployeeCanDo = null,
+    List<string>? EmployeeCannotDo = null
 );
 
 public record UpdatePermissionRequest(
@@ -358,7 +367,10 @@ public record UpdatePermissionRequest(
     string? Description,
     bool Developer,
     bool ITAdmin,
-    bool Employee
+    bool Employee,
+    bool? EmployeeCanEdit = null,
+    List<string>? EmployeeCanDo = null,
+    List<string>? EmployeeCannotDo = null
 );
 
 public record UpdateSessionRequest(

@@ -15,6 +15,7 @@ import { api } from '../api';
 export default function CheckingSessionView({
   user,
   userPermissions,
+  permissionDetails,
   onSessionChange,
   onSaveAndExit
 }) {
@@ -34,17 +35,16 @@ export default function CheckingSessionView({
 
   const pageSize = 5;
   const canManageSessions =
-    userPermissions?.checking_sessions !== undefined
-      ? userPermissions.checking_sessions
-      : user?.role === 'ITAdmin' || user?.role === 'Developer';
+    user?.role === 'Developer' ||
+    (user?.role === 'Employee' && Boolean(permissionDetails?.checking_sessions?.employeeCanEdit));
   const canStartSessions =
-    userPermissions?.start_checking_sessions !== undefined
-      ? userPermissions.start_checking_sessions
-      : user?.role === 'ITAdmin' || user?.role === 'Developer';
+    user?.role === 'Developer' ||
+    user?.role === 'ITAdmin' ||
+    Boolean(userPermissions?.start_checking_sessions);
   const canMarkAvailability =
-    userPermissions?.mark_availability !== undefined
-      ? userPermissions.mark_availability
-      : user?.role === 'ITAdmin' || user?.role === 'Developer';
+    user?.role === 'Developer' ||
+    user?.role === 'ITAdmin' ||
+    Boolean(userPermissions?.mark_availability);
   const canEdit = canMarkAvailability;
 
   const loadSession = async () => {

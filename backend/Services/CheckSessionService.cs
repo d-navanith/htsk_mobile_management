@@ -36,12 +36,17 @@ public class CheckSessionService : ICheckSessionService
             .Include(s => s.CheckRecords)
             .FirstOrDefaultAsync(s => s.SessionStatus == "InProgress");
 
+        var totalActiveDevices = await _db.MobileDevices.CountAsync(d => d.IsActive);
+
         if (activeSession != null)
         {
+            if (activeSession.TotalDevices < totalActiveDevices)
+            {
+                activeSession.TotalDevices = totalActiveDevices;
+                await _db.SaveChangesAsync();
+            }
             return MapToSummary(activeSession);
         }
-
-        var totalActiveDevices = await _db.MobileDevices.CountAsync(d => d.IsActive);
 
         var session = new CheckSession
         {
@@ -239,6 +244,39 @@ public class CheckSessionService : ICheckSessionService
             session.Notes = string.IsNullOrWhiteSpace(session.Notes) ? notes : $"{session.Notes} | {notes}";
         }
 
+        // Automatically identify any unverified active devices at the end of a physical inspection and flag them as Missing
+        var activeDevices = await _db.MobileDevices.Where(d => d.IsActive).ToListAsync();
+        var checkedIds = session.CheckRecords.Select(r => r.DeviceId).ToHashSet();
+        var unverifiedDevices = activeDevices.Where(d => !checkedIds.Contains(d.DeviceId)).ToList();
+
+        foreach (var dev in unverifiedDevices)
+        {
+            var autoMissingReq = new RecordCheckRequest(
+                DeviceId: dev.DeviceId,
+                DeviceStatus: "Missing",
+                Notes: "Automatically identified as missing (unverified during physical inspection)"
+            );
+            // Temporarily set status back to InProgress for helper or record directly
+            var checkTime = _time.UtcNow;
+            var autoRecord = new DeviceCheckRecord
+            {
+                SessionId = sessionId,
+                DeviceId = dev.DeviceId,
+                GroupId = dev.GroupId,
+                CheckedByUserId = session.StartedByUserId,
+                DeviceStatus = "Missing",
+                CheckedAtUtc = checkTime,
+                Notes = autoMissingReq.Notes
+            };
+            _db.DeviceCheckRecords.Add(autoRecord);
+            await _db.SaveChangesAsync();
+
+            dev.CurrentStatus = "Missing";
+            dev.UpdatedAtUtc = checkTime;
+
+            await HandleIncidentWorkflowAsync(dev, autoRecord, "Missing", string.Empty, sessionId);
+        }
+
         await _db.SaveChangesAsync();
         return MapToSummary(session);
     }
@@ -310,7 +348,10 @@ public class CheckSessionService : ICheckSessionService
                 CheckNotes: rec?.Notes,
                 Description: d.Description,
                 PreviouslyMissing: prevMissing,
-                LastSessionSummary: lastSummary
+                LastSessionSummary: lastSummary,
+                PhoneNumber: d.PhoneNumber,
+                IMEI: d.IMEI,
+                SerialNumber: d.SerialNumber
             );
         }).OrderBy(d => d.GroupName).ThenBy(d => d.MobileCode).ToList();
 
@@ -390,6 +431,8 @@ public class CheckSessionService : ICheckSessionService
         var availableDevices = await _db.MobileDevices.CountAsync(d => d.IsActive && d.CurrentStatus == "Available");
         var missingDevices = await _db.MobileDevices.CountAsync(d => d.IsActive && d.CurrentStatus == "Missing");
         var notCheckedDevices = await _db.MobileDevices.CountAsync(d => d.IsActive && d.CurrentStatus == "NotChecked");
+        var assignedDevices = await _db.MobileDevices.CountAsync(d => d.IsActive && d.CurrentStatus != "Missing" && d.PhoneNumber != null && d.PhoneNumber != "");
+        var availableUnassignedDevices = await _db.MobileDevices.CountAsync(d => d.IsActive && d.CurrentStatus != "Missing" && (d.PhoneNumber == null || d.PhoneNumber == ""));
         var totalGroups = await _db.Groups.CountAsync(g => g.IsActive);
         var totalSessions = await _db.CheckSessions.CountAsync();
 
@@ -398,6 +441,12 @@ public class CheckSessionService : ICheckSessionService
             .Include(s => s.CheckRecords)
             .OrderByDescending(s => s.StartedAtUtc)
             .FirstOrDefaultAsync();
+
+        if (latestSessionEntity != null && latestSessionEntity.TotalDevices < totalDevices)
+        {
+            latestSessionEntity.TotalDevices = totalDevices;
+            await _db.SaveChangesAsync();
+        }
 
         SessionSummaryDto? latestSession = latestSessionEntity != null ? MapToSummary(latestSessionEntity) : null;
 
@@ -411,24 +460,44 @@ public class CheckSessionService : ICheckSessionService
         var escalatedIncidents = await _db.MissingIncidents
             .Include(i => i.Device)
                 .ThenInclude(d => d!.Group)
+            .Include(i => i.Device)
+                .ThenInclude(d => d!.CheckRecords)
             .Where(i => i.IncidentStatus == "Escalated" || (i.IncidentStatus == "Open" && i.ConsecutiveMissingCount >= 2))
             .OrderByDescending(i => i.ConsecutiveMissingCount)
             .ToListAsync();
 
-        var alertList = escalatedIncidents.Select(i => new MissingIncidentDto(
-            IncidentId: i.IncidentId,
-            DeviceId: i.DeviceId,
-            MobileCode: i.Device?.MobileCode ?? "Unknown",
-            MobileName: i.Device?.MobileName,
-            GroupName: i.Device?.Group?.GroupName ?? "Unknown",
-            ConsecutiveMissingCount: i.ConsecutiveMissingCount,
-            IncidentStatus: i.IncidentStatus,
-            FirstMissingAtColombo: _time.FormatColombo(i.FirstMissingAtUtc),
-            RecoveredAtColombo: _time.FormatColombo(i.RecoveredAtUtc),
-            ActionTaken: i.ActionTaken,
-            Notes: i.Notes,
-            IsEscalated: true
-        )).ToList();
+        var alertList = escalatedIncidents.Select(i =>
+        {
+            var lastVerifiedRec = i.Device?.CheckRecords
+                .Where(c => c.DeviceStatus == "Available")
+                .OrderByDescending(c => c.CheckedAtUtc)
+                .FirstOrDefault();
+
+            return new MissingIncidentDto(
+                IncidentId: i.IncidentId,
+                DeviceId: i.DeviceId,
+                MobileCode: i.Device?.MobileCode ?? "Unknown",
+                MobileName: i.Device?.MobileName,
+                GroupName: i.Device?.Group?.GroupName ?? "Unknown",
+                ConsecutiveMissingCount: i.ConsecutiveMissingCount,
+                IncidentStatus: i.IncidentStatus,
+                FirstMissingAtColombo: _time.FormatColombo(i.FirstMissingAtUtc) ?? "-",
+                RecoveredAtColombo: _time.FormatColombo(i.RecoveredAtUtc),
+                ActionTaken: i.ActionTaken,
+                Notes: i.Notes,
+                IsEscalated: true,
+                Brand: i.Device?.Brand,
+                Model: i.Device?.Model,
+                IMEI: i.Device?.IMEI,
+                SerialNumber: i.Device?.SerialNumber,
+                AssignedTo: i.Device?.PhoneNumber,
+                LastKnownLocation: i.Device?.Description,
+                PreviousAssignmentDetails: i.Notes,
+                LastVerifiedAtColombo: lastVerifiedRec != null
+                    ? _time.FormatColombo(lastVerifiedRec.CheckedAtUtc)
+                    : (i.Device != null ? _time.FormatColombo(i.Device.CreatedAtUtc) : null)
+            );
+        }).ToList();
 
         // Interval calculation
         var intervalMinutes = 120;
@@ -474,7 +543,9 @@ public class CheckSessionService : ICheckSessionService
             GroupProgress: await BuildGroupProgressAsync(latestSessionEntity),
             RecentActivities: await BuildRecentActivitiesAsync(),
             ActiveIncidentsCount: await _db.MissingIncidents.CountAsync(i => i.IncidentStatus == "Open" || i.IncidentStatus == "Escalated"),
-            UnreadNotificationsCount: await _db.Notifications.CountAsync(n => !n.IsRead)
+            UnreadNotificationsCount: await _db.Notifications.CountAsync(n => !n.IsRead),
+            AssignedDevices: assignedDevices,
+            AvailableUnassignedDevices: availableUnassignedDevices
         );
     }
 
@@ -562,14 +633,17 @@ public class CheckSessionService : ICheckSessionService
 
     private SessionSummaryDto MapToSummary(CheckSession s)
     {
+        var checkedCount = s.CheckRecords?.Count ?? 0;
+        var total = Math.Max(s.TotalDevices, checkedCount);
+
         return new SessionSummaryDto(
             SessionId: s.SessionId,
             StartedByAdmin: s.StartedByUser?.FullName ?? s.StartedByUser?.Username ?? "Unknown",
             StartedAtColombo: _time.FormatColombo(s.StartedAtUtc),
             CompletedAtColombo: _time.FormatColombo(s.CompletedAtUtc),
             SessionStatus: s.SessionStatus,
-            TotalDevices: s.TotalDevices,
-            CheckedCount: s.CheckRecords?.Count ?? 0,
+            TotalDevices: total,
+            CheckedCount: checkedCount,
             AvailableCount: s.CheckRecords?.Count(r => r.DeviceStatus == "Available") ?? 0,
             MissingCount: s.CheckRecords?.Count(r => r.DeviceStatus == "Missing") ?? 0,
             Notes: s.Notes

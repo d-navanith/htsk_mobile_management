@@ -74,7 +74,8 @@ public record DeviceDto(
     string CreatedAtColombo,
     string UpdatedAtColombo,
     string? LastCheckedAtColombo,
-    string? LastCheckedByAdmin = null
+    string? LastCheckedByAdmin = null,
+    int IdentificationNumber = 0
 );
 
 public record CreateDeviceRequest(
@@ -101,7 +102,8 @@ public record UpdateDeviceRequest(
     string? Description,
     bool IsActive,
     string? MobileCode = null,
-    string? GroupName = null
+    string? GroupName = null,
+    string? CurrentStatus = null
 );
 
 // --- Session & Checking DTOs ---
@@ -134,7 +136,10 @@ public record DeviceSessionCheckDto(
     string? CheckNotes,
     string? Description = null,
     bool PreviouslyMissing = false,
-    string? LastSessionSummary = null
+    string? LastSessionSummary = null,
+    string? PhoneNumber = null,
+    string? IMEI = null,
+    string? SerialNumber = null
 );
 
 public record SessionDetailsDto(
@@ -180,7 +185,15 @@ public record MissingIncidentDto(
     string? RecoveredAtColombo,
     string? ActionTaken,
     string? Notes,
-    bool IsEscalated
+    bool IsEscalated,
+    string? Brand = null,
+    string? Model = null,
+    string? IMEI = null,
+    string? SerialNumber = null,
+    string? AssignedTo = null,
+    string? LastKnownLocation = null,
+    string? PreviousAssignmentDetails = null,
+    string? LastVerifiedAtColombo = null
 );
 
 public record UpdateIncidentActionRequest(
@@ -238,7 +251,9 @@ public record DashboardDto(
     List<GroupSessionProgressDto>? GroupProgress = null,
     List<RecentActivityDto>? RecentActivities = null,
     int ActiveIncidentsCount = 0,
-    int UnreadNotificationsCount = 0
+    int UnreadNotificationsCount = 0,
+    int AssignedDevices = 0,
+    int AvailableUnassignedDevices = 0
 );
 
 // --- History DTO ---
@@ -408,6 +423,97 @@ public record CreateSettingRequest(
     string SettingKey,
     string SettingValue,
     string? Description
+);
+
+// --- Device Return & Replacement DTOs ---
+public record EmployeeAssignedDeviceDto(
+    int DeviceId,
+    string MobileCode,
+    string? MobileName,
+    string? Brand,
+    string? Model,
+    string? IMEI,
+    string? SerialNumber,
+    int GroupId,
+    string GroupName,
+    string? Location,
+    string CurrentStatus,
+    string AssignedAtColombo
+);
+
+public record EmployeeReturnOptionDto(
+    string EmployeeId,
+    string EmployeeName,
+    string GroupName,
+    List<EmployeeAssignedDeviceDto> AssignedDevices,
+    int? PendingReturnTransactionId = null,
+    string? LastReturnedMobileCode = null,
+    string? LastReturnedDeviceModel = null,
+    string? LastReturnDateColombo = null
+);
+
+public record ProcessDeviceReturnRequest(
+    string EmployeeId,
+    string EmployeeName,
+    int DeviceId,
+    string DeviceCondition,
+    string? Remarks
+);
+
+public record ProcessDeviceReplacementRequest(
+    string EmployeeId,
+    string EmployeeName,
+    int ReplacementDeviceId,
+    int? ReturnTransactionId = null,
+    int? PreviouslyAssignedDeviceId = null,
+    string? GroupName = null,
+    string? Remarks = null
+);
+
+public record ProcessReturnAndReplaceRequest(
+    string EmployeeId,
+    string EmployeeName,
+    int ReturnedDeviceId,
+    string DeviceCondition,
+    int ReplacementDeviceId,
+    string? Remarks = null
+);
+
+public record DeviceReturnReplacementDto(
+    int TransactionId,
+    string TransactionType,
+    string EmployeeId,
+    string EmployeeName,
+    string? GroupName,
+    int? PreviouslyAssignedDeviceId,
+    string? PreviouslyAssignedMobileCode,
+    string? PreviouslyAssignedDeviceModel,
+    int? ReturnedDeviceId,
+    string? ReturnedMobileCode,
+    string? ReturnedDeviceModel,
+    string? ReturnDateColombo,
+    string? DeviceCondition,
+    string? ReturnProcessedByName,
+    int? ReplacementDeviceId,
+    string? ReplacementMobileCode,
+    string? ReplacementDeviceModel,
+    string? NewAssignmentDateColombo,
+    string? ReplacementAssignedByName,
+    string? Remarks,
+    string CreatedAtColombo
+);
+
+public record ReturnReplacementCountsDto(
+    int TotalDevices,
+    int AssignedDevices,
+    int AvailableDevices,
+    int MissingDevices
+);
+
+public record ReturnReplacementOperationResponse(
+    string Message,
+    DeviceReturnReplacementDto Transaction,
+    ReturnReplacementCountsDto Counts
 );
 
 

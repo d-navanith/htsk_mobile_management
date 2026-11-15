@@ -5,11 +5,14 @@ import LoginModal, { detectPortalFromLocation, PORTAL_CONFIGS } from './componen
 import DashboardView from './components/DashboardView';
 import CheckingSessionView from './components/CheckingSessionView';
 import DevicesView from './components/DevicesView';
+import ReturnReplacementView from './components/ReturnReplacementView';
 import GroupsView from './components/GroupsView';
 import IncidentsView from './components/IncidentsView';
 import NotificationsView from './components/NotificationsView';
 import HistoryView from './components/HistoryView';
 import ReportsView from './components/ReportsView';
+import ReconciliationView from './components/ReconciliationView';
+import AuditLogsView from './components/AuditLogsView';
 import UsersView from './components/UsersView';
 import PermissionsView from './components/PermissionsView';
 import SettingsView from './components/SettingsView';
@@ -91,6 +94,7 @@ export default function App() {
   const [lastRolePortal, setLastRolePortal] = useState(() => detectPortalFromLocation());
   const [globalSearch, setGlobalSearch] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [initialReturnDevice, setInitialReturnDevice] = useState(null);
 
   const fetchDashboard = async () => {
     if (!user) return;
@@ -212,7 +216,7 @@ export default function App() {
 
   return (
     <WorkspaceErrorBoundary>
-      <div className="min-h-screen bg-[#f8fafc] flex font-sans text-slate-800">
+      <div className="min-h-screen bg-[#f4f9f2] flex font-sans text-slate-900">
         {/* Left Sidebar + Mobile Drawer + Mobile Bottom Bar */}
         <Sidebar
           user={user}
@@ -251,7 +255,24 @@ export default function App() {
                 onNavigateToGroups={() => setActiveTab('groups')}
                 onNavigateToReports={() => setActiveTab('reports')}
                 onNavigateToHistory={() => setActiveTab('history')}
+                onNavigateToDevices={() => setActiveTab('devices')}
+                onNavigateToReturns={(dev = null) => {
+                  setInitialReturnDevice(dev);
+                  setActiveTab('returns');
+                }}
                 onStartSession={handleStartSessionFromDashboard}
+                onDataChange={fetchDashboard}
+              />
+            )}
+
+            {activeTab === 'returns' && (
+              <ReturnReplacementView
+                user={user}
+                userPermissions={userPermissions}
+                permissionDetails={permissionDetails}
+                onDataChange={fetchDashboard}
+                initialDevice={initialReturnDevice}
+                onClearInitialDevice={() => setInitialReturnDevice(null)}
               />
             )}
 
@@ -271,6 +292,10 @@ export default function App() {
                 userPermissions={userPermissions}
                 permissionDetails={permissionDetails}
                 onDataChange={fetchDashboard}
+                onNavigateToReturns={(dev = null) => {
+                  setInitialReturnDevice(dev);
+                  setActiveTab('returns');
+                }}
                 externalSearch={globalSearch}
               />
             )}
@@ -312,6 +337,14 @@ export default function App() {
 
             {activeTab === 'reports' && (
               <ReportsView />
+            )}
+
+            {activeTab === 'reconciliation' && (
+              <ReconciliationView user={user} />
+            )}
+
+            {activeTab === 'audit-logs' && user?.role === 'Developer' && (
+              <AuditLogsView user={user} />
             )}
 
             {activeTab === 'users' && (user?.role === 'Developer' || userPermissions?.add_user_accounts) && (

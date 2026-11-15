@@ -126,23 +126,23 @@ export default function SettingsView({ onSettingsChange }) {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white p-6 sm:p-7 rounded-[28px] border-2 border-slate-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center space-x-2">
-            <Settings className="w-5 h-5 text-purple-600" />
-            <h2 className="text-lg font-bold text-slate-900">
-              System Configuration &amp; Parameters
+          <div className="flex items-center space-x-2.5">
+            <Settings className="w-5 h-5 text-[#1a6e3c]" />
+            <h2 className="text-xl sm:text-2xl font-extrabold text-slate-950 tracking-tight">
+              System Settings
             </h2>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Developer Console: Create, edit, and delete global checking intervals, escalation rules, and parameters
+            Configure global checking intervals, escalation rules, and system parameters.
           </p>
         </div>
 
         <button
           type="button"
           onClick={() => setModalOpen(true)}
-          className="inline-flex items-center space-x-1.5 px-4 py-2.5 bg-[#1e4e8c] hover:bg-[#163b6b] text-white rounded-xl text-xs font-semibold shadow transition shrink-0"
+          className="inline-flex items-center space-x-1.5 px-4 py-2.5 bg-[#c8f53b] hover:bg-[#b8e629] text-slate-950 rounded-xl text-xs font-extrabold shadow-xs transition shrink-0 cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>Add Parameter</span>
@@ -153,7 +153,7 @@ export default function SettingsView({ onSettingsChange }) {
         <div
           role="status"
           aria-live="polite"
-          className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-800 text-xs font-semibold flex items-center space-x-2"
+          className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-2xl text-emerald-950 text-xs font-bold flex items-center space-x-2"
         >
           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>{successMsg}</span>
@@ -164,7 +164,7 @@ export default function SettingsView({ onSettingsChange }) {
         <div
           role="alert"
           aria-live="polite"
-          className="p-3.5 bg-rose-50 border border-rose-300 rounded-xl text-rose-800 text-xs font-semibold"
+          className="p-3.5 bg-rose-50 border border-rose-300 rounded-2xl text-rose-950 text-xs font-bold"
         >
           {error}
         </div>
@@ -183,17 +183,17 @@ export default function SettingsView({ onSettingsChange }) {
               <form
                 key={setting.settingId || setting.settingKey}
                 onSubmit={(e) => handleSave(e, setting)}
-                className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex flex-col justify-between space-y-4"
+                className="bg-white rounded-[28px] border-2 border-slate-100 p-6 shadow-sm flex flex-col justify-between space-y-4"
               >
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center space-x-2.5">
-                      <div className="p-2 rounded-xl bg-purple-50 text-purple-600 border border-purple-100">
+                      <div className="p-2 rounded-xl bg-[#f6f9f4] text-[#1a6e3c] border border-slate-200">
                         <Icon className="w-5 h-5" />
                       </div>
                       <label
                         htmlFor={`setting-${setting.settingKey}`}
-                        className="font-mono font-bold text-xs text-slate-800"
+                        className="font-mono font-bold text-xs text-slate-900"
                       >
                         {setting.settingKey}
                       </label>

@@ -158,14 +158,14 @@ export default function NotificationsView({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="text-[11px] font-bold tracking-wider uppercase text-[#1d4ed8]">
-            SYSTEM ALERTS
+          <div className="text-[11px] font-bold tracking-wider uppercase text-[#1a6e3c]">
+            SYSTEM ALERTS &amp; LOGS
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 mt-0.5">
+          <h1 className="text-2xl sm:text-[28px] font-extrabold text-slate-950 tracking-tight mt-0.5">
             Notifications
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Real-time alerts for missing phones, consecutive missing escalations, and recoveries.
+            Real-time alerts for missing phones, consecutive missing escalations, handovers, and recoveries.
           </p>
         </div>
 
@@ -173,9 +173,9 @@ export default function NotificationsView({
           <button
             type="button"
             onClick={() => setFilterUnread((prev) => !prev)}
-            className={`px-3.5 py-2 rounded-lg text-xs font-semibold border transition ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold border-2 transition cursor-pointer ${
               filterUnread
-                ? 'bg-[#edf4ff] text-[#1d4ed8] border-[#bfdbfe]'
+                ? 'bg-[#c8f53b]/30 text-slate-950 border-[#68c73a]'
                 : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
             }`}
           >
@@ -185,7 +185,7 @@ export default function NotificationsView({
           <button
             type="button"
             onClick={handleMarkAllRead}
-            className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs transition"
+            className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 text-slate-800 border-2 border-slate-200 shadow-2xs transition cursor-pointer"
           >
             <CheckCheck className="w-3.5 h-3.5 text-slate-500" />
             <span>Mark all as read</span>
@@ -195,7 +195,7 @@ export default function NotificationsView({
             <button
               type="button"
               onClick={openCreateModal}
-              className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-[#1e4e8c] hover:bg-[#163b6b] text-white shadow-xs transition"
+              className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-extrabold bg-[#c8f53b] hover:bg-[#b8e629] text-slate-950 shadow-xs transition cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Create Alert</span>
@@ -250,7 +250,7 @@ export default function NotificationsView({
         </div>
       )}
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+      <div className="bg-white rounded-[28px] border-2 border-slate-100 shadow-sm overflow-hidden p-2">
         {loading ? (
           <div className="p-8 text-center text-xs text-slate-500">
             Loading notifications...

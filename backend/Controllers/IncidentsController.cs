@@ -29,12 +29,16 @@ public class IncidentsController : ControllerBase
         return int.TryParse(idStr, out var id) ? id : 1;
     }
 
+    private string GetCurrentRole() => User.FindFirstValue(ClaimTypes.Role) ?? "ITAdmin";
+
     [HttpGet]
     public async Task<ActionResult<List<MissingIncidentDto>>> GetIncidents([FromQuery] string? status)
     {
         var query = _db.MissingIncidents
             .Include(i => i.Device)
                 .ThenInclude(d => d!.Group)
+            .Include(i => i.Device)
+                .ThenInclude(d => d!.CheckRecords)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(status))
@@ -46,20 +50,38 @@ public class IncidentsController : ControllerBase
             .OrderByDescending(i => i.FirstMissingAtUtc)
             .ToListAsync();
 
-        var list = incidents.Select(i => new MissingIncidentDto(
-            IncidentId: i.IncidentId,
-            DeviceId: i.DeviceId,
-            MobileCode: i.Device?.MobileCode ?? "Unknown",
-            MobileName: i.Device?.MobileName,
-            GroupName: i.Device?.Group?.GroupName ?? "Unassigned",
-            ConsecutiveMissingCount: i.ConsecutiveMissingCount,
-            IncidentStatus: i.IncidentStatus,
-            FirstMissingAtColombo: _timeService.FormatColombo(i.FirstMissingAtUtc),
-            RecoveredAtColombo: _timeService.FormatColombo(i.RecoveredAtUtc),
-            ActionTaken: i.ActionTaken,
-            Notes: i.Notes,
-            IsEscalated: i.IncidentStatus == "Escalated" || (i.IncidentStatus == "Open" && i.ConsecutiveMissingCount >= 2)
-        )).ToList();
+        var list = incidents.Select(i =>
+        {
+            var lastVerifiedRec = i.Device?.CheckRecords
+                .Where(c => c.DeviceStatus == "Available")
+                .OrderByDescending(c => c.CheckedAtUtc)
+                .FirstOrDefault();
+
+            return new MissingIncidentDto(
+                IncidentId: i.IncidentId,
+                DeviceId: i.DeviceId,
+                MobileCode: i.Device?.MobileCode ?? "Unknown",
+                MobileName: i.Device?.MobileName,
+                GroupName: i.Device?.Group?.GroupName ?? "Unassigned",
+                ConsecutiveMissingCount: i.ConsecutiveMissingCount,
+                IncidentStatus: i.IncidentStatus,
+                FirstMissingAtColombo: _timeService.FormatColombo(i.FirstMissingAtUtc) ?? "-",
+                RecoveredAtColombo: _timeService.FormatColombo(i.RecoveredAtUtc),
+                ActionTaken: i.ActionTaken,
+                Notes: i.Notes,
+                IsEscalated: i.IncidentStatus == "Escalated" || (i.IncidentStatus == "Open" && i.ConsecutiveMissingCount >= 2),
+                Brand: i.Device?.Brand,
+                Model: i.Device?.Model,
+                IMEI: i.Device?.IMEI,
+                SerialNumber: i.Device?.SerialNumber,
+                AssignedTo: i.Device?.PhoneNumber,
+                LastKnownLocation: i.Device?.Description,
+                PreviousAssignmentDetails: i.Notes,
+                LastVerifiedAtColombo: lastVerifiedRec != null
+                    ? _timeService.FormatColombo(lastVerifiedRec.CheckedAtUtc)
+                    : (i.Device != null ? _timeService.FormatColombo(i.Device.CreatedAtUtc) : null)
+            );
+        }).ToList();
 
         return Ok(list);
     }
@@ -180,12 +202,18 @@ public class IncidentsController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(request.Status))
         {
-            var newStatus = request.Status.Trim();
-            incident.IncidentStatus = newStatus;
+            var rawStatus = request.Status.Trim();
+            var isFoundOrRecovered = string.Equals(rawStatus, "Recovered", StringComparison.OrdinalIgnoreCase) ||
+                                     string.Equals(rawStatus, "Found", StringComparison.OrdinalIgnoreCase) ||
+                                     string.Equals(rawStatus, "Available", StringComparison.OrdinalIgnoreCase);
+            var isClosed = string.Equals(rawStatus, "Closed", StringComparison.OrdinalIgnoreCase);
 
-            if (newStatus == "Recovered" || newStatus == "Closed")
+            if (isFoundOrRecovered || isClosed)
             {
+                var newStatus = isClosed ? "Closed" : "Recovered";
+                incident.IncidentStatus = newStatus;
                 incident.RecoveredAtUtc = now;
+                incident.ConsecutiveMissingCount = 0; // Reset consecutive missing checks because the device is FOUND
 
                 // 1. Update Device CurrentStatus -> Available
                 if (incident.Device != null)
@@ -218,7 +246,7 @@ public class IncidentsController : ControllerBase
                     ? $"Recovered: {incident.ActionTaken}"
                     : !string.IsNullOrWhiteSpace(incident.Notes)
                     ? $"Recovered: {incident.Notes}"
-                    : $"Marked {newStatus} by Admin";
+                    : $"Marked FOUND ({newStatus}) by Authorized Staff";
 
                 foreach (var rec in checkRecordsToUpdate)
                 {
@@ -244,15 +272,31 @@ public class IncidentsController : ControllerBase
                         DeviceId = incident.DeviceId,
                         IncidentId = incident.IncidentId,
                         NotificationType = "Recovered",
-                        Message = $"Device {incident.Device.MobileCode} status updated to {newStatus}. {recoverySummary}",
+                        Message = $"Device {incident.Device.MobileCode} status updated to FOUND ({newStatus}). {recoverySummary}",
                         Priority = "Low",
                         IsRead = false,
                         CreatedAtUtc = now
                     });
+
+                    _db.AuditLogs.Add(new AuditLog
+                    {
+                        UserId = userId,
+                        UserName = User.FindFirstValue(ClaimTypes.Name) ?? "Authorized User",
+                        UserRole = GetCurrentRole(),
+                        Action = "RecoverIncident",
+                        EntityName = "MissingIncident",
+                        EntityId = incident.IncidentId.ToString(),
+                        Details = $"Device {incident.Device.MobileCode} marked FOUND: {recoverySummary}",
+                        IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1",
+                        TimestampUtc = DateTime.UtcNow
+                    });
                 }
             }
-            else if (newStatus == "Open" || newStatus == "Escalated")
+            else if (string.Equals(rawStatus, "Open", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(rawStatus, "Escalated", StringComparison.OrdinalIgnoreCase))
             {
+                var newStatus = string.Equals(rawStatus, "Escalated", StringComparison.OrdinalIgnoreCase) ? "Escalated" : "Open";
+                incident.IncidentStatus = newStatus;
                 incident.RecoveredAtUtc = null;
                 if (newStatus == "Escalated" && incident.ConsecutiveMissingCount < 2)
                 {

@@ -128,16 +128,16 @@ export default function UsersView({ user: currentUser, onNavigateToPermissions }
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 sm:p-7 rounded-[28px] border-2 border-slate-100 shadow-sm">
         <div>
-          <div className="flex items-center space-x-2">
-            <Users className="w-5 h-5 text-purple-600" />
-            <h2 className="text-lg font-bold text-slate-900">
-              User Accounts Management
+          <div className="flex items-center space-x-2.5">
+            <Users className="w-5 h-5 text-[#1a6e3c]" />
+            <h2 className="text-xl sm:text-2xl font-extrabold text-slate-950 tracking-tight">
+              User Management
             </h2>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Developer Console: Create, edit, and delete system user accounts and role assignments (FR-01)
+            Create, edit, and manage user accounts and system access credentials.
           </p>
         </div>
 
@@ -146,16 +146,16 @@ export default function UsersView({ user: currentUser, onNavigateToPermissions }
             <button
               type="button"
               onClick={onNavigateToPermissions}
-              className="flex items-center space-x-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 font-semibold text-xs rounded-xl shadow-2xs transition shrink-0"
+              className="flex items-center space-x-2 px-4 py-2.5 bg-white hover:bg-slate-50 border-2 border-slate-200 text-slate-900 font-bold text-xs rounded-xl shadow-2xs transition shrink-0 cursor-pointer"
             >
-              <Shield className="w-4 h-4 text-[#1e4e8c]" />
+              <Shield className="w-4 h-4 text-[#1a6e3c]" />
               <span>User Permission Dashboard</span>
             </button>
           )}
           <button
             type="button"
             onClick={openCreateModal}
-            className="flex items-center space-x-2 px-4 py-2.5 bg-[#1e4e8c] hover:bg-[#163b6b] text-white font-semibold text-xs rounded-xl shadow transition shrink-0"
+            className="flex items-center space-x-2 px-4 py-2.5 bg-[#c8f53b] hover:bg-[#b8e629] text-slate-950 font-extrabold text-xs rounded-xl shadow-xs transition shrink-0 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Create New User</span>
@@ -164,13 +164,13 @@ export default function UsersView({ user: currentUser, onNavigateToPermissions }
       </div>
 
       {error && !modalOpen && (
-        <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs font-semibold text-rose-700">
+        <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs font-semibold text-rose-700">
           {error}
         </div>
       )}
 
       {/* Users Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+      <div className="bg-white rounded-[28px] border-2 border-slate-100 overflow-hidden shadow-sm p-5 sm:p-6">
         {loading ? (
           <div className="p-8 text-center text-slate-500 text-xs">
             Loading user accounts...

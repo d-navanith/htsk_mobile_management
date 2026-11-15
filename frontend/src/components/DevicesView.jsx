@@ -8,7 +8,12 @@ import {
   X,
   ArrowRight,
   SlidersHorizontal,
-  Trash2
+  Trash2,
+  UserCheck,
+  MapPin,
+  History,
+  Check,
+  ArrowLeftRight
 } from 'lucide-react';
 import { api } from '../api';
 
@@ -17,6 +22,7 @@ export default function DevicesView({
   userPermissions,
   permissionDetails,
   onDataChange,
+  onNavigateToReturns,
   externalSearch = ''
 }) {
   const canEdit =
@@ -31,28 +37,33 @@ export default function DevicesView({
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(externalSearch || '');
   const [selectedGroup, setSelectedGroup] = useState('');
+  const [categoryPrefix, setCategoryPrefix] = useState('ALL'); // ALL, Phone, New, Cass
   const [statusTab, setStatusTab] = useState('ALL'); // ALL, Available, Missing
   const [statusDropdown, setStatusDropdown] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [panelOpen, setPanelOpen] = useState(canEdit);
   const [editingDevice, setEditingDevice] = useState(null);
   const [customGroupMode, setCustomGroupMode] = useState(false);
+  const [deviceHistory, setDeviceHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const panelRef = useRef(null);
 
-  // Side Panel Form State — user decides both Mobile ID and Group (never pre-filled on our own)
   const [formData, setFormData] = useState({
     mobileCode: '',
     groupId: '',
     customGroupName: '',
     deviceName: '',
-    imeiOrSerial: '',
+    brand: '',
+    imei: '',
+    serialNumber: '',
     assignedTo: '',
-    location: ''
+    location: '',
+    currentStatus: 'Available'
   });
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const pageSize = 8;
+  const pageSize = 12;
 
   useEffect(() => {
     if (externalSearch) {
@@ -67,8 +78,8 @@ export default function DevicesView({
         api.getDevices({ isActive: true }),
         api.getGroups(true)
       ]);
-      setAllDevices(devList);
-      setGroups(grpList);
+      setAllDevices(Array.isArray(devList) ? devList : []);
+      setGroups(Array.isArray(grpList) ? grpList : []);
     } catch (err) {
       console.error('Failed to load devices:', err);
     } finally {
@@ -80,8 +91,25 @@ export default function DevicesView({
     loadData();
   }, []);
 
+  const loadDeviceAuditHistory = async (mobileCode) => {
+    if (!mobileCode) {
+      setDeviceHistory([]);
+      return;
+    }
+    setLoadingHistory(true);
+    try {
+      const hist = await api.getHistory({ mobileCode });
+      setDeviceHistory(Array.isArray(hist) ? hist.slice(0, 8) : []);
+    } catch {
+      setDeviceHistory([]);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
   const openAddPanel = () => {
     setEditingDevice(null);
+    setDeviceHistory([]);
     setFormError('');
     setCustomGroupMode(groups.length === 0);
     setFormData({
@@ -89,9 +117,12 @@ export default function DevicesView({
       groupId: '',
       customGroupName: '',
       deviceName: '',
-      imeiOrSerial: '',
+      brand: '',
+      imei: '',
+      serialNumber: '',
       assignedTo: '',
-      location: ''
+      location: '',
+      currentStatus: 'Available'
     });
     setPanelOpen(true);
     setTimeout(() => {
@@ -108,11 +139,15 @@ export default function DevicesView({
       groupId: device.groupId ? String(device.groupId) : '',
       customGroupName: '',
       deviceName: device.mobileName || device.model || '',
-      imeiOrSerial: device.imei || device.serialNumber || '',
-      assignedTo: device.phoneNumber || device.brand || '',
-      location: device.description || ''
+      brand: device.brand || '',
+      imei: device.imei || '',
+      serialNumber: device.serialNumber || '',
+      assignedTo: device.phoneNumber || '',
+      location: device.description || '',
+      currentStatus: device.currentStatus || 'Available'
     });
     setPanelOpen(true);
+    loadDeviceAuditHistory(device.mobileCode);
     setTimeout(() => {
       panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, 50);
@@ -122,7 +157,7 @@ export default function DevicesView({
     e.preventDefault();
     const trimmedCode = formData.mobileCode.trim();
     if (!trimmedCode) {
-      setFormError('Please enter a Mobile ID.');
+      setFormError('Please enter a Unique Device ID (e.g. Phone 2, New 4, Cass 7).');
       return;
     }
 
@@ -145,17 +180,18 @@ export default function DevicesView({
         groupId: customGroupMode ? 0 : Number(formData.groupId),
         groupName: customGroupMode ? trimmedCustomGroup : null,
         mobileName: formData.deviceName.trim() || null,
+        brand: formData.brand.trim() || null,
         model: formData.deviceName.trim() || null,
-        imei: formData.imeiOrSerial.trim() || null,
-        serialNumber: formData.imeiOrSerial.trim() || null,
+        imei: formData.imei.trim() || null,
+        serialNumber: formData.serialNumber.trim() || formData.imei.trim() || null,
         phoneNumber: formData.assignedTo.trim() || null,
-        description: formData.location.trim() || null
+        description: formData.location.trim() || null,
+        currentStatus: formData.currentStatus || 'Available'
       };
 
       if (editingDevice) {
         await api.updateDevice(editingDevice.deviceId, {
           ...payload,
-          brand: editingDevice.brand || null,
           isActive: true
         });
       } else {
@@ -165,20 +201,23 @@ export default function DevicesView({
       await loadData();
       if (onDataChange) onDataChange();
 
-      // Reset form cleanly for next entry without auto-filling Mobile ID or Group
-      setEditingDevice(null);
-      setCustomGroupMode(false);
-      setFormData({
-        mobileCode: '',
-        groupId: '',
-        customGroupName: '',
-        deviceName: '',
-        imeiOrSerial: '',
-        assignedTo: '',
-        location: ''
-      });
+      if (editingDevice) {
+        await loadDeviceAuditHistory(trimmedCode);
+      } else {
+        setFormData({
+          mobileCode: '',
+          groupId: '',
+          customGroupName: '',
+          deviceName: '',
+          brand: '',
+          imei: '',
+          serialNumber: '',
+          assignedTo: '',
+          location: ''
+        });
+      }
     } catch (err) {
-      setFormError(err.message || 'Failed to save mobile phone');
+      setFormError(err.message || 'Failed to save mobile device');
     } finally {
       setSaving(false);
     }
@@ -187,7 +226,7 @@ export default function DevicesView({
   const handleDeactivate = async (device) => {
     if (
       !window.confirm(
-        `Delete ${device.mobileCode} (${device.mobileName || 'Unnamed'})?`
+        `Delete ${device.mobileCode} (${device.phoneNumber || device.mobileName || 'Unnamed'})?`
       )
     ) {
       return;
@@ -197,6 +236,7 @@ export default function DevicesView({
       await api.deleteDevice(device.deviceId);
       if (editingDevice?.deviceId === device.deviceId) {
         setEditingDevice(null);
+        setDeviceHistory([]);
       }
       await loadData();
       if (onDataChange) onDataChange();
@@ -207,22 +247,26 @@ export default function DevicesView({
 
   const handleExportCsv = () => {
     const headers = [
-      'Mobile ID',
-      'Device Name',
+      'Category / Unique ID',
+      'Assigned Employee (Name)',
       'Group',
+      'Device Name / Model',
+      'Brand',
+      'IMEI',
+      'Serial Number',
       'Status',
-      'IMEI / Serial',
-      'Assigned To',
-      'Location',
-      'Last Checked (Colombo)'
+      'Last Known Location',
+      'Last Physical Verification (Colombo)'
     ];
     const rows = filteredDevices.map((d) => [
       d.mobileCode,
-      d.mobileName || d.model || '',
-      d.groupName || '',
-      d.currentStatus || '',
-      d.imei || d.serialNumber || '',
       d.phoneNumber || '',
+      d.groupName || '',
+      d.mobileName || d.model || '',
+      d.brand || '',
+      d.imei || '',
+      d.serialNumber || '',
+      d.currentStatus === 'Available' ? 'FOUND (Available)' : 'MISSING',
       d.description || '',
       d.lastCheckedAtColombo || d.createdAtColombo || ''
     ]);
@@ -244,14 +288,32 @@ export default function DevicesView({
 
   // Counts for top filter tabs
   const totalCount = allDevices.length;
-  const availableCount = allDevices.filter(
-    (d) => d.currentStatus === 'Available'
+  const assignedCount = allDevices.filter(
+    (d) =>
+      d.currentStatus !== 'Missing' &&
+      d.phoneNumber &&
+      d.phoneNumber.trim().length > 0
+  ).length;
+  const availableStockCount = allDevices.filter(
+    (d) =>
+      d.currentStatus !== 'Missing' &&
+      (!d.phoneNumber || d.phoneNumber.trim().length === 0)
   ).length;
   const missingCount = allDevices.filter(
     (d) => d.currentStatus === 'Missing'
   ).length;
 
-  // Filtered list
+  // Category counts matching the Excel sheet ("Phone *", "New *", "Cass *")
+  const phoneCatCount = allDevices.filter((d) =>
+    (d.mobileCode || '').toLowerCase().startsWith('phone')
+  ).length;
+  const newCatCount = allDevices.filter((d) =>
+    (d.mobileCode || '').toLowerCase().startsWith('new')
+  ).length;
+  const cassCatCount = allDevices.filter((d) =>
+    (d.mobileCode || '').toLowerCase().startsWith('cass')
+  ).length;
+
   const effectiveStatusFilter =
     statusDropdown || (statusTab !== 'ALL' ? statusTab : '');
 
@@ -259,7 +321,26 @@ export default function DevicesView({
     if (selectedGroup && String(d.groupId) !== String(selectedGroup)) {
       return false;
     }
-    if (
+    if (categoryPrefix !== 'ALL') {
+      const code = (d.mobileCode || '').toLowerCase();
+      if (!code.startsWith(categoryPrefix.toLowerCase())) return false;
+    }
+    if (effectiveStatusFilter === 'Assigned') {
+      if (
+        d.currentStatus === 'Missing' ||
+        !d.phoneNumber ||
+        !d.phoneNumber.trim()
+      ) {
+        return false;
+      }
+    } else if (effectiveStatusFilter === 'Available') {
+      if (
+        d.currentStatus === 'Missing' ||
+        (d.phoneNumber && d.phoneNumber.trim().length > 0)
+      ) {
+        return false;
+      }
+    } else if (
       effectiveStatusFilter &&
       d.currentStatus?.toLowerCase() !== effectiveStatusFilter.toLowerCase()
     ) {
@@ -267,12 +348,17 @@ export default function DevicesView({
     }
     if (search.trim()) {
       const q = search.trim().toLowerCase();
+      const rawNum = q.startsWith('#') ? q.slice(1) : q;
       const match =
+        String(d.identificationNumber || d.deviceId) === rawNum ||
         (d.mobileCode || '').toLowerCase().includes(q) ||
+        (d.phoneNumber || '').toLowerCase().includes(q) ||
         (d.mobileName || '').toLowerCase().includes(q) ||
         (d.model || '').toLowerCase().includes(q) ||
         (d.brand || '').toLowerCase().includes(q) ||
         (d.imei || '').toLowerCase().includes(q) ||
+        (d.serialNumber || '').toLowerCase().includes(q) ||
+        (d.description || '').toLowerCase().includes(q) ||
         (d.groupName || '').toLowerCase().includes(q);
       if (!match) return false;
     }
@@ -288,7 +374,7 @@ export default function DevicesView({
   );
 
   const formatCheckTime = (colomboStr) => {
-    if (!colomboStr) return { time: 'Not checked', date: 'Registered' };
+    if (!colomboStr) return { time: 'Not verified', date: 'Registered' };
     const parts = colomboStr.split(' ');
     if (parts.length >= 2) {
       const [hh, mm] = parts[1].split(':');
@@ -296,10 +382,10 @@ export default function DevicesView({
       if (!isNaN(h)) {
         const suffix = h >= 12 ? 'PM' : 'AM';
         const h12 = h % 12 || 12;
-        return { time: `${h12}:${mm} ${suffix}`, date: 'Today' };
+        return { time: `${h12}:${mm} ${suffix}`, date: parts[0] };
       }
     }
-    return { time: colomboStr, date: 'Today' };
+    return { time: colomboStr, date: 'Verified' };
   };
 
   return (
@@ -307,14 +393,14 @@ export default function DevicesView({
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <div className="text-[11px] font-bold tracking-wider uppercase text-[#1d4ed8]">
-            DEVICE INVENTORY
+          <div className="text-[11px] font-bold tracking-wider uppercase text-[#1a6e3c]">
+            DEVICE REGISTRATION &amp; EMPLOYEE ASSIGNMENT
           </div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5">
-            Mobile phones
+            Mobile Phones &amp; Employee Assignments
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Register, organize and keep track of every device.
+            Complete company device registry ({totalCount} registered devices) with unique IDs, assigned employees, IMEI/serial numbers, and handover tracking.
           </p>
         </div>
 
@@ -322,70 +408,99 @@ export default function DevicesView({
           <button
             type="button"
             onClick={handleExportCsv}
-            className="flex-1 sm:flex-initial justify-center inline-flex items-center space-x-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 shadow-2xs transition"
+            className="flex-1 sm:flex-initial justify-center inline-flex items-center space-x-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 shadow-2xs transition"
           >
             <Download className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-            <span>Export inventory</span>
+            <span>Export CSV</span>
           </button>
 
           {canEdit && (
             <button
               type="button"
               onClick={openAddPanel}
-              className="flex-1 sm:flex-initial justify-center inline-flex items-center space-x-1.5 px-4 py-2 bg-[#1e4e8c] hover:bg-[#163b6b] text-white rounded-lg text-xs font-semibold shadow-xs transition"
+              className="flex-1 sm:flex-initial justify-center inline-flex items-center space-x-1.5 px-4 py-2 bg-[#c8f53b] hover:bg-[#b8e629] text-slate-950 rounded-xl text-xs font-extrabold shadow-xs transition"
             >
               <Plus className="w-3.5 h-3.5 shrink-0" />
-              <span>Add phone</span>
+              <span>Register Device</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Filter Tabs Row (All phones, Available, Missing) */}
-      <div
-        role="tablist"
-        aria-label="Filter phones by status"
-        className="flex items-center space-x-5 sm:space-x-6 border-b border-slate-200 text-xs overflow-x-auto"
-      >
-        {[
-          { id: 'ALL', label: 'All phones', count: totalCount },
-          { id: 'Available', label: 'Available', count: availableCount },
-          { id: 'Missing', label: 'Missing', count: missingCount }
-        ].map((tab) => {
-          const isSelected = statusTab === tab.id;
-          return (
-            <button
-              type="button"
-              role="tab"
-              key={tab.id}
-              aria-selected={isSelected}
-              onClick={() => {
-                setStatusTab(tab.id);
-                setStatusDropdown('');
-                setCurrentPage(1);
-              }}
-              className={`pb-2.5 flex items-center space-x-2 border-b-2 whitespace-nowrap transition ${
-                isSelected
-                  ? 'border-[#1e4e8c] text-[#1e4e8c] font-bold'
-                  : 'border-transparent text-slate-500 hover:text-slate-800 font-medium'
-              }`}
-            >
-              <span>{tab.label}</span>
-              <span
-                className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+      {/* Status Filter Tabs + Excel Category Pills */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-2">
+        <div
+          role="tablist"
+          aria-label="Filter phones by status"
+          className="flex items-center space-x-5 text-xs overflow-x-auto"
+        >
+          {[
+            { id: 'ALL', label: 'All Registered Devices', count: totalCount },
+            { id: 'Assigned', label: 'Active / Assigned', count: assignedCount },
+            { id: 'Available', label: 'Available (In Stock)', count: availableStockCount },
+            { id: 'Missing', label: 'Missing / Unverified', count: missingCount }
+          ].map((tab) => {
+            const isSelected = statusTab === tab.id;
+            return (
+              <button
+                type="button"
+                role="tab"
+                key={tab.id}
+                aria-selected={isSelected}
+                onClick={() => {
+                  setStatusTab(tab.id);
+                  setStatusDropdown('');
+                  setCurrentPage(1);
+                }}
+                className={`pb-2 flex items-center space-x-2 border-b-2 whitespace-nowrap transition ${
                   isSelected
-                    ? 'bg-[#edf4ff] text-[#1d4ed8]'
-                    : 'bg-slate-100 text-slate-500'
+                    ? 'border-[#1a6e3c] text-slate-950 font-bold'
+                    : 'border-transparent text-slate-500 hover:text-slate-800 font-medium'
                 }`}
               >
-                {tab.count}
-              </span>
+                <span>{tab.label}</span>
+                <span
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                    isSelected
+                      ? 'bg-[#c8f53b] text-slate-950'
+                      : 'bg-slate-100 text-slate-500'
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Excel Category Quick Filter Pills (Phone / New / Cass) */}
+        <div className="flex items-center space-x-1.5 text-xs">
+          {[
+            { id: 'ALL', label: 'All Sheet Rows', count: totalCount },
+            { id: 'Phone', label: 'Phone #', count: phoneCatCount },
+            { id: 'New', label: 'New #', count: newCatCount },
+            { id: 'Cass', label: 'Cass #', count: cassCatCount }
+          ].map((cat) => (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => {
+                setCategoryPrefix(cat.id);
+                setCurrentPage(1);
+              }}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${
+                categoryPrefix === cat.id
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {cat.label} ({cat.count})
             </button>
-          );
-        })}
+          ))}
+        </div>
       </div>
 
-      {/* Main Split Grid: Inventory Table + Add/Edit Phone Side Panel */}
+      {/* Main Split Grid: Inventory Table + Register/Update & Handover Side Panel */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* Inventory Table Card */}
         <div
@@ -397,17 +512,17 @@ export default function DevicesView({
         >
           {/* Search & Dropdown Filters */}
           <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2.5 pb-4">
-            <div className="flex-1 min-w-0 sm:min-w-[200px] relative">
+            <div className="flex-1 min-w-0 sm:min-w-[220px] relative">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="search"
-                placeholder="Search by ID, device or IMEI..."
+                placeholder="Search by Unique ID (e.g. Phone 2, New 4, Cass 7), Employee, or IMEI..."
                 value={search}
                 onChange={(e) => {
                   setSearch(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1e4e8c]"
+                className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#68c73a]"
               />
             </div>
 
@@ -419,28 +534,14 @@ export default function DevicesView({
                   setSelectedGroup(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="flex-1 sm:flex-initial px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#1e4e8c]"
+                className="flex-1 sm:flex-initial px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 font-medium focus:outline-none"
               >
-                <option value="">All groups</option>
+                <option value="">All Groups</option>
                 {groups.map((g) => (
                   <option key={g.groupId} value={g.groupId}>
-                    {g.groupName}
+                    Group {g.groupName}
                   </option>
                 ))}
-              </select>
-
-              <select
-                aria-label="Filter by status"
-                value={statusDropdown}
-                onChange={(e) => {
-                  setStatusDropdown(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="flex-1 sm:flex-initial px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#1e4e8c]"
-              >
-                <option value="">Status</option>
-                <option value="Available">Available</option>
-                <option value="Missing">Missing</option>
               </select>
 
               <button
@@ -448,6 +549,7 @@ export default function DevicesView({
                 onClick={() => {
                   setSearch('');
                   setSelectedGroup('');
+                  setCategoryPrefix('ALL');
                   setStatusDropdown('');
                   setStatusTab('ALL');
                   setCurrentPage(1);
@@ -476,21 +578,16 @@ export default function DevicesView({
                 No mobile phones match your filter criteria.
               </div>
             ) : (
-              <table className="w-full text-left border-collapse min-w-[520px]">
+              <table className="w-full text-left border-collapse min-w-[680px]">
                 <thead>
-                  <tr className="bg-slate-50/70 border-y border-slate-100 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    <th className="py-2.5 pl-3 pr-2 w-8">
-                      <input
-                        type="checkbox"
-                        aria-label="Select all phones on page"
-                        className="rounded border-slate-300"
-                      />
-                    </th>
-                    <th className="py-2.5 px-3">DEVICE / MOBILE ID</th>
+                  <tr className="bg-slate-50/80 border-y border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    <th className="py-2.5 px-3">UNIQUE ID (CATEGORY)</th>
+                    <th className="py-2.5 px-3">ASSIGNED EMPLOYEE</th>
                     <th className="py-2.5 px-3">GROUP</th>
+                    <th className="py-2.5 px-3">DEVICE &amp; IMEI / SERIAL</th>
                     <th className="py-2.5 px-3">STATUS</th>
-                    <th className="py-2.5 px-3">LAST CHECKED</th>
-                    <th className="py-2.5 px-3 text-right"></th>
+                    <th className="py-2.5 px-3">LAST VERIFIED</th>
+                    <th className="py-2.5 px-3 text-right">ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
@@ -499,73 +596,105 @@ export default function DevicesView({
                     const checkInfo = formatCheckTime(
                       d.lastCheckedAtColombo || d.createdAtColombo
                     );
-                    const displayTitle =
+                    const modelLabel =
                       d.mobileName ||
                       [d.brand, d.model].filter(Boolean).join(' ') ||
-                      d.mobileCode;
+                      'iPhone 15';
 
                     return (
                       <tr
                         key={d.deviceId}
-                        className="hover:bg-slate-50/80 transition"
+                        className="hover:bg-lime-50/40 transition"
                       >
-                        <td className="py-3.5 pl-3 pr-2">
-                          <input
-                            type="checkbox"
-                            aria-label={`Select ${d.mobileCode}`}
-                            className="rounded border-slate-300"
-                          />
-                        </td>
-                        <td className="py-3.5 px-3">
-                          <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 rounded-lg bg-[#f4f7fb] border border-slate-200/80 flex items-center justify-center text-[#1e4e8c] shrink-0">
+                        <td className="py-3 px-3">
+                          <div className="flex items-center space-x-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-[#f6f9f4] border border-slate-200 flex items-center justify-center text-[#1a6e3c] shrink-0">
                               <Smartphone className="w-4 h-4" />
                             </div>
                             <div>
-                              <div className="font-bold text-slate-900">
-                                {displayTitle}
+                              <div className="font-extrabold text-slate-900 flex items-center space-x-1.5">
+                                <span className="px-1.5 py-0.5 rounded bg-slate-900 text-[#c8f53b] font-mono text-[10px] font-black tracking-tight" title="Permanent Sequential Identification Number (1 to Infinity)">
+                                  #{d.identificationNumber || d.deviceId}
+                                </span>
+                                <span>{d.mobileCode}</span>
                               </div>
-                              <div className="text-[11px] text-slate-400">
-                                {d.mobileCode}
+                              <div className="text-[10px] text-slate-400 truncate max-w-[130px]">
+                                {d.description || 'HQ Station'}
                               </div>
                             </div>
                           </div>
                         </td>
-                        <td className="py-3.5 px-3 text-slate-600 font-medium">
-                          {d.groupName}
+                        <td className="py-3 px-3">
+                          <div className="font-bold text-slate-900 flex items-center space-x-1.5">
+                            <UserCheck className="w-3.5 h-3.5 text-[#1a6e3c] shrink-0" />
+                            <span>{d.phoneNumber || 'Unassigned'}</span>
+                          </div>
+                          <div className="text-[10px] text-slate-400">
+                            Updated {d.updatedAtColombo?.split(' ')[0] || 'Today'}
+                          </div>
                         </td>
-                        <td className="py-3.5 px-3">
-                          {isAvailable ? (
-                            <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
-                              <span>Available</span>
+                        <td className="py-3 px-3">
+                          <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 font-bold text-[11px]">
+                            {d.groupName}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3">
+                          <div className="font-semibold text-slate-800">
+                            {modelLabel}
+                          </div>
+                          <div className="text-[11px] font-mono text-slate-700">
+                            <span className="font-semibold text-slate-500">IMEI:</span> <span className="font-bold text-slate-950 font-mono select-all">{d.imei || '—'}</span> · <span className="text-slate-500">{d.serialNumber || '—'}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-3">
+                          {d.currentStatus === 'Missing' ? (
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-600 border border-rose-200">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
+                              <span>MISSING</span>
+                            </span>
+                          ) : d.phoneNumber && d.phoneNumber.trim() ? (
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#c4f5fc] text-slate-900 border border-cyan-300">
+                              <Check className="w-3 h-3 stroke-[2.5]" />
+                              <span>Active / Assigned</span>
                             </span>
                           ) : (
-                            <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-600">
-                              <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
-                              <span>Missing</span>
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <Check className="w-3 h-3 stroke-[2.5]" />
+                              <span>Available</span>
                             </span>
                           )}
                         </td>
-                        <td className="py-3.5 px-3">
+                        <td className="py-3 px-3">
                           <div className="font-semibold text-slate-800">
                             {checkInfo.time}
                           </div>
-                          <div className="text-[11px] text-slate-400">
+                          <div className="text-[10px] text-slate-400">
                             {checkInfo.date} · {d.lastCheckedByAdmin || 'System'}
                           </div>
                         </td>
-                        <td className="py-3.5 px-3 text-right whitespace-nowrap">
+                        <td className="py-3 px-3 text-right whitespace-nowrap">
                           {canEdit && (
                             <div className="inline-flex items-center space-x-1">
+                              {onNavigateToReturns && d.phoneNumber && (
+                                <button
+                                  type="button"
+                                  onClick={() => onNavigateToReturns(d)}
+                                  title="Return or Replace this device"
+                                  className="px-2 py-1 text-[11px] font-semibold text-[#1a6e3c] hover:text-slate-950 bg-[#f6f9f4] hover:bg-[#c8f53b] border border-slate-200 rounded-lg transition inline-flex items-center space-x-1"
+                                >
+                                  <ArrowLeftRight className="w-3 h-3" />
+                                  <span>Return / Replace</span>
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => openEditPanel(d)}
                                 aria-label={`Edit ${d.mobileCode}`}
-                                title={`Edit ${d.mobileCode}`}
-                                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition"
+                                title="Update device or reassign employee"
+                                className="px-2 py-1 text-[11px] font-semibold text-slate-700 hover:text-slate-950 bg-slate-100 hover:bg-[#c8f53b] rounded-lg transition inline-flex items-center space-x-1"
                               >
-                                <Edit2 className="w-3.5 h-3.5" />
+                                <Edit2 className="w-3 h-3" />
+                                <span>Update</span>
                               </button>
                               <button
                                 type="button"
@@ -593,7 +722,7 @@ export default function DevicesView({
               Showing{' '}
               {filteredDevices.length === 0 ? 0 : startIndex + 1}–
               {Math.min(startIndex + pageSize, filteredDevices.length)} of{' '}
-              {filteredDevices.length} phones
+              {filteredDevices.length} devices
             </span>
 
             <div className="flex items-center space-x-1">
@@ -601,56 +730,44 @@ export default function DevicesView({
                 type="button"
                 disabled={safePage <= 1}
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                className="px-2 py-1 rounded hover:bg-slate-100 disabled:opacity-40"
+                className="px-2.5 py-1 rounded border border-slate-200 hover:bg-slate-100 disabled:opacity-40 text-slate-700 font-semibold"
               >
-                ‹
+                ‹ Prev
               </button>
-              {Array.from({ length: Math.min(totalPages, 5) }, (_, idx) => {
-                const pageNum = idx + 1;
-                return (
-                  <button
-                    type="button"
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`w-6 h-6 rounded text-xs font-bold ${
-                      safePage === pageNum
-                        ? 'bg-[#edf4ff] text-[#1d4ed8]'
-                        : 'text-slate-500 hover:bg-slate-100'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
+              <span className="px-2 font-bold text-slate-700">
+                {safePage} / {totalPages}
+              </span>
               <button
                 type="button"
                 disabled={safePage >= totalPages}
                 onClick={() =>
                   setCurrentPage((p) => Math.min(totalPages, p + 1))
                 }
-                className="px-2 py-1 rounded hover:bg-slate-100 disabled:opacity-40"
+                className="px-2.5 py-1 rounded border border-slate-200 hover:bg-slate-100 disabled:opacity-40 text-slate-700 font-semibold"
               >
-                ›
+                Next ›
               </button>
             </div>
           </div>
         </div>
 
-        {/* Right Side Panel: Add a new phone / Edit phone */}
+        {/* Right Side Panel: Register Device / Update Assignment & Handover History */}
         {panelOpen && canEdit && (
           <div
             ref={panelRef}
-            className="lg:col-span-4 order-1 lg:order-2 bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-2xs"
+            className="lg:col-span-4 order-1 lg:order-2 bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-2xs space-y-5"
           >
             <div className="flex items-start justify-between">
               <div>
                 <h2 className="text-base font-bold text-slate-900">
                   {editingDevice
-                    ? `Edit ${editingDevice.mobileCode}`
-                    : 'Add a new phone'}
+                    ? `Update ${editingDevice.mobileCode}`
+                    : 'Register Mobile Device'}
                 </h2>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Enter your Mobile ID and Group to get started.
+                  {editingDevice
+                    ? 'Update device details, record employee handover, or change location.'
+                    : 'Assign a unique ID, group, employee, and IMEI/Serial.'}
                 </p>
               </div>
               <button
@@ -663,7 +780,7 @@ export default function DevicesView({
               </button>
             </div>
 
-            <form onSubmit={handleSavePhone} className="mt-5 space-y-4">
+            <form onSubmit={handleSavePhone} className="space-y-3.5">
               {formError && (
                 <div
                   role="alert"
@@ -673,28 +790,49 @@ export default function DevicesView({
                 </div>
               )}
 
-              {/* Mobile ID * — User-decided editable input (no auto-lock) */}
+              {/* Unique Device ID * */}
               <div>
                 <label
                   htmlFor="panel-mobile-id"
                   className="block text-xs font-semibold text-slate-700 mb-1"
                 >
-                  Mobile ID <span className="text-rose-500">*</span>
+                  Unique Device ID (Category){' '}
+                  <span className="text-rose-500">*</span>
                 </label>
                 <input
                   id="panel-mobile-id"
                   type="text"
                   required
-                  placeholder="Enter Mobile ID (e.g. MOB-0001)"
+                  placeholder="e.g. Phone 2, New 4, Cass 7, PN 001"
                   value={formData.mobileCode}
                   onChange={(e) =>
                     setFormData({ ...formData, mobileCode: e.target.value })
                   }
-                  className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1e4e8c]"
+                  className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#68c73a]"
                 />
               </div>
 
-              {/* Group * — User-decided (select existing or type a new group name, never auto-selected) */}
+              {/* Assigned Employee * */}
+              <div>
+                <label
+                  htmlFor="panel-assigned"
+                  className="block text-xs font-semibold text-slate-700 mb-1"
+                >
+                  Assigned Employee (Current User)
+                </label>
+                <input
+                  id="panel-assigned"
+                  type="text"
+                  placeholder="e.g. David joseph, Olivia Oimin"
+                  value={formData.assignedTo}
+                  onChange={(e) =>
+                    setFormData({ ...formData, assignedTo: e.target.value })
+                  }
+                  className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#68c73a]"
+                />
+              </div>
+
+              {/* Group * */}
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label
@@ -709,7 +847,7 @@ export default function DevicesView({
                       setCustomGroupMode((prev) => !prev);
                       setFormError('');
                     }}
-                    className="text-[11px] font-semibold text-[#1d4ed8] hover:underline"
+                    className="text-[11px] font-semibold text-[#1a6e3c] hover:underline"
                   >
                     {customGroupMode
                       ? 'Choose existing group'
@@ -722,7 +860,7 @@ export default function DevicesView({
                     id="panel-group"
                     type="text"
                     required
-                    placeholder="Enter group name (e.g. Engineering)"
+                    placeholder="Enter group code (e.g. D, E, AO, AH)"
                     value={formData.customGroupName}
                     onChange={(e) =>
                       setFormData({
@@ -730,7 +868,7 @@ export default function DevicesView({
                         customGroupName: e.target.value
                       })
                     }
-                    className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1e4e8c]"
+                    className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#68c73a]"
                   />
                 ) : (
                   <select
@@ -740,145 +878,221 @@ export default function DevicesView({
                     onChange={(e) =>
                       setFormData({ ...formData, groupId: e.target.value })
                     }
-                    className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-[#1e4e8c]"
+                    className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-[#68c73a]"
                   >
                     <option value="">Select a group...</option>
                     {groups.map((g) => (
                       <option key={g.groupId} value={g.groupId}>
-                        {g.groupName}
+                        Group {g.groupName}
                       </option>
                     ))}
                   </select>
                 )}
               </div>
 
-              {/* Device name · Optional */}
-              <div>
-                <label
-                  htmlFor="panel-device-name"
-                  className="block text-xs font-semibold text-slate-700 mb-1"
-                >
-                  Device name{' '}
-                  <span className="text-slate-400 font-normal">· Optional</span>
-                </label>
-                <input
-                  id="panel-device-name"
-                  type="text"
-                  placeholder="e.g. iPhone 15"
-                  value={formData.deviceName}
-                  onChange={(e) =>
-                    setFormData({ ...formData, deviceName: e.target.value })
-                  }
-                  className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1e4e8c]"
-                />
+              {/* Brand & Model */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label
+                    htmlFor="panel-brand"
+                    className="block text-xs font-semibold text-slate-700 mb-1"
+                  >
+                    Brand
+                  </label>
+                  <input
+                    id="panel-brand"
+                    type="text"
+                    placeholder="e.g. Apple"
+                    value={formData.brand}
+                    onChange={(e) =>
+                      setFormData({ ...formData, brand: e.target.value })
+                    }
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="panel-device-name"
+                    className="block text-xs font-semibold text-slate-700 mb-1"
+                  >
+                    Device Model
+                  </label>
+                  <input
+                    id="panel-device-name"
+                    type="text"
+                    placeholder="e.g. iPhone 15"
+                    value={formData.deviceName}
+                    onChange={(e) =>
+                      setFormData({ ...formData, deviceName: e.target.value })
+                    }
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800"
+                  />
+                </div>
               </div>
 
-              {/* IMEI / Serial number · Optional */}
-              <div>
-                <label
-                  htmlFor="panel-imei"
-                  className="block text-xs font-semibold text-slate-700 mb-1"
-                >
-                  IMEI / Serial number{' '}
-                  <span className="text-slate-400 font-normal">· Optional</span>
-                </label>
-                <input
-                  id="panel-imei"
-                  type="text"
-                  placeholder="Enter IMEI or serial number"
-                  value={formData.imeiOrSerial}
-                  onChange={(e) =>
-                    setFormData({ ...formData, imeiOrSerial: e.target.value })
-                  }
-                  className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1e4e8c]"
-                />
+              {/* IMEI & Serial Number */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label
+                    htmlFor="panel-imei"
+                    className="block text-xs font-semibold text-slate-700 mb-1"
+                  >
+                    IMEI Number 1/2
+                  </label>
+                  <input
+                    id="panel-imei"
+                    type="text"
+                    placeholder="15-digit IMEI"
+                    value={formData.imei}
+                    onChange={(e) =>
+                      setFormData({ ...formData, imei: e.target.value })
+                    }
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="panel-serial"
+                    className="block text-xs font-semibold text-slate-700 mb-1"
+                  >
+                    Serial Number
+                  </label>
+                  <input
+                    id="panel-serial"
+                    type="text"
+                    placeholder="e.g. SN-HTSK-0001"
+                    value={formData.serialNumber}
+                    onChange={(e) =>
+                      setFormData({ ...formData, serialNumber: e.target.value })
+                    }
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-800"
+                  />
+                </div>
               </div>
 
-              {/* Assigned to · Optional */}
-              <div>
-                <label
-                  htmlFor="panel-assigned"
-                  className="block text-xs font-semibold text-slate-700 mb-1"
-                >
-                  Assigned to{' '}
-                  <span className="text-slate-400 font-normal">· Optional</span>
-                </label>
-                <input
-                  id="panel-assigned"
-                  type="text"
-                  placeholder="Employee name or phone number"
-                  value={formData.assignedTo}
-                  onChange={(e) =>
-                    setFormData({ ...formData, assignedTo: e.target.value })
-                  }
-                  className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1e4e8c]"
-                />
-              </div>
-
-              {/* Location · Optional */}
+              {/* Last Known Location */}
               <div>
                 <label
                   htmlFor="panel-location"
                   className="block text-xs font-semibold text-slate-700 mb-1"
                 >
-                  Location{' '}
-                  <span className="text-slate-400 font-normal">· Optional</span>
+                  Last Known Location / Station
                 </label>
-                <input
-                  id="panel-location"
-                  type="text"
-                  placeholder="e.g. HQ · Floor 3"
-                  value={formData.location}
-                  onChange={(e) =>
-                    setFormData({ ...formData, location: e.target.value })
-                  }
-                  className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1e4e8c]"
-                />
+                <div className="relative">
+                  <MapPin className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    id="panel-location"
+                    type="text"
+                    placeholder="e.g. Main Floor · Group D Station"
+                    value={formData.location}
+                    onChange={(e) =>
+                      setFormData({ ...formData, location: e.target.value })
+                    }
+                    className="w-full pl-8 pr-3.5 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400"
+                  />
+                </div>
               </div>
 
-              {/* Info Box */}
-              <div className="bg-[#f4f7fb] rounded-xl p-3 text-[11px] text-slate-500 leading-relaxed">
-                You decide the Mobile ID and Group. New phones join the next checking session.
+              {/* Device Physical Verification / Stock Status */}
+              <div>
+                <label
+                  htmlFor="panel-status"
+                  className="block text-[11px] font-bold text-slate-700 mb-1"
+                >
+                  Device Status / Physical Verification
+                </label>
+                <select
+                  id="panel-status"
+                  value={formData.currentStatus}
+                  onChange={(e) =>
+                    setFormData({ ...formData, currentStatus: e.target.value })
+                  }
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#68c73a]"
+                >
+                  <option value="Available">FOUND (Available / In Service)</option>
+                  <option value="Missing">MISSING (Flagged during physical check)</option>
+                </select>
               </div>
 
               {/* Action Buttons */}
               <div className="pt-2 flex items-center justify-between gap-2">
-                <div className="flex items-center space-x-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingDevice(null);
-                      setPanelOpen(false);
-                    }}
-                    className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 transition"
-                  >
-                    Cancel
-                  </button>
-
-                  {editingDevice && (
-                    <button
-                      type="button"
-                      onClick={() => handleDeactivate(editingDevice)}
-                      title="Deactivate phone"
-                      className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingDevice(null);
+                    setDeviceHistory([]);
+                  }}
+                  className="px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 transition"
+                >
+                  Reset
+                </button>
 
                 <button
                   type="submit"
                   disabled={saving}
-                  className="inline-flex items-center space-x-1.5 px-4 py-2 bg-[#1e4e8c] hover:bg-[#163b6b] text-white rounded-lg text-xs font-semibold shadow-xs transition disabled:opacity-50"
+                  className="inline-flex items-center space-x-1.5 px-4 py-2 bg-[#c8f53b] hover:bg-[#b8e629] text-slate-950 rounded-lg text-xs font-extrabold shadow-xs transition disabled:opacity-50"
                 >
                   <ArrowRight className="w-3.5 h-3.5" />
-                  <span>{saving ? 'Saving...' : 'Save phone'}</span>
+                  <span>
+                    {saving
+                      ? 'Saving...'
+                      : editingDevice
+                      ? 'Save Update & Log Handover'
+                      : 'Register Device'}
+                  </span>
                 </button>
               </div>
-
-              <div className="text-[10px] text-slate-400">* Required field</div>
             </form>
+
+            {/* Previous Assignment & Verification History for Selected Device */}
+            {editingDevice && (
+              <div className="pt-4 border-t border-slate-200 space-y-2.5">
+                <div className="flex items-center space-x-1.5 text-xs font-bold text-slate-800">
+                  <History className="w-3.5 h-3.5 text-[#1a6e3c]" />
+                  <span>
+                    Assignment Handovers &amp; Verification Log ({editingDevice.mobileCode})
+                  </span>
+                </div>
+                {loadingHistory ? (
+                  <div className="text-[11px] text-slate-400">
+                    Loading device history...
+                  </div>
+                ) : deviceHistory.length === 0 ? (
+                  <div className="text-[11px] text-slate-400 bg-slate-50 p-2.5 rounded-lg">
+                    Registered on {editingDevice.createdAtColombo} · Assigned to{' '}
+                    <strong>{editingDevice.phoneNumber || 'Unassigned'}</strong>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {deviceHistory.map((h) => (
+                      <div
+                        key={h.checkRecordId}
+                        className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/80 text-[11px]"
+                      >
+                        <div className="flex items-center justify-between font-bold text-slate-800">
+                          <span>
+                            {h.deviceStatus === 'Available'
+                              ? '✓ Verified FOUND'
+                              : '✕ Marked MISSING'}
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-500">
+                            {h.checkedAtColombo}
+                          </span>
+                        </div>
+                        <div className="text-slate-600 mt-0.5">
+                          By: <strong>{h.checkedByAdmin}</strong> (Group {h.groupName})
+                        </div>
+                        {h.notes && (
+                          <div className="text-slate-500 mt-0.5 italic">
+                            {h.notes}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -20,9 +20,12 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // 3. Custom services
 builder.Services.AddSingleton<ITimeService, ColomboTimeService>();
+builder.Services.AddSingleton<ColomboTimeService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<ICheckSessionService, CheckSessionService>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
+builder.Services.AddScoped<ReconciliationEngine>();
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 
 // 4. JWT Authentication
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "CompanyMobileManagementSystemSecretKey2026!SecureKeyForJwtTokenAuth";

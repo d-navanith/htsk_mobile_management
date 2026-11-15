@@ -109,10 +109,10 @@ export default function HistoryView({ user, onDataChange }) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-        <div className="flex items-center space-x-2">
-          <History className="w-5 h-5 text-indigo-600" />
-          <h2 className="text-lg font-bold text-slate-900">
+      <div className="bg-white p-6 sm:p-7 rounded-[28px] border-2 border-slate-100 shadow-sm">
+        <div className="flex items-center space-x-2.5">
+          <History className="w-5 h-5 text-[#1a6e3c]" />
+          <h2 className="text-xl sm:text-2xl font-extrabold text-slate-950 tracking-tight">
             Historical Checking Log
           </h2>
         </div>
@@ -121,24 +121,24 @@ export default function HistoryView({ user, onDataChange }) {
         </p>
 
         {/* Filters */}
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 pt-4 border-t border-slate-100 text-xs">
+        <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 pt-4 border-t border-slate-100 text-xs">
           <div>
-            <label className="block text-slate-500 font-semibold mb-1">
-              Mobile Code
+            <label className="block text-slate-700 font-bold mb-1">
+              Mobile Code / ID
             </label>
             <input
               type="text"
-              placeholder="e.g. MOB-0001"
+              placeholder="e.g. Phone 2, New 4"
               value={filters.mobileCode}
               onChange={(e) =>
                 setFilters({ ...filters, mobileCode: e.target.value })
               }
-              className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs"
+              className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#68c73a]"
             />
           </div>
 
           <div>
-            <label className="block text-slate-500 font-semibold mb-1">
+            <label className="block text-slate-700 font-bold mb-1">
               Employee Group
             </label>
             <select
@@ -146,19 +146,19 @@ export default function HistoryView({ user, onDataChange }) {
               onChange={(e) =>
                 setFilters({ ...filters, groupId: e.target.value })
               }
-              className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white"
+              className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-[#68c73a]"
             >
               <option value="">All Groups</option>
               {groups.map((g) => (
                 <option key={g.groupId} value={g.groupId}>
-                  {g.groupName}
+                  Group {g.groupName}
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="block text-slate-500 font-semibold mb-1">
+            <label className="block text-slate-700 font-bold mb-1">
               Inspection Result
             </label>
             <select
@@ -166,34 +166,34 @@ export default function HistoryView({ user, onDataChange }) {
               onChange={(e) =>
                 setFilters({ ...filters, status: e.target.value })
               }
-              className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white"
+              className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-[#68c73a]"
             >
               <option value="">All Results</option>
-              <option value="Available">Available</option>
-              <option value="Missing">Missing</option>
+              <option value="Available">FOUND (Available)</option>
+              <option value="Missing">MISSING</option>
             </select>
           </div>
 
           <div>
-            <label className="block text-slate-500 font-semibold mb-1">
+            <label className="block text-slate-700 font-bold mb-1">
               Inspection Date
             </label>
             <input
               type="date"
               value={filters.date}
               onChange={(e) => setFilters({ ...filters, date: e.target.value })}
-              className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white"
+              className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-[#68c73a]"
             />
           </div>
 
-          <div className="flex items-end space-x-2">
+          <div className="flex items-end">
             <button
               type="button"
               onClick={handleReset}
-              className="px-3 py-1.5 border border-slate-300 hover:bg-slate-50 text-slate-600 rounded-lg text-xs font-semibold flex items-center space-x-1"
+              className="w-full px-4 py-2 bg-[#c8f53b] hover:bg-[#b8e629] text-slate-950 rounded-xl text-xs font-extrabold flex items-center justify-center space-x-1.5 transition cursor-pointer shadow-2xs"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              <span>Reset</span>
+              <span>Reset Filters</span>
             </button>
           </div>
         </div>
@@ -206,7 +206,7 @@ export default function HistoryView({ user, onDataChange }) {
       )}
 
       {/* History Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+      <div className="bg-white rounded-[28px] border-2 border-slate-100 overflow-hidden shadow-sm p-5 sm:p-6">
         {loading ? (
           <div className="p-8 text-center text-slate-500 text-xs">
             Loading checking records...

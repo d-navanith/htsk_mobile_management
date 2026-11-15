@@ -66,10 +66,34 @@ export default function IncidentModal({ isOpen, onClose, onSave, incident }) {
             </div>
           )}
 
-          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1">
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1.5">
             <div className="flex justify-between">
-              <span className="text-slate-500">First Missing (Colombo):</span>
-              <span className="font-mono font-semibold text-slate-800">{incident.firstMissingAtColombo}</span>
+              <span className="text-slate-500">Unique Device ID &amp; Model:</span>
+              <span className="font-bold text-slate-900">
+                {incident.mobileCode} · {incident.mobileName || incident.model || 'iPhone 15'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Last Assigned Employee:</span>
+              <span className="font-bold text-slate-900">
+                {incident.assignedTo || 'Unassigned'} (Group {incident.groupName})
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Last Known Location:</span>
+              <span className="font-semibold text-slate-800">
+                {incident.lastKnownLocation || `Group ${incident.groupName} Station`}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Last Physical Verification:</span>
+              <span className="font-mono font-semibold text-slate-800">
+                {incident.lastVerifiedAtColombo || incident.firstMissingAtColombo}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Flagged Missing (Colombo):</span>
+              <span className="font-mono font-semibold text-rose-600">{incident.firstMissingAtColombo}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Consecutive Missing Checks:</span>
@@ -88,11 +112,11 @@ export default function IncidentModal({ isOpen, onClose, onSave, incident }) {
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#68c73a] font-semibold"
             >
-              <option value="Open">Open</option>
-              <option value="Escalated">Escalated (High Priority Alert)</option>
-              <option value="Recovered">Recovered (Phone Found)</option>
+              <option value="Recovered">FOUND (Device Recovered &amp; Available)</option>
+              <option value="Open">Missing (Open Investigation)</option>
+              <option value="Escalated">Escalated (High Priority Missing Alert)</option>
               <option value="Closed">Closed (Written off or archived)</option>
             </select>
           </div>

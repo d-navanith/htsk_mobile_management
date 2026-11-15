@@ -25,7 +25,13 @@ public class DevicesController : ControllerBase
         _permissionService = permissionService;
     }
 
-    private string? GetCurrentRole() => User.FindFirstValue(ClaimTypes.Role);
+    private string? GetCurrentRole() => User.FindFirstValue(ClaimTypes.Role) ?? User.FindFirst("role")?.Value;
+
+    private int GetCurrentUserId()
+    {
+        var idStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("nameid")?.Value;
+        return int.TryParse(idStr, out var id) ? id : 1;
+    }
 
     [HttpGet]
     public async Task<ActionResult<List<DeviceDto>>> GetDevices(
@@ -97,7 +103,8 @@ public class DevicesController : ControllerBase
                 CreatedAtColombo: _timeService.FormatColombo(d.CreatedAtUtc),
                 UpdatedAtColombo: _timeService.FormatColombo(d.UpdatedAtUtc),
                 LastCheckedAtColombo: lastCheck != null ? _timeService.FormatColombo(lastCheck.CheckedAtUtc) : null,
-                LastCheckedByAdmin: lastCheck?.CheckedByUser?.FullName ?? lastCheck?.CheckedByUser?.Username
+                LastCheckedByAdmin: lastCheck?.CheckedByUser?.FullName ?? lastCheck?.CheckedByUser?.Username,
+                IdentificationNumber: d.IdentificationNumber > 0 ? d.IdentificationNumber : d.DeviceId
             );
         }).ToList();
 
@@ -137,7 +144,8 @@ public class DevicesController : ControllerBase
             CreatedAtColombo: _timeService.FormatColombo(d.CreatedAtUtc),
             UpdatedAtColombo: _timeService.FormatColombo(d.UpdatedAtUtc),
             LastCheckedAtColombo: lastCheck != null ? _timeService.FormatColombo(lastCheck.CheckedAtUtc) : null,
-            LastCheckedByAdmin: lastCheck?.CheckedByUser?.FullName ?? lastCheck?.CheckedByUser?.Username
+            LastCheckedByAdmin: lastCheck?.CheckedByUser?.FullName ?? lastCheck?.CheckedByUser?.Username,
+            IdentificationNumber: d.IdentificationNumber > 0 ? d.IdentificationNumber : d.DeviceId
         ));
     }
 
@@ -198,8 +206,12 @@ public class DevicesController : ControllerBase
             return BadRequest(new { message = "Mobile ID is required." });
         }
 
+        var maxId = await _db.MobileDevices.MaxAsync(d => (int?)d.IdentificationNumber) ?? 0;
+        int nextIdNum = maxId + 1;
+
         var device = new MobileDevice
         {
+            IdentificationNumber = nextIdNum,
             MobileCode = mobileCode,
             GroupId = group.GroupId,
             MobileName = request.MobileName?.Trim(),
@@ -215,7 +227,51 @@ public class DevicesController : ControllerBase
             UpdatedAtUtc = _timeService.UtcNow
         };
 
+        // BCNF Normalization: Model linkage
+        if (!string.IsNullOrWhiteSpace(device.Model))
+        {
+            var brandName = device.Brand ?? "Apple";
+            var modelEntity = await _db.DeviceModels.FirstOrDefaultAsync(m => m.ModelName.ToLower() == device.Model.ToLower());
+            if (modelEntity == null)
+            {
+                modelEntity = new DeviceModel { Brand = brandName, ModelName = device.Model, DeviceType = "SmartPhone", CreatedAtUtc = DateTime.UtcNow };
+                _db.DeviceModels.Add(modelEntity);
+                await _db.SaveChangesAsync();
+            }
+            device.ModelId = modelEntity.ModelId;
+        }
+
+        // BCNF Normalization: Employee linkage
+        if (!string.IsNullOrWhiteSpace(device.PhoneNumber))
+        {
+            var empName = device.PhoneNumber.Trim();
+            var empEntity = await _db.Employees.FirstOrDefaultAsync(e => e.FullName.ToLower() == empName.ToLower());
+            if (empEntity == null)
+            {
+                var empCount = await _db.Employees.CountAsync();
+                empEntity = new Employee { EmployeeCode = $"EMP-{(empCount + 1):D4}", FullName = empName, Department = "Operations", CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow };
+                _db.Employees.Add(empEntity);
+                await _db.SaveChangesAsync();
+            }
+            device.EmployeeId = empEntity.EmployeeId;
+            device.AssignedEmployeeName = empEntity.FullName;
+            device.AssignedEmployeeId = empEntity.EmployeeCode;
+        }
+
         _db.MobileDevices.Add(device);
+        await _db.SaveChangesAsync();
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            UserId = GetCurrentUserId(),
+            UserName = User.Identity?.Name ?? "Administrator",
+            UserRole = GetCurrentRole(),
+            Action = "CreateDevice",
+            EntityName = "MobileDevice",
+            EntityId = device.DeviceId.ToString(),
+            Details = $"Registered mobile device #{device.IdentificationNumber} ({device.MobileCode}), Model: {device.Brand} {device.Model}, IMEI: {device.IMEI}",
+            TimestampUtc = DateTime.UtcNow
+        });
         await _db.SaveChangesAsync();
 
         return CreatedAtAction(nameof(GetDevice), new { id = device.DeviceId }, new DeviceDto(
@@ -235,7 +291,9 @@ public class DevicesController : ControllerBase
             ConsecutiveMissingCount: 0,
             CreatedAtColombo: _timeService.FormatColombo(device.CreatedAtUtc),
             UpdatedAtColombo: _timeService.FormatColombo(device.UpdatedAtUtc),
-            LastCheckedAtColombo: null
+            LastCheckedAtColombo: null,
+            LastCheckedByAdmin: null,
+            IdentificationNumber: device.IdentificationNumber
         ));
     }
 
@@ -298,6 +356,78 @@ public class DevicesController : ControllerBase
             }
         }
 
+        var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var currentUserId = int.TryParse(userIdStr, out var uid) ? uid : 1;
+        var currentUsername = User.FindFirstValue(ClaimTypes.Name) ?? "Authorized User";
+
+        var oldAssigned = device.PhoneNumber ?? "Unassigned";
+        var newAssigned = request.PhoneNumber?.Trim() ?? "Unassigned";
+        var oldLocation = device.Description ?? "Unspecified";
+        var newLocation = request.Description?.Trim() ?? "Unspecified";
+
+        var changeParts = new List<string>();
+        if (!string.Equals(oldAssigned, newAssigned, StringComparison.OrdinalIgnoreCase))
+        {
+            changeParts.Add($"Handover: {oldAssigned} → {newAssigned}");
+        }
+        if (!string.Equals(oldLocation, newLocation, StringComparison.OrdinalIgnoreCase))
+        {
+            changeParts.Add($"Location: {oldLocation} → {newLocation}");
+        }
+        if (!string.Equals(device.MobileName ?? "", request.MobileName?.Trim() ?? "", StringComparison.OrdinalIgnoreCase))
+        {
+            changeParts.Add($"Device: {device.MobileName ?? "-"} → {request.MobileName?.Trim() ?? "-"}");
+        }
+        if (device.GroupId != group.GroupId)
+        {
+            changeParts.Add($"Group changed to {group.GroupName}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.CurrentStatus))
+        {
+            var requestedStatus = request.CurrentStatus.Trim();
+            if (string.Equals(requestedStatus, "Available", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(requestedStatus, "Found", StringComparison.OrdinalIgnoreCase))
+            {
+                if (device.CurrentStatus != "Available")
+                {
+                    changeParts.Add($"Status: {device.CurrentStatus} → Available (FOUND)");
+                    device.CurrentStatus = "Available";
+
+                    // Automatically resolve any open MissingIncidents for this device
+                    var openIncidents = await _db.MissingIncidents
+                        .Where(i => i.DeviceId == device.DeviceId && i.IncidentStatus != "Recovered" && i.IncidentStatus != "Closed")
+                        .ToListAsync();
+                    foreach (var inc in openIncidents)
+                    {
+                        inc.IncidentStatus = "Recovered";
+                        inc.RecoveredAtUtc = _timeService.UtcNow;
+                        inc.ConsecutiveMissingCount = 0;
+                        inc.ActionTaken = $"Device updated to Available (FOUND) by {currentUsername}";
+                    }
+
+                    // Update recent missing check records
+                    var recentMissingChecks = await _db.DeviceCheckRecords
+                        .Where(r => r.DeviceId == device.DeviceId && r.DeviceStatus == "Missing")
+                        .ToListAsync();
+                    foreach (var rec in recentMissingChecks)
+                    {
+                        rec.DeviceStatus = "Available";
+                        rec.CheckedAtUtc = _timeService.UtcNow;
+                        rec.Notes = $"Marked Available (FOUND) by {currentUsername}";
+                    }
+                }
+            }
+            else if (string.Equals(requestedStatus, "Missing", StringComparison.OrdinalIgnoreCase))
+            {
+                if (device.CurrentStatus != "Missing")
+                {
+                    changeParts.Add($"Status: {device.CurrentStatus} → Missing");
+                    device.CurrentStatus = "Missing";
+                }
+            }
+        }
+
         device.GroupId = group.GroupId;
         device.MobileName = request.MobileName?.Trim();
         device.Brand = request.Brand?.Trim();
@@ -309,6 +439,10 @@ public class DevicesController : ControllerBase
         device.IsActive = request.IsActive;
         device.UpdatedAtUtc = _timeService.UtcNow;
 
+        var auditSummary = changeParts.Count > 0
+            ? $"Updated by {currentUsername}: {string.Join(" | ", changeParts)}"
+            : $"Device info updated ({device.MobileCode}) by {currentUsername}";
+
         var latestCheck = await _db.DeviceCheckRecords
             .Where(r => r.DeviceId == id)
             .OrderByDescending(r => r.CheckedAtUtc)
@@ -317,8 +451,31 @@ public class DevicesController : ControllerBase
         {
             latestCheck.GroupId = group.GroupId;
             latestCheck.CheckedAtUtc = _timeService.UtcNow;
-            latestCheck.Notes = $"Phone details updated ({device.MobileCode})";
+            latestCheck.CheckedByUserId = currentUserId;
+            latestCheck.Notes = auditSummary;
         }
+
+        _db.Notifications.Add(new Notification
+        {
+            DeviceId = device.DeviceId,
+            NotificationType = "DeviceUpdate",
+            Message = $"{device.MobileCode}: {auditSummary}",
+            Priority = "Low",
+            IsRead = false,
+            CreatedAtUtc = _timeService.UtcNow
+        });
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            UserId = currentUserId,
+            UserName = currentUsername,
+            UserRole = GetCurrentRole(),
+            Action = "UpdateDevice",
+            EntityName = "MobileDevice",
+            EntityId = device.DeviceId.ToString(),
+            Details = $"Updated Device #{device.IdentificationNumber} ({device.MobileCode}): {auditSummary}",
+            TimestampUtc = DateTime.UtcNow
+        });
 
         await _db.SaveChangesAsync();
         return NoContent();
@@ -346,8 +503,30 @@ public class DevicesController : ControllerBase
         if (checkRecords.Count > 0) _db.DeviceCheckRecords.RemoveRange(checkRecords);
 
         _db.MobileDevices.Remove(device);
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            UserId = GetCurrentUserId(),
+            UserName = User.Identity?.Name ?? "Administrator",
+            UserRole = GetCurrentRole(),
+            Action = "DeleteDevice",
+            EntityName = "MobileDevice",
+            EntityId = device.DeviceId.ToString(),
+            Details = $"Permanently deleted device #{device.IdentificationNumber} ({device.MobileCode})",
+            TimestampUtc = DateTime.UtcNow
+        });
+
         await _db.SaveChangesAsync();
 
         return Ok(new { message = $"Device {device.MobileCode} has been deleted." });
+    }
+
+    [HttpPost("seed-excel")]
+    [Authorize(Roles = "Developer,ITAdmin")]
+    public async Task<ActionResult> SeedExcelInventory()
+    {
+        await DbInitializer.SeedExcelInventoryAsync(_db);
+        var total = await _db.MobileDevices.CountAsync(d => d.IsActive);
+        return Ok(new { message = "Company Excel inventory seeded.", totalDevices = total });
     }
 }

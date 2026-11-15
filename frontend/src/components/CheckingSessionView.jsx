@@ -22,7 +22,7 @@ export default function CheckingSessionView({
   const [activeSession, setActiveSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [selectedGroup, setSelectedGroup] = useState('');
+  const [selectedGroup, setSelectedGroup] = useState('ALL_GROUPS');
   const [tabFilter, setTabFilter] = useState('ALL'); // PENDING, CHECKED, ALL, LAST
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -33,7 +33,7 @@ export default function CheckingSessionView({
   const [editingSession, setEditingSession] = useState(null);
   const [sessionForm, setSessionForm] = useState({ sessionStatus: 'Completed', notes: '' });
 
-  const pageSize = 5;
+  const pageSize = 10;
   const canManageSessions =
     user?.role === 'Developer' ||
     (user?.role === 'Employee' && Boolean(permissionDetails?.checking_sessions?.employeeCanEdit));
@@ -127,7 +127,7 @@ export default function CheckingSessionView({
     if (!canStartSessions || !activeSession) return;
     if (activeSession.uncheckedCount > 0) {
       const ok = window.confirm(
-        `There are ${activeSession.uncheckedCount} unchecked phones remaining. Complete this session anyway?`
+        `There are ${activeSession.uncheckedCount} unverified devices remaining. Completing the session now will automatically identify and mark those ${activeSession.uncheckedCount} unverified devices as MISSING for investigation. Proceed?`
       );
       if (!ok) return;
     }
@@ -379,15 +379,15 @@ export default function CheckingSessionView({
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center max-w-xl mx-auto shadow-2xs">
-          <div className="w-12 h-12 rounded-2xl bg-[#edf4ff] text-[#1e4e8c] flex items-center justify-center mx-auto mb-3">
-            <Clock className="w-6 h-6" />
+        <div className="bg-white rounded-[28px] border-2 border-slate-100 p-8 text-center max-w-xl mx-auto shadow-sm">
+          <div className="w-14 h-14 rounded-2xl bg-[#c8f53b]/30 text-[#1a6e3c] flex items-center justify-center mx-auto mb-3.5">
+            <Clock className="w-7 h-7 stroke-[2.2]" />
           </div>
-          <h2 className="text-lg font-bold text-slate-900">
-            Ready for the next 2-hour inspection
+          <h2 className="text-xl font-extrabold text-slate-950">
+            Ready for the next 2-hour physical inspection
           </h2>
           <p className="text-xs text-slate-500 mt-1.5 max-w-md mx-auto leading-relaxed">
-            Inspect mobile phones group by group and record whether each phone is physically Available or Missing in Colombo Standard Time.
+            Inspect mobile phones group by group and record whether each device is physically Available (FOUND) or Missing in Colombo Standard Time.
           </p>
 
           {canStartSessions ? (
@@ -397,17 +397,17 @@ export default function CheckingSessionView({
                 placeholder="Optional session notes (e.g. Afternoon 2:00 PM check)"
                 value={startNotes}
                 onChange={(e) => setStartNotes(e.target.value)}
-                className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1e4e8c]"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#68c73a]"
               />
               <button
                 type="button"
                 onClick={handleStartSession}
                 disabled={submitting}
-                className="w-full inline-flex items-center justify-center space-x-2 py-2.5 px-5 bg-[#1e4e8c] hover:bg-[#163b6b] text-white font-semibold text-xs rounded-xl shadow-xs transition disabled:opacity-50"
+                className="w-full inline-flex items-center justify-center space-x-2 py-3.5 px-6 bg-[#c8f53b] hover:bg-[#b8e629] text-slate-950 font-extrabold text-sm rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50"
               >
-                <Play className="w-3.5 h-3.5 fill-white" />
+                <Play className="w-4 h-4 fill-slate-950" />
                 <span>
-                  {submitting ? 'Starting session...' : 'Start 2-hour checking session'}
+                  {submitting ? 'Starting session...' : 'START 2-HOUR CHECKING SESSION'}
                 </span>
               </button>
             </div>
@@ -424,7 +424,7 @@ export default function CheckingSessionView({
     );
   }
 
-  // --- WHEN A CHECKING SESSION IS ACTIVE (MATCHING IMAGE 1) ---
+  // --- WHEN A CHECKING SESSION IS ACTIVE ---
   const devices = activeSession.devices || [];
   const groupsMap = {};
   devices.forEach((d) => {
@@ -436,11 +436,16 @@ export default function CheckingSessionView({
 
   const groupNames = Object.keys(groupsMap);
   const activeGroupName =
-    selectedGroup && groupsMap[selectedGroup]
+    selectedGroup === 'ALL_GROUPS'
+      ? 'ALL_GROUPS'
+      : selectedGroup && groupsMap[selectedGroup]
       ? selectedGroup
-      : groupNames[0] || 'All Groups';
+      : 'ALL_GROUPS';
 
-  const currentGroupDevices = groupsMap[activeGroupName] || [];
+  const currentGroupDevices =
+    activeGroupName === 'ALL_GROUPS'
+      ? devices
+      : groupsMap[activeGroupName] || [];
   const groupCheckedCount = currentGroupDevices.filter((d) => d.isCheckedInSession).length;
   const groupPendingCount = currentGroupDevices.length - groupCheckedCount;
   const groupAvailCount = currentGroupDevices.filter(
@@ -456,11 +461,13 @@ export default function CheckingSessionView({
     if (tabFilter === 'CHECKED' && !d.isCheckedInSession) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
-      const matchCode = d.mobileCode.toLowerCase().includes(q);
+      const matchCode = (d.mobileCode || '').toLowerCase().includes(q);
       const matchName = (d.mobileName || '').toLowerCase().includes(q);
       const matchModel = (d.model || '').toLowerCase().includes(q);
       const matchBrand = (d.brand || '').toLowerCase().includes(q);
-      if (!matchCode && !matchName && !matchModel && !matchBrand) return false;
+      const matchEmployee = (d.phoneNumber || '').toLowerCase().includes(q);
+      const matchImei = (d.imei || '').toLowerCase().includes(q);
+      if (!matchCode && !matchName && !matchModel && !matchBrand && !matchEmployee && !matchImei) return false;
     }
     return true;
   });
@@ -487,29 +494,29 @@ export default function CheckingSessionView({
       {/* Top Page Title & Save/Exit */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="text-[11px] font-bold tracking-wider uppercase text-[#1d4ed8]">
-            CHECKING SESSIONS / {sessionCode}
+          <div className="text-[11px] font-bold tracking-wider uppercase text-[#1a6e3c]">
+            PHYSICAL VERIFICATION / {sessionCode}
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 mt-0.5">
-            Active checking
+          <h1 className="text-2xl sm:text-[28px] font-extrabold text-slate-950 mt-0.5 tracking-tight">
+            Active Checking Session
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Physically inspect each phone, then record its status.
+            Physically inspect each device against the registered fleet, then record whether it is FOUND or Missing.
           </p>
         </div>
 
         <div className="flex items-center space-x-3">
-          <span className="text-xs font-medium text-emerald-700 flex items-center space-x-1">
-            <Check className="w-3.5 h-3.5" />
+          <span className="text-xs font-bold text-emerald-800 flex items-center space-x-1 px-2.5 py-1 rounded-full bg-emerald-100">
+            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>{saveIndicator}</span>
           </span>
           {onSaveAndExit && (
             <button
               type="button"
               onClick={onSaveAndExit}
-              className="px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 shadow-2xs transition"
+              className="px-4 py-2 bg-white hover:bg-slate-50 border-2 border-slate-200 rounded-xl text-xs font-bold text-slate-900 shadow-2xs transition cursor-pointer"
             >
-              Save &amp; exit
+              Save &amp; Exit
             </button>
           )}
         </div>
@@ -518,21 +525,21 @@ export default function CheckingSessionView({
       {error && (
         <div
           role="alert"
-          className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-semibold text-rose-700"
+          className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs font-semibold text-rose-700"
         >
           {error}
         </div>
       )}
 
       {/* Session Summary Banner Card */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-2xs">
+      <div className="bg-white rounded-[28px] border-2 border-slate-100 p-6 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center space-x-3">
-            <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#edf4ff] text-[#1d4ed8]">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#1d4ed8]" />
+            <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-[#c8f53b] text-slate-950">
+              <span className="w-2 h-2 rounded-full bg-emerald-800" />
               <span>IN PROGRESS</span>
             </span>
-            <span className="text-xs font-bold text-slate-900">
+            <span className="text-xs font-extrabold text-slate-950">
               Today, {formatShortTime(activeSession.startedAtColombo)} session
             </span>
             <span className="text-xs text-slate-400">
@@ -540,37 +547,39 @@ export default function CheckingSessionView({
             </span>
           </div>
 
-          <div className="flex items-center space-x-1.5 text-xs text-slate-500">
+          <div className="flex items-center space-x-1.5 text-xs text-slate-500 font-medium">
             <Clock className="w-3.5 h-3.5 text-slate-400" />
-            <span>2-Hour Cycle (SLST)</span>
+            <span>2-Hour Physical Inspection Cycle</span>
           </div>
         </div>
 
         <div className="mt-4 flex flex-wrap items-baseline justify-between gap-2">
           <div>
-            <span className="text-2xl font-extrabold text-slate-900">
+            <span className="text-3xl font-black text-slate-950">
               {activeSession.checkedCount} / {activeSession.totalExpectedDevices}
             </span>
-            <span className="text-xs text-slate-400 ml-1.5">phones checked</span>
+            <span className="text-xs text-slate-400 ml-2 font-medium">devices verified</span>
           </div>
 
-          <div className="flex items-center space-x-4 text-xs font-semibold">
-            <span className="text-emerald-700">
-              {activeSession.availableCount} Available
+          <div className="flex items-center space-x-4 text-xs font-bold">
+            <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-900">
+              {activeSession.availableCount} FOUND
             </span>
-            <span className="text-rose-600">{activeSession.missingCount} Missing</span>
-            <span className="text-amber-600">
+            <span className="px-2.5 py-1 rounded-full bg-rose-100 text-rose-900">
+              {activeSession.missingCount} Missing
+            </span>
+            <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">
               {activeSession.uncheckedCount} Pending
             </span>
-            <span className="text-sm font-extrabold text-slate-900">
+            <span className="text-base font-black text-slate-950">
               {percentChecked}%
             </span>
           </div>
         </div>
 
-        <div className="mt-2.5 w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+        <div className="mt-3 w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
           <div
-            className="bg-[#1e4e8c] h-full rounded-full transition-all duration-300"
+            className="bg-[#c8f53b] h-full rounded-full transition-all duration-300"
             style={{ width: `${percentChecked}%` }}
           />
         </div>
@@ -579,15 +588,40 @@ export default function CheckingSessionView({
       {/* 2-Column Master-Detail Checking Workspace */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* Left Groups Panel (3 cols) */}
-        <div className="lg:col-span-3 bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs space-y-3">
+        <div className="lg:col-span-3 bg-white rounded-[28px] border-2 border-slate-100 p-5 shadow-sm space-y-3">
           <div className="flex items-center justify-between px-1">
-            <h2 className="text-xs font-bold text-slate-900">Groups</h2>
-            <span className="text-[11px] text-slate-400">
-              {groupNames.length} total
+            <h2 className="text-sm font-extrabold text-slate-900">Groups</h2>
+            <span className="text-[11px] font-bold text-slate-400">
+              {groupNames.length} groups
             </span>
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 max-h-[440px] overflow-y-auto pr-1">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedGroup('ALL_GROUPS');
+                setCurrentPage(1);
+              }}
+              className={`w-full text-left p-3.5 rounded-2xl transition cursor-pointer ${
+                activeGroupName === 'ALL_GROUPS'
+                  ? 'bg-[#c8f53b]/25 border-2 border-[#68c73a]'
+                  : 'hover:bg-slate-50 border-2 border-transparent'
+              }`}
+            >
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-extrabold text-slate-950">
+                  All Registered Devices
+                </span>
+                <span className="text-[11px] text-slate-600 font-bold">
+                  {activeSession.checkedCount}/{activeSession.totalExpectedDevices}
+                </span>
+              </div>
+              <div className="mt-1 text-[11px] font-medium text-slate-500">
+                {activeSession.uncheckedCount} unverified remaining
+              </div>
+            </button>
+
             {groupNames.map((gName) => {
               const gDevs = groupsMap[gName];
               const gTotal = gDevs.length;
@@ -605,68 +639,61 @@ export default function CheckingSessionView({
                     setSelectedGroup(gName);
                     setCurrentPage(1);
                   }}
-                  className={`w-full text-left p-3 rounded-xl transition ${
+                  className={`w-full text-left p-3.5 rounded-2xl transition cursor-pointer ${
                     isSelected
-                      ? 'bg-[#f0f6ff] border border-[#bfdbfe]'
-                      : 'hover:bg-slate-50 border border-transparent'
+                      ? 'bg-[#c8f53b]/25 border-2 border-[#68c73a]'
+                      : 'hover:bg-slate-50 border-2 border-transparent'
                   }`}
                 >
                   <div className="flex items-center justify-between text-xs">
                     <span
-                      className={`font-bold truncate ${
-                        isSelected ? 'text-[#1e4e8c]' : 'text-slate-800'
+                      className={`font-extrabold truncate ${
+                        isSelected ? 'text-slate-950' : 'text-slate-800'
                       }`}
                     >
-                      {gName}
+                      Group {gName}
                     </span>
-                    <span className="text-[11px] text-slate-400 font-medium">
+                    <span className="text-[11px] text-slate-500 font-bold">
                       {gChecked}/{gTotal}
                     </span>
                   </div>
 
-                  <div className="mt-2 w-full bg-slate-200/70 rounded-full h-1.5 overflow-hidden">
+                  <div className="mt-2 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                     <div
                       className={`h-full rounded-full ${
-                        isComp ? 'bg-emerald-600' : 'bg-[#1e4e8c]'
+                        isComp ? 'bg-emerald-600' : 'bg-[#c8f53b]'
                       }`}
                       style={{ width: `${gPct}%` }}
                     />
                   </div>
 
                   <div
-                    className={`mt-1.5 text-[10px] font-medium ${
-                      isComp ? 'text-emerald-700' : 'text-slate-400'
+                    className={`mt-1.5 text-[10px] font-bold ${
+                      isComp ? 'text-emerald-800' : 'text-slate-400'
                     }`}
                   >
-                    {isComp ? 'Completed' : `${gRem} remaining`}
+                    {isComp ? '✓ Completed' : `${gRem} unverified`}
                   </div>
                 </button>
               );
             })}
           </div>
-
-          {/* Quick Reminder Callout */}
-          <div className="bg-[#f4f7fb] rounded-xl p-3.5 border border-slate-200/60 mt-4">
-            <div className="text-xs font-bold text-slate-800">
-              A quick reminder
-            </div>
-            <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-              Only mark Available when you can physically confirm the phone is present.
-            </p>
-          </div>
         </div>
 
         {/* Right Selected Group Inspection Panel (9 cols) */}
-        <div className="lg:col-span-9 bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-6 shadow-2xs">
+        <div className="lg:col-span-9 bg-white rounded-[28px] border-2 border-slate-100 p-5 sm:p-7 shadow-sm">
           {/* Group Header & Search */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                {activeGroupName}
+                {activeGroupName === 'ALL_GROUPS'
+                  ? 'All Registered Company Devices'
+                  : `Group ${activeGroupName}`}
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                {groupCheckedCount} of {currentGroupDevices.length} checked ·{' '}
-                {groupAvailCount} available · {groupMissingCount} missing
+                {groupCheckedCount} of {currentGroupDevices.length} verified ·{' '}
+                {groupAvailCount} FOUND · {groupMissingCount} MISSING ·{' '}
+                {groupPendingCount} Unverified
               </p>
             </div>
 
@@ -675,13 +702,13 @@ export default function CheckingSessionView({
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="search"
-                  placeholder="Search Mobile ID or device..."
+                  placeholder="Search Unique ID or employee..."
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="w-full sm:w-56 pl-8 pr-3 py-2 sm:py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1e4e8c]"
+                  className="w-full sm:w-56 pl-8 pr-3 py-2 sm:py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#68c73a]"
                 />
               </div>
 
@@ -692,11 +719,11 @@ export default function CheckingSessionView({
                     handleMarkGroupAvailable(activeGroupName, currentGroupDevices)
                   }
                   disabled={submitting}
-                  title="Mark all phones in this group Available"
-                  className="px-3 py-2 sm:py-1.5 bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 border border-slate-200 rounded-lg text-xs font-semibold transition flex items-center space-x-1 shrink-0"
+                  title="Mark all phones in this view FOUND"
+                  className="px-3 py-2 sm:py-1.5 bg-[#c8f53b] hover:bg-[#b8e629] text-slate-950 rounded-lg text-xs font-extrabold transition flex items-center space-x-1 shrink-0"
                 >
                   <CheckCheck className="w-3.5 h-3.5" />
-                  <span className="hidden xl:inline">Mark group available</span>
+                  <span className="hidden xl:inline">Mark all FOUND</span>
                 </button>
               )}
             </div>
@@ -709,9 +736,9 @@ export default function CheckingSessionView({
             className="mt-4 flex items-center space-x-2 border-b border-slate-100 pb-3 text-xs overflow-x-auto"
           >
             {[
-              { id: 'PENDING', label: `Pending ${groupPendingCount}` },
-              { id: 'CHECKED', label: `Checked ${groupCheckedCount}` },
-              { id: 'ALL', label: `All phones ${currentGroupDevices.length}` }
+              { id: 'ALL', label: `All Registered (${currentGroupDevices.length})` },
+              { id: 'PENDING', label: `Unverified (${groupPendingCount})` },
+              { id: 'CHECKED', label: `Verified (${groupCheckedCount})` }
             ].map((t) => {
               const isSelected = tabFilter === t.id;
               return (
@@ -726,7 +753,7 @@ export default function CheckingSessionView({
                   }}
                   className={`px-3 py-1.5 rounded-lg font-semibold whitespace-nowrap border-b-2 transition ${
                     isSelected
-                      ? 'bg-[#edf4ff] text-[#1d4ed8] border-[#1d4ed8]'
+                      ? 'bg-[#f6f9f4] text-[#1a6e3c] border-[#1a6e3c]'
                       : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'
                   }`}
                 >
@@ -740,7 +767,7 @@ export default function CheckingSessionView({
           <div className="divide-y divide-slate-100">
             {paginatedDevices.length === 0 ? (
               <div className="py-10 text-center text-xs text-slate-400">
-                No phones match the current filter in {activeGroupName}.
+                No phones match the current filter.
               </div>
             ) : (
               paginatedDevices.map((device) => {
@@ -754,7 +781,7 @@ export default function CheckingSessionView({
                     className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4"
                   >
                     <div className="flex items-start space-x-3 sm:space-x-3.5 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-[#f0f6ff] border border-[#dbeafe] text-[#1e4e8c] flex items-center justify-center shrink-0 mt-0.5">
+                      <div className="w-10 h-10 rounded-xl bg-[#f6f9f4] border border-slate-200 text-[#1a6e3c] flex items-center justify-center shrink-0 mt-0.5">
                         <Smartphone className="w-4 h-4" />
                       </div>
                       <div className="min-w-0">
@@ -762,13 +789,16 @@ export default function CheckingSessionView({
                           <span className="text-xs font-extrabold text-slate-900">
                             {device.mobileCode}
                           </span>
-                          <span className="text-xs text-slate-500 font-medium truncate">
-                            {device.model || device.mobileName || 'Company Phone'}
+                          <span className="px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-bold text-slate-700">
+                            Group {device.groupName}
+                          </span>
+                          <span className="text-xs text-slate-700 font-bold truncate">
+                            · Assigned to: {device.phoneNumber || 'Unassigned'}
                           </span>
                         </div>
-                        <div className="text-[11px] text-slate-400 mt-0.5 truncate">
-                          {device.description ||
-                            `${device.brand || 'Corporate'} · ${device.groupName}`}
+                        <div className="text-[11px] text-slate-500 mt-0.5 truncate">
+                          {device.model || device.mobileName || 'iPhone 15'} · Location:{' '}
+                          {device.description || `Group ${device.groupName} Station`}
                         </div>
                         {device.previouslyMissing ? (
                           <div className="text-[11px] font-medium text-rose-600 mt-0.5">
@@ -777,13 +807,13 @@ export default function CheckingSessionView({
                         ) : (
                           <div className="text-[11px] text-slate-400 mt-0.5">
                             {device.lastSessionSummary ||
-                              'Last session: Verified Available'}
+                              'Last inspection: Verified FOUND'}
                           </div>
                         )}
                       </div>
                     </div>
 
-                    {/* Right Action Buttons (Full width 50/50 on mobile, fixed width on sm+) */}
+                    {/* Right Action Buttons */}
                     {canEdit ? (
                       <div className="flex items-center gap-2 sm:space-x-2.5 w-full sm:w-auto shrink-0">
                         <button
@@ -791,14 +821,14 @@ export default function CheckingSessionView({
                           onClick={() =>
                             handleRecordCheck(device.deviceId, 'Available')
                           }
-                          className={`flex-1 sm:flex-initial sm:min-w-[112px] py-2.5 sm:py-2 px-4 rounded-lg text-xs font-semibold inline-flex items-center justify-center space-x-1.5 transition ${
+                          className={`flex-1 sm:flex-initial sm:min-w-[120px] py-2.5 sm:py-2 px-4 rounded-lg text-xs font-bold inline-flex items-center justify-center space-x-1.5 transition ${
                             isChecked && isAvail
                               ? 'bg-emerald-600 text-white shadow-xs ring-2 ring-emerald-200'
                               : 'bg-[#e8f5ee] hover:bg-[#d1fae5] text-[#15803d]'
                           }`}
                         >
                           <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                          <span>Available</span>
+                          <span>FOUND</span>
                         </button>
 
                         <button
@@ -806,14 +836,14 @@ export default function CheckingSessionView({
                           onClick={() =>
                             handleRecordCheck(device.deviceId, 'Missing')
                           }
-                          className={`flex-1 sm:flex-initial sm:min-w-[112px] py-2.5 sm:py-2 px-4 rounded-lg text-xs font-semibold inline-flex items-center justify-center space-x-1.5 transition ${
+                          className={`flex-1 sm:flex-initial sm:min-w-[120px] py-2.5 sm:py-2 px-4 rounded-lg text-xs font-bold inline-flex items-center justify-center space-x-1.5 transition ${
                             isChecked && isMiss
                               ? 'bg-rose-600 text-white shadow-xs ring-2 ring-rose-200'
                               : 'bg-[#fdecec] hover:bg-[#fee2e2] text-[#b91c1c]'
                           }`}
                         >
                           <X className="w-3.5 h-3.5 stroke-[2.5]" />
-                          <span>Missing</span>
+                          <span>MISSING</span>
                         </button>
                       </div>
                     ) : (
@@ -827,7 +857,11 @@ export default function CheckingSessionView({
                               : 'bg-rose-50 text-rose-700'
                           }`}
                         >
-                          {!isChecked ? 'Pending' : device.checkedStatus}
+                          {!isChecked
+                            ? 'Unverified'
+                            : isAvail
+                            ? 'FOUND'
+                            : 'MISSING'}
                         </span>
                       </div>
                     )}
@@ -887,13 +921,13 @@ export default function CheckingSessionView({
             type="button"
             onClick={handleCompleteSession}
             disabled={submitting}
-            className={`w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-semibold transition ${
+            className={`w-full sm:w-auto px-8 py-3 rounded-xl text-xs font-extrabold tracking-wide transition cursor-pointer shadow-sm ${
               activeSession.uncheckedCount === 0
-                ? 'bg-[#1e4e8c] hover:bg-[#163b6b] text-white shadow-sm'
-                : 'bg-slate-200/80 hover:bg-slate-300/80 text-slate-600'
+                ? 'bg-[#c8f53b] hover:bg-[#b8e629] text-slate-950'
+                : 'bg-slate-900 hover:bg-slate-800 text-[#c8f53b]'
             }`}
           >
-            Complete session
+            COMPLETE SESSION &amp; FLAG UNVERIFIED
           </button>
         )}
       </div>

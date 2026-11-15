@@ -1,24 +1,22 @@
 import React, { useState } from 'react';
 import {
-  Smartphone,
   LayoutGrid,
-  Folder,
+  Smartphone,
+  ArrowLeftRight,
   CalendarCheck,
   AlertTriangle,
   Bell,
   BarChart2,
+  GitCompare,
   History,
   Users,
+  ShieldCheck,
   Settings,
-  Clock,
-  HelpCircle,
-  ChevronDown,
+  ClipboardList,
   Search,
   LogOut,
-  User as UserIcon,
   Menu,
-  X,
-  ShieldCheck
+  X
 } from 'lucide-react';
 
 export function Sidebar({
@@ -30,67 +28,61 @@ export function Sidebar({
   mobileMenuOpen = false,
   setMobileMenuOpen = () => {}
 }) {
-  const role = user?.role || 'Employee';
   const activeIncidentsCount =
     dashboardData?.activeIncidentsCount ?? dashboardData?.missingDevices ?? 0;
   const unreadNotificationsCount = dashboardData?.unreadNotificationsCount ?? 0;
 
-  const canViewDashboard = userPermissions?.view_dashboard ?? true;
-  const canViewCheckingSessions = userPermissions?.checking_sessions ?? true;
-  const canViewNotifications = userPermissions?.notifications ?? true;
-  const canViewReports = userPermissions?.view_missing_reports ?? true;
-  const canViewHistory = userPermissions?.view_checking_history ?? true;
-  const canManageUsers =
-    userPermissions?.add_user_accounts ?? role === 'Developer';
+  const isDeveloper = user?.role === 'Developer';
+  const isAdmin = user?.role === 'ITAdmin';
+  const isEmployee = user?.role === 'Employee';
 
-  const mainNav = [
-    ...(canViewDashboard
-      ? [{ id: 'dashboard', label: 'Dashboard', icon: LayoutGrid }]
-      : []),
-    { id: 'devices', label: 'Mobile phones', icon: Smartphone },
-    { id: 'groups', label: 'Groups', icon: Folder },
-    ...(canViewCheckingSessions
-      ? [{ id: 'checking', label: 'Checking sessions', icon: CalendarCheck }]
-      : []),
-    ...(canViewReports
-      ? [
-          {
-            id: 'incidents',
-            label: 'Missing incidents',
-            icon: AlertTriangle,
-            badge: activeIncidentsCount > 0 ? activeIncidentsCount : null,
-            badgeColor: 'text-rose-600 font-bold'
-          }
-        ]
-      : []),
-    ...(canViewNotifications
-      ? [
-          {
-            id: 'notifications',
-            label: 'Notifications',
-            icon: Bell,
-            badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : null,
-            badgeColor: 'text-amber-600 font-bold'
-          }
-        ]
-      : [])
-  ];
+  const mainNav = isEmployee
+    ? [
+        { id: 'dashboard', label: 'My Dashboard', icon: LayoutGrid },
+        { id: 'devices', label: 'My Assigned Phone', icon: Smartphone },
+        {
+          id: 'notifications',
+          label: 'Notification',
+          icon: Bell,
+          badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : null
+        }
+      ]
+    : [
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid },
+        { id: 'devices', label: 'Mobile Phones', icon: Smartphone },
+        { id: 'returns', label: 'Return & Replace', icon: ArrowLeftRight },
+        { id: 'checking', label: 'Checking sessions', icon: CalendarCheck },
+        {
+          id: 'incidents',
+          label: 'Missing Incidents',
+          icon: AlertTriangle,
+          badge: activeIncidentsCount > 0 ? activeIncidentsCount : null
+        },
+        {
+          id: 'notifications',
+          label: 'Notification',
+          icon: Bell,
+          badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : null
+        }
+      ];
 
   const insightsNav = [
-    ...(canViewReports ? [{ id: 'reports', label: 'Reports', icon: BarChart2 }] : []),
-    ...(canViewHistory ? [{ id: 'history', label: 'History', icon: History }] : [])
+    { id: 'reconciliation', label: 'Reconciliation', icon: GitCompare },
+    { id: 'reports', label: 'Report', icon: BarChart2 },
+    { id: 'history', label: 'History', icon: History }
   ];
 
+  // Developer exclusive console
+  const developerNav = [
+    { id: 'audit-logs', label: 'System Audit Logs', icon: ClipboardList },
+    { id: 'permissions', label: 'User Permissions', icon: ShieldCheck },
+    { id: 'settings', label: 'System Settings', icon: Settings },
+    { id: 'users', label: 'User Management', icon: Users }
+  ];
+
+  // Admin operational management (Developer console items hidden!)
   const adminNav = [
-    ...(canManageUsers
-      ? [{ id: 'users', label: 'User management', icon: Users }]
-      : []),
-    ...(role === 'Developer'
-      ? [
-          { id: 'permissions', label: 'User permissions', icon: ShieldCheck },
-          { id: 'settings', label: 'Settings', icon: Settings }
-        ]
-      : [])
+    { id: 'users', label: 'Staff & Accounts', icon: Users }
   ];
 
   const handleSelectTab = (tabId) => {
@@ -101,28 +93,29 @@ export function Sidebar({
   const renderNavButton = (item) => {
     const isActive = activeTab === item.id;
     const Icon = item.icon;
+
     return (
       <button
         type="button"
         key={item.id}
         onClick={() => handleSelectTab(item.id)}
         aria-current={isActive ? 'page' : undefined}
-        className={`w-full flex items-center justify-between px-3 py-2.5 lg:py-2 rounded-lg text-[13px] transition-colors ${
+        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-[14.5px] transition-all cursor-pointer select-none ${
           isActive
-            ? 'bg-[#edf4ff] text-[#1d4ed8] font-semibold'
-            : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 font-medium'
+            ? 'bg-white text-slate-950 font-bold shadow-2xs'
+            : 'text-slate-800 hover:text-black hover:bg-white/60 font-medium'
         }`}
       >
-        <span className="flex items-center space-x-2.5">
+        <span className="flex items-center space-x-3">
           <Icon
-            className={`w-4 h-4 ${
-              isActive ? 'text-[#1d4ed8]' : 'text-slate-500'
+            className={`w-[18px] h-[18px] shrink-0 ${
+              isActive ? 'text-black stroke-[2.2]' : 'text-slate-700 stroke-[1.8]'
             }`}
           />
-          <span>{item.label}</span>
+          <span className="truncate">{item.label}</span>
         </span>
         {item.badge !== null && item.badge !== undefined && (
-          <span className={`text-xs ${item.badgeColor || 'text-slate-500'}`}>
+          <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-[#ffc5c5] text-rose-900 shrink-0">
             {item.badge}
           </span>
         )}
@@ -131,97 +124,72 @@ export function Sidebar({
   };
 
   const sidebarContent = (isMobile = false) => (
-    <>
-      <div className="p-4 space-y-5 overflow-y-auto">
-        {/* Top Brand Logo */}
-        <div className="flex items-center justify-between px-1">
-          <div
-            onClick={() => handleSelectTab('dashboard')}
-            className="flex items-center space-x-2.5 cursor-pointer"
-          >
-            <div className="w-9 h-9 rounded-xl bg-[#0f2942] flex items-center justify-center text-white shadow-xs">
-              <Smartphone className="w-5 h-5" />
-            </div>
-            <div className="leading-tight">
-              <div className="font-extrabold text-[15px] tracking-tight text-slate-900">
-                HTSK
-              </div>
-              <div className="text-[10px] text-slate-500 font-medium">
-                HTSK Mobile Management
-              </div>
-            </div>
+    <div className="px-5 py-6 flex flex-col h-full overflow-y-auto">
+      {/* Top Brand Logo — HTSK Gradient Style matching mockup */}
+      <div className="flex items-center justify-between px-2 mb-6">
+        <div
+          onClick={() => handleSelectTab('dashboard')}
+          className="cursor-pointer select-none"
+        >
+          <div className="text-[34px] leading-none font-black tracking-widest bg-gradient-to-r from-[#c8f53b] via-[#7ed321] to-[#1b6b3a] bg-clip-text text-transparent">
+            HTSK
           </div>
-
-          {isMobile && (
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen(false)}
-              aria-label="Close navigation menu"
-              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          )}
         </div>
 
-        {/* Organization Selector */}
-        <div className="px-3 py-2 rounded-lg border border-slate-200 bg-white flex items-center justify-between text-xs font-semibold text-slate-800 shadow-2xs">
-          <span className="truncate">HTSK Mobile Management</span>
-          <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-        </div>
+        {isMobile && (
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-label="Close navigation menu"
+            className="p-1.5 text-slate-500 hover:text-slate-800 rounded-lg"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
+      </div>
 
-        {/* Primary Navigation */}
-        <nav aria-label="Primary Workspace Navigation" className="space-y-1">
-          {mainNav.map(renderNavButton)}
-        </nav>
+      {/* Primary Navigation */}
+      <nav aria-label="Primary Workspace Navigation" className="space-y-1">
+        {mainNav.map(renderNavButton)}
+      </nav>
 
-        {/* Insights Section */}
-        <div className="space-y-1 pt-1">
-          <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+      {/* INSIGHTS Section - Hidden for standard employees */}
+      {!isEmployee && (
+        <div className="mt-6 space-y-1">
+          <div className="px-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
             INSIGHTS
           </div>
           {insightsNav.map(renderNavButton)}
         </div>
+      )}
 
-        {/* Administration Section (Developer Only) */}
-        {adminNav.length > 0 && (
-          <div className="space-y-1 pt-1">
-            <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              ADMINISTRATION
-            </div>
-            {adminNav.map(renderNavButton)}
+      {/* Developer Exclusive Suite */}
+      {isDeveloper && (
+        <div className="mt-6 space-y-1">
+          <div className="px-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-slate-900 flex items-center justify-between">
+            <span>DEVELOPER SUITE</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-[#7ed321]"></span>
           </div>
-        )}
-      </div>
-
-      {/* Bottom 2-Hour Callout & Help */}
-      <div className="p-4 space-y-3 border-t border-slate-100">
-        <div className="bg-[#f4f7fb] rounded-xl p-3.5 border border-slate-200/60">
-          <Clock className="w-4 h-4 text-[#1d4ed8] mb-2" />
-          <div className="text-xs font-bold text-slate-900">
-            Every device. Every 2 hours.
-          </div>
-          <div className="text-[11px] text-slate-500 mt-0.5">
-            Manual checks. Peace of mind.
-          </div>
+          {developerNav.map(renderNavButton)}
         </div>
+      )}
 
-        <button
-          type="button"
-          onClick={() => handleSelectTab('reports')}
-          className="w-full flex items-center space-x-2 px-2 py-1 text-xs text-slate-500 hover:text-slate-800 transition"
-        >
-          <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
-          <span>Help &amp; documentation</span>
-        </button>
-      </div>
-    </>
+      {/* Admin Operations Section - Dedicated to ITAdmin */}
+      {isAdmin && (
+        <div className="mt-6 space-y-1">
+          <div className="px-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            OPERATIONS
+          </div>
+          {adminNav.map(renderNavButton)}
+        </div>
+      )}
+    </div>
   );
 
   return (
     <>
       {/* Desktop Left Sidebar */}
-      <aside className="hidden lg:flex w-60 bg-white border-r border-slate-200/90 flex-col justify-between shrink-0 select-none">
+      <aside className="hidden lg:flex w-[240px] bg-[#f4f9f2] flex-col shrink-0 select-none border-r border-slate-200/60">
         {sidebarContent(false)}
       </aside>
 
@@ -233,92 +201,39 @@ export function Sidebar({
             onClick={() => setMobileMenuOpen(false)}
             aria-hidden="true"
           />
-          <aside className="relative w-72 max-w-[85vw] bg-white h-full flex flex-col justify-between shadow-2xl z-10 select-none">
+          <aside className="relative w-72 max-w-[85vw] bg-[#f4f9f2] h-full flex flex-col shadow-2xl z-10 select-none border-r border-slate-200/60">
             {sidebarContent(true)}
           </aside>
         </div>
       )}
-
-      {/* Mobile Bottom Quick Navigation Bar (< lg) */}
-      <nav
-        aria-label="Mobile Bottom Navigation"
-        className="lg:hidden fixed bottom-0 inset-x-0 bg-white border-t border-slate-200 z-30 flex items-center justify-around py-1.5 px-2 shadow-lg"
-      >
-        {[
-          ...(canViewDashboard
-            ? [{ id: 'dashboard', label: 'Dashboard', icon: LayoutGrid }]
-            : []),
-          { id: 'devices', label: 'Phones', icon: Smartphone },
-          ...(canViewCheckingSessions
-            ? [{ id: 'checking', label: 'Check', icon: CalendarCheck }]
-            : []),
-          ...(canViewReports
-            ? [
-                {
-                  id: 'incidents',
-                  label: 'Missing',
-                  icon: AlertTriangle,
-                  badge: activeIncidentsCount > 0 ? activeIncidentsCount : null
-                }
-              ]
-            : []),
-          { id: 'groups', label: 'Groups', icon: Folder }
-        ].map((item) => {
-          const isActive = activeTab === item.id;
-          const Icon = item.icon;
-          return (
-            <button
-              type="button"
-              key={item.id}
-              onClick={() => handleSelectTab(item.id)}
-              className={`relative flex flex-col items-center justify-center py-1 px-2.5 rounded-lg text-[10px] font-semibold transition ${
-                isActive ? 'text-[#1d4ed8]' : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <Icon className={`w-4 h-4 mb-0.5 ${isActive ? 'text-[#1d4ed8]' : 'text-slate-400'}`} />
-              <span>{item.label}</span>
-              {item.badge && (
-                <span className="absolute top-0.5 right-1.5 px-1 min-w-[14px] h-[14px] rounded-full bg-rose-600 text-white text-[9px] font-bold flex items-center justify-center">
-                  {item.badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </nav>
     </>
   );
 }
 
 export function TopHeader({
   user,
-  userPermissions,
   activeTab,
   setActiveTab,
   onLogout,
-  dashboardData,
   globalSearch,
   setGlobalSearch,
   onOpenMobileMenu = () => {}
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
-  const canViewNotifications = userPermissions?.notifications ?? true;
 
   const breadcrumbMap = {
     dashboard: 'Dashboard',
-    devices: 'Mobile phones',
-    groups: 'Groups',
-    checking:
-      dashboardData?.latestSession?.sessionStatus === 'InProgress'
-        ? 'Checking sessions / Active checking'
-        : 'Checking sessions',
-    incidents: 'Missing incidents',
-    notifications: 'Notifications',
-    reports: 'Reports',
+    devices: 'Mobile Phones',
+    returns: 'Return & Replace',
+    checking: 'Checking sessions',
+    incidents: 'Missing Incidents',
+    notifications: 'Notification',
+    reports: 'Report',
     history: 'History',
-    users: 'User management',
-    permissions: 'User permissions',
+    reconciliation: 'Reconciliation',
+    'audit-logs': 'System Audit Logs',
+    users: 'User Management',
+    permissions: 'User Permissions',
     settings: 'Settings'
   };
 
@@ -329,108 +244,80 @@ export function TopHeader({
       ? 'Developer'
       : 'Employee';
 
-  const unreadCount = dashboardData?.unreadNotificationsCount ?? 0;
-
   const handleSearchKeyDown = (e) => {
     if (e.key === 'Enter' && globalSearch.trim()) {
       setActiveTab('devices');
-      setMobileSearchOpen(false);
     }
   };
 
   return (
-    <header className="bg-white border-b border-slate-200/90 sticky top-0 z-30 shrink-0">
-      <div className="h-14 px-3 sm:px-6 flex items-center justify-between gap-2">
-        {/* Left: Mobile Menu Button + Breadcrumb */}
+    <header className="bg-[#f4f9f2] sticky top-0 z-30 shrink-0">
+      <div className="h-16 px-4 sm:px-8 flex items-center justify-between gap-4">
+        {/* Left: Mobile Menu Button + Breadcrumb ("Workspace / Dashboard") */}
         <div className="flex items-center space-x-2 min-w-0">
           <button
             type="button"
             onClick={onOpenMobileMenu}
             aria-label="Open navigation menu"
-            className="lg:hidden p-2 -ml-1 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition shrink-0"
+            className="lg:hidden p-2 -ml-1 text-slate-600 hover:text-slate-900 rounded-lg transition shrink-0"
           >
             <Menu className="w-5 h-5" />
           </button>
 
-          <div className="flex items-center space-x-1.5 sm:space-x-2 text-xs min-w-0">
+          <div className="flex items-center space-x-1.5 text-xs text-slate-400 font-normal">
             <button
               type="button"
               onClick={() => setActiveTab('dashboard')}
-              className="hidden sm:inline text-slate-400 hover:text-slate-600 font-medium shrink-0"
+              className="hover:text-slate-600 cursor-pointer"
             >
               Workspace
             </button>
-            <span className="hidden sm:inline text-slate-300 shrink-0">/</span>
-            <span className="text-slate-800 font-semibold truncate">
+            <span>/</span>
+            <span className="text-slate-500 font-medium">
               {breadcrumbMap[activeTab] || 'Dashboard'}
             </span>
           </div>
         </div>
 
-        {/* Right: Search, Notifications & User Profile */}
-        <div className="flex items-center space-x-1.5 sm:space-x-3 shrink-0">
-          {/* Desktop Global Workspace Search */}
-          <search className="hidden sm:block relative">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+        {/* Right: Search Input + User Avatar matching mockup */}
+        <div className="flex items-center space-x-4 sm:space-x-6 shrink-0">
+          <div className="relative">
             <input
               type="search"
-              aria-label="Search workspace"
-              placeholder="Search workspace...  ⌘K"
+              aria-label="Search"
+              placeholder="| Search"
               value={globalSearch}
               onChange={(e) => setGlobalSearch(e.target.value)}
               onKeyDown={handleSearchKeyDown}
-              className="w-44 md:w-56 pl-8 pr-3 py-1.5 bg-slate-100/80 hover:bg-slate-100 focus:bg-white border border-transparent focus:border-slate-300 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none transition"
+              className="w-44 sm:w-72 md:w-80 px-3.5 py-1.5 bg-[#ecefee] focus:bg-white border border-slate-300/90 rounded-md text-xs text-slate-800 placeholder-slate-400 focus:outline-none transition"
             />
-          </search>
+          </div>
 
-          {/* Mobile Search Toggle */}
-          <button
-            type="button"
-            onClick={() => setMobileSearchOpen((prev) => !prev)}
-            aria-label="Toggle search"
-            className="sm:hidden p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition"
-          >
-            <Search className="w-4 h-4" />
-          </button>
-
-          {/* Notification Bell */}
-          {canViewNotifications && (
-            <button
-              type="button"
-              onClick={() => setActiveTab('notifications')}
-              aria-label="Notifications"
-              className="relative p-2 sm:p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition"
-            >
-              <Bell className="w-4 h-4" />
-              {unreadCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500" />
-              )}
-            </button>
-          )}
-
-          {/* User Profile Dropdown */}
+          {/* User Profile Avatar Circle matching mockup */}
           <div className="relative">
             <button
               type="button"
               onClick={() => setMenuOpen((prev) => !prev)}
-              className="flex items-center space-x-2 py-1 px-1.5 sm:px-2 rounded-lg hover:bg-slate-100 transition text-left"
+              className="w-9 h-9 rounded-full overflow-hidden border-2 border-white shadow-sm bg-slate-200 flex items-center justify-center cursor-pointer"
+              title={`${user?.fullName || user?.username} (${roleLabel})`}
             >
-              <div className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 shrink-0">
-                <UserIcon className="w-4 h-4" />
-              </div>
-              <div className="hidden md:block leading-tight">
-                <div className="text-xs font-bold text-slate-800">
-                  {user?.fullName || user?.username}
-                </div>
-                <div className="text-[10px] text-slate-500 font-medium">
-                  {roleLabel}
-                </div>
-              </div>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              <svg
+                viewBox="0 0 36 36"
+                className="w-full h-full"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <rect width="36" height="36" rx="18" fill="#e2e8f0" />
+                <circle cx="18" cy="13.5" r="5.5" fill="#475569" />
+                <path
+                  d="M7 33c1.5-6.5 6-10 11-10s9.5 3.5 11 10"
+                  fill="#1e293b"
+                />
+              </svg>
             </button>
 
             {menuOpen && (
-              <div className="absolute right-0 mt-1.5 w-52 bg-white rounded-xl border border-slate-200 shadow-lg py-1.5 z-50 text-xs">
+              <div className="absolute right-0 mt-2 w-52 bg-white rounded-xl border border-slate-200 shadow-lg py-1.5 z-50 text-xs">
                 <div className="px-3 py-2 border-b border-slate-100">
                   <div className="font-bold text-slate-800 truncate">
                     {user?.fullName || user?.username}
@@ -438,8 +325,8 @@ export function TopHeader({
                   <div className="text-[11px] text-slate-500 truncate">
                     {user?.email || `@${user?.username}`}
                   </div>
-                  <span className="inline-block mt-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
-                    {roleLabel} Portal
+                  <span className="inline-block mt-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-lime-100 text-lime-900 border border-lime-300">
+                    {roleLabel}
                   </span>
                 </div>
                 <button
@@ -448,7 +335,7 @@ export function TopHeader({
                     setMenuOpen(false);
                     onLogout();
                   }}
-                  className="w-full px-3 py-2 text-left text-rose-600 hover:bg-rose-50 font-semibold flex items-center space-x-2 transition"
+                  className="w-full px-3 py-2 text-left text-rose-600 hover:bg-rose-50 font-semibold flex items-center space-x-2 transition cursor-pointer"
                 >
                   <LogOut className="w-3.5 h-3.5" />
                   <span>Sign Out</span>
@@ -458,25 +345,6 @@ export function TopHeader({
           </div>
         </div>
       </div>
-
-      {/* Expandable Mobile Search Bar */}
-      {mobileSearchOpen && (
-        <div className="sm:hidden px-3 pb-2.5 border-t border-slate-100 pt-2 bg-white">
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="search"
-              aria-label="Search workspace"
-              placeholder="Search Mobile ID, device or group..."
-              value={globalSearch}
-              onChange={(e) => setGlobalSearch(e.target.value)}
-              onKeyDown={handleSearchKeyDown}
-              autoFocus
-              className="w-full pl-8 pr-3 py-2 bg-slate-100 focus:bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none"
-            />
-          </div>
-        </div>
-      )}
     </header>
   );
 }

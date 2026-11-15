@@ -145,21 +145,24 @@ export default function ReportsView() {
       {/* Simple Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <div className="text-xs font-bold tracking-wider uppercase text-[#1d4ed8]">
-            REPORTS
+          <div className="text-xs font-bold tracking-wider uppercase text-[#1a6e3c]">
+            INSPECTION &amp; AUDIT REPORTS
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-            Daily Check Report
+          <h1 className="text-2xl sm:text-[28px] font-extrabold text-slate-950 tracking-tight">
+            Daily Inspection Report
           </h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Historical physical checking sessions, FOUND availability rates, and missing incident logs by date.
+          </p>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => loadByDate(selectedDate)}
-            className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 shadow-2xs transition"
+            className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 shadow-2xs transition cursor-pointer"
           >
-            <RefreshCw className="w-4 h-4 text-slate-500" />
+            <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
             <span>Refresh</span>
           </button>
           <input
@@ -167,12 +170,12 @@ export default function ReportsView() {
             aria-label="Select date"
             value={selectedDate}
             onChange={(e) => e.target.value && handleSelectDate(e.target.value)}
-            className="px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-[#1e4e8c]"
+            className="px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-[#68c73a]"
           />
           <button
             type="button"
             onClick={() => handleSelectDate(todayStr)}
-            className="px-4 py-2 bg-[#1e4e8c] hover:bg-[#163b6b] text-white rounded-xl text-sm font-semibold transition"
+            className="px-4 py-2 bg-[#c8f53b] hover:bg-[#b8e629] text-slate-950 rounded-xl text-xs font-extrabold transition cursor-pointer shadow-2xs"
           >
             Today
           </button>
@@ -182,11 +185,11 @@ export default function ReportsView() {
       {/* Main Layout: Left Calendar + Right At-a-Glance Summary */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* 1. Left: Clean Calendar Picker (4 cols) */}
-        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/90 p-5 shadow-2xs">
+        <div className="lg:col-span-4 bg-white rounded-[28px] border-2 border-slate-100 p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2">
-              <CalendarIcon className="w-5 h-5 text-[#1e4e8c]" />
-              <span className="text-base font-bold text-slate-900">
+              <CalendarIcon className="w-5 h-5 text-[#1a6e3c]" />
+              <span className="text-base font-extrabold text-slate-950">
                 {monthLabel}
               </span>
             </div>
@@ -195,7 +198,7 @@ export default function ReportsView() {
                 type="button"
                 onClick={() => changeMonth(-1)}
                 aria-label="Previous month"
-                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600"
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 cursor-pointer"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -203,14 +206,14 @@ export default function ReportsView() {
                 type="button"
                 onClick={() => changeMonth(1)}
                 aria-label="Next month"
-                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600"
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 cursor-pointer"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-7 text-center text-xs font-bold uppercase text-slate-500 mb-1.5">
+          <div className="grid grid-cols-7 text-center text-[11px] font-bold uppercase text-slate-400 mb-1.5">
             {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((d) => (
               <div key={d} className="py-1">
                 {d}
@@ -218,9 +221,9 @@ export default function ReportsView() {
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-1 text-sm">
+          <div className="grid grid-cols-7 gap-1 text-xs">
             {Array.from({ length: firstDayOfWeek }, (_, idx) => (
-              <div key={`empty-${idx}`} className="h-10" />
+              <div key={`empty-${idx}`} className="h-9" />
             ))}
 
             {Array.from({ length: daysInMonth }, (_, idx) => {
@@ -239,11 +242,11 @@ export default function ReportsView() {
                   type="button"
                   key={dateStr}
                   onClick={() => handleSelectDate(dateStr)}
-                  className={`h-10 rounded-xl flex flex-col items-center justify-center transition font-bold ${
+                  className={`h-9 rounded-xl flex flex-col items-center justify-center transition font-bold cursor-pointer ${
                     isSelected
-                      ? 'bg-[#1e4e8c] text-white shadow-xs'
+                      ? 'bg-slate-950 text-[#c8f53b] shadow-xs'
                       : isToday
-                      ? 'bg-[#edf4ff] text-[#1d4ed8] border border-[#bfdbfe]'
+                      ? 'bg-[#c8f53b]/30 text-slate-900 border border-[#c8f53b]'
                       : 'text-slate-700 hover:bg-slate-100'
                   }`}
                 >
@@ -256,7 +259,7 @@ export default function ReportsView() {
                             ? 'bg-rose-300'
                             : 'bg-rose-500'
                           : isSelected
-                          ? 'bg-emerald-300'
+                          ? 'bg-[#c8f53b]'
                           : 'bg-emerald-500'
                       }`}
                     />
@@ -281,12 +284,12 @@ export default function ReportsView() {
         {/* 2. Right: At-a-Glance Results for Selected Date (8 cols) */}
         <div className="lg:col-span-8 space-y-4">
           {/* Date Title + 3 Big Numbers */}
-          <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-2xs">
+          <div className="bg-white rounded-[28px] border-2 border-slate-100 p-6 shadow-sm">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-bold uppercase tracking-wider text-slate-500">
+              <div className="text-xs font-bold uppercase tracking-wider text-slate-400">
                 {formattedSelectedDate}
                 {activeSelectedSession && (
-                  <span className="ml-2 text-[#1d4ed8]">
+                  <span className="ml-2 text-[#1a6e3c]">
                     · {formatTime(activeSelectedSession.startedAtColombo)} Session
                   </span>
                 )}
@@ -295,37 +298,37 @@ export default function ReportsView() {
                 <button
                   type="button"
                   onClick={() => setSelectedSessionId('ALL')}
-                  className="text-xs font-bold text-[#1d4ed8] hover:underline"
+                  className="text-xs font-bold text-[#1a6e3c] hover:underline cursor-pointer"
                 >
                   Show full day
                 </button>
               )}
             </div>
 
-            <div className="mt-3 grid grid-cols-3 gap-3 text-center">
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
-                <div className="text-3xl font-extrabold text-slate-900">
+            <div className="mt-4 grid grid-cols-3 gap-4 text-center">
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
+                <div className="text-3xl font-black text-slate-950">
                   {displaySessionsCount}
                 </div>
-                <div className="text-sm font-semibold text-slate-600 mt-1">
+                <div className="text-xs font-bold text-slate-600 mt-1">
                   Checking Sessions
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-100">
-                <div className="text-3xl font-extrabold text-emerald-600">
+              <div className="p-4 rounded-2xl bg-[#c4f5fc] border-2 border-white">
+                <div className="text-3xl font-black text-slate-950">
                   {displayAvailableCount}
                 </div>
-                <div className="text-sm font-semibold text-emerald-700 mt-1">
-                  Available
+                <div className="text-xs font-bold text-slate-900 mt-1">
+                  FOUND
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-rose-50/70 border border-rose-100">
-                <div className="text-3xl font-extrabold text-rose-600">
+              <div className="p-4 rounded-2xl bg-[#ffc5c5] border-2 border-white">
+                <div className="text-3xl font-black text-slate-950">
                   {displayMissingCount}
                 </div>
-                <div className="text-sm font-semibold text-rose-700 mt-1">
+                <div className="text-xs font-bold text-slate-900 mt-1">
                   Missing
                 </div>
               </div>
@@ -335,17 +338,17 @@ export default function ReportsView() {
           {/* Two Clean Side-by-Side Cards: Checking Times + Missing Phones */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Card A: Checking Sessions & Times */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-2xs">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
-                  <Clock className="w-4 h-4 text-[#1e4e8c]" />
+            <div className="bg-white rounded-[28px] border-2 border-slate-100 p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base font-extrabold text-slate-950 flex items-center space-x-2">
+                  <Clock className="w-4 h-4 text-[#1a6e3c]" />
                   <span>Checking Times</span>
                 </h2>
                 {selectedSessionId !== 'ALL' && (
                   <button
                     type="button"
                     onClick={() => setSelectedSessionId('ALL')}
-                    className="text-xs font-bold text-[#1d4ed8] hover:underline"
+                    className="text-xs font-bold text-[#1a6e3c] hover:underline cursor-pointer"
                   >
                     Show all
                   </button>
@@ -357,7 +360,7 @@ export default function ReportsView() {
                   Loading...
                 </div>
               ) : sessions.length === 0 ? (
-                <div className="py-8 text-center text-sm text-slate-500 bg-slate-50 rounded-xl">
+                <div className="py-8 text-center text-sm text-slate-500 bg-slate-50 rounded-2xl">
                   No checks recorded on this date.
                 </div>
               ) : (
@@ -372,14 +375,14 @@ export default function ReportsView() {
                         onClick={() =>
                           setSelectedSessionId(isSelected ? 'ALL' : s.sessionId)
                         }
-                        className={`w-full p-3.5 rounded-xl border text-left flex items-center justify-between transition ${
+                        className={`w-full p-4 rounded-2xl border-2 text-left flex items-center justify-between transition cursor-pointer ${
                           isSelected
-                            ? 'bg-[#edf4ff] border-[#1d4ed8] ring-1 ring-[#1d4ed8]'
-                            : 'bg-slate-50/70 hover:bg-slate-100/80 border-slate-200/80'
+                            ? 'bg-[#c8f53b]/25 border-[#68c73a]'
+                            : 'bg-slate-50 hover:bg-slate-100/80 border-slate-100'
                         }`}
                       >
                         <div>
-                          <div className="text-base font-extrabold text-slate-900">
+                          <div className="text-base font-extrabold text-slate-950">
                             {formatTime(s.startedAtColombo)}
                           </div>
                           <div className="text-xs font-medium text-slate-600">
@@ -387,18 +390,20 @@ export default function ReportsView() {
                           </div>
                         </div>
 
-                        <div className="flex items-center space-x-2 text-sm font-bold">
-                          <span className="px-3 py-1 rounded-lg bg-emerald-100 text-emerald-800">
+                        <div className="flex items-center space-x-2 text-xs font-extrabold">
+                          <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-900">
                             ✓ {s.availableCount}
                           </span>
                           <span
-                            className={`px-3 py-1 rounded-lg ${
+                            className={`px-3 py-1 rounded-full ${
                               s.missingCount > 0
-                                ? 'bg-rose-100 text-rose-700'
-                                : 'bg-slate-100 text-slate-500'
+                                ? 'bg-rose-100 text-rose-800'
+                                : 'bg-slate-100 text-slate-600'
                             }`}
                           >
-                            ✕ {s.missingCount}
+                            {s.missingCount > 0
+                              ? `! ${s.missingCount}`
+                              : '0 missing'}
                           </span>
                         </div>
                       </button>
@@ -408,18 +413,18 @@ export default function ReportsView() {
               )}
             </div>
 
-            {/* Card B: Missing Items */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-2xs">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
+            {/* Card B: Missing Phones for Selected Date */}
+            <div className="bg-white rounded-[28px] border-2 border-slate-100 p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base font-extrabold text-slate-950 flex items-center space-x-2">
                   <AlertTriangle className="w-4 h-4 text-rose-600" />
                   <span>Missing Phones</span>
                 </h2>
                 <span
-                  className={`px-2.5 py-0.5 rounded-full text-sm font-bold ${
+                  className={`px-3 py-1 rounded-full text-xs font-bold ${
                     visibleMissing.length > 0
-                      ? 'bg-rose-100 text-rose-700'
-                      : 'bg-emerald-50 text-emerald-700'
+                      ? 'bg-rose-100 text-rose-800'
+                      : 'bg-emerald-100 text-emerald-800'
                   }`}
                 >
                   {visibleMissing.length}

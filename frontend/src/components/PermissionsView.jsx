@@ -618,12 +618,12 @@ export default function PermissionsView({ onPermissionsChange }) {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="text-[11px] font-bold tracking-wider uppercase text-[#1d4ed8]">
-            ADMINISTRATION · FULL CRUD &amp; ACCESS GOVERNANCE
+          <div className="text-[11px] font-bold tracking-wider uppercase text-[#1a6e3c]">
+            ADMINISTRATION · ACCESS GOVERNANCE
           </div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5 flex items-center space-x-2">
-            <ShieldCheck className="w-6 h-6 text-[#1e4e8c] shrink-0" />
-            <span>User Permission Dashboard</span>
+          <h1 className="text-2xl sm:text-[28px] font-extrabold text-slate-950 tracking-tight mt-0.5 flex items-center space-x-2.5">
+            <ShieldCheck className="w-6 h-6 text-[#1a6e3c] shrink-0" />
+            <span>User Permissions</span>
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
             Assign functions to roles and configure exact &ldquo;Can Do&rdquo; &amp; &ldquo;Cannot Do&rdquo; rules before assigning to Employees. Only Developer has full edit access.
@@ -634,7 +634,7 @@ export default function PermissionsView({ onPermissionsChange }) {
           <button
             type="button"
             onClick={loadPermissions}
-            className="inline-flex items-center space-x-1.5 px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 shadow-2xs transition"
+            className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 border-2 border-slate-200 rounded-xl text-xs font-bold text-slate-800 shadow-2xs transition cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
             <span>Refresh</span>
@@ -643,7 +643,7 @@ export default function PermissionsView({ onPermissionsChange }) {
           <button
             type="button"
             onClick={handleResetDefaults}
-            className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 shadow-2xs transition"
+            className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 border-2 border-slate-200 rounded-xl text-xs font-bold text-slate-800 shadow-2xs transition cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
             <span>Reset defaults</span>
@@ -652,7 +652,7 @@ export default function PermissionsView({ onPermissionsChange }) {
           <button
             type="button"
             onClick={openAddModal}
-            className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-[#1e4e8c] hover:bg-[#163b6b] text-white rounded-lg text-xs font-semibold shadow-xs transition"
+            className="inline-flex items-center space-x-1.5 px-4 py-2 bg-[#c8f53b] hover:bg-[#b8e629] text-slate-950 rounded-xl text-xs font-extrabold shadow-xs transition cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add Function</span>
@@ -690,7 +690,7 @@ export default function PermissionsView({ onPermissionsChange }) {
       )}
 
       {/* Permission Matrix Table Card */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+      <div className="bg-white rounded-[28px] border-2 border-slate-100 shadow-sm overflow-hidden p-4 sm:p-6">
         <div className="px-5 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h2

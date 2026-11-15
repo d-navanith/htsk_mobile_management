@@ -146,6 +146,12 @@ export const api = {
     });
   },
 
+  async seedExcelDevices() {
+    return request('/devices/seed-excel', {
+      method: 'POST',
+    });
+  },
+
   // Groups
   async getGroups(isActive) {
     const query = isActive !== undefined ? `?isActive=${isActive}` : '';
@@ -435,5 +441,99 @@ export const api = {
     return request('/permissions/reset', {
       method: 'POST',
     });
+  },
+
+  // Device Return & Replacement Management
+  async getReturnReplacementCounts() {
+    return request('/returns/counts');
+  },
+
+  async getReturnEmployees(search = '') {
+    const query = search ? `?search=${encodeURIComponent(search)}` : '';
+    return request(`/returns/employees${query}`);
+  },
+
+  async getAvailableDevicesForReplacement(search = '') {
+    const query = search ? `?search=${encodeURIComponent(search)}` : '';
+    return request(`/returns/available-devices${query}`);
+  },
+
+  async getReturnReplacementHistory(search = '') {
+    const query = search ? `?search=${encodeURIComponent(search)}` : '';
+    return request(`/returns/history${query}`);
+  },
+
+  async processDeviceReturn(payload) {
+    return request('/returns/return', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async processDeviceReplacement(payload) {
+    return request('/returns/replace', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async processReturnAndReplace(payload) {
+    return request('/returns/return-and-replace', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // Intelligent Device Reconciliation & Lifecycle Tracking
+  async getReconciliationBenchmarkData() {
+    return request('/reconciliation/benchmark-data');
+  },
+
+  async runReconciliationBenchmark() {
+    return request('/reconciliation/benchmark-run', {
+      method: 'POST',
+    });
+  },
+
+  async compareReconciliationAudits(payload) {
+    return request('/reconciliation/compare', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getReconciliationSessions() {
+    return request('/reconciliation/sessions');
+  },
+
+  async getReconciliationSessionDetails(id) {
+    return request(`/reconciliation/sessions/${id}`);
+  },
+
+  async updateReconciliationItemResolution(itemId, payload) {
+    return request(`/reconciliation/items/${itemId}/resolution`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getReconciliationBalanceReport() {
+    return request('/reconciliation/balance-report');
+  },
+
+  // Developer System Audit Trail
+  async getAuditLogs(params = {}) {
+    const query = new URLSearchParams();
+    if (params.search) query.append('search', params.search);
+    if (params.actionType && params.actionType !== 'ALL') query.append('actionType', params.actionType);
+    if (params.entityName && params.entityName !== 'ALL') query.append('entityName', params.entityName);
+    if (params.page) query.append('page', params.page);
+    if (params.pageSize) query.append('pageSize', params.pageSize);
+    const qs = query.toString();
+    return request(`/auditlogs${qs ? '?' + qs : ''}`);
+  },
+
+  async getAuditLogStats() {
+    return request('/auditlogs/stats');
   },
 };

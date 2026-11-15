@@ -8,7 +8,9 @@ import {
   Play,
   CheckCheck,
   Edit2,
-  Trash2
+  Trash2,
+  CreditCard,
+  UserCheck
 } from 'lucide-react';
 import { api } from '../api';
 
@@ -465,9 +467,10 @@ export default function CheckingSessionView({
       const matchName = (d.mobileName || '').toLowerCase().includes(q);
       const matchModel = (d.model || '').toLowerCase().includes(q);
       const matchBrand = (d.brand || '').toLowerCase().includes(q);
-      const matchEmployee = (d.phoneNumber || '').toLowerCase().includes(q);
+      const matchBank = ((d.bankAccountName || d.phoneNumber) || '').toLowerCase().includes(q);
+      const matchEmployee = (d.assignedEmployeeName || '').toLowerCase().includes(q);
       const matchImei = (d.imei || '').toLowerCase().includes(q);
-      if (!matchCode && !matchName && !matchModel && !matchBrand && !matchEmployee && !matchImei) return false;
+      if (!matchCode && !matchName && !matchModel && !matchBrand && !matchBank && !matchEmployee && !matchImei) return false;
     }
     return true;
   });
@@ -792,8 +795,13 @@ export default function CheckingSessionView({
                           <span className="px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-bold text-slate-700">
                             Group {device.groupName}
                           </span>
-                          <span className="text-xs text-slate-700 font-bold truncate">
-                            · Assigned to: {device.phoneNumber || 'Unassigned'}
+                          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-blue-50 text-[11px] font-bold text-blue-900 border border-blue-200">
+                            <CreditCard className="w-3 h-3 text-blue-600 shrink-0" />
+                            <span>Bank: {device.bankAccountName || device.phoneNumber || '—'}</span>
+                          </span>
+                          <span className="inline-flex items-center space-x-1 text-xs font-bold text-slate-800">
+                            <UserCheck className="w-3 h-3 text-[#1a6e3c] shrink-0" />
+                            <span>Operator: {device.assignedEmployeeName || <span className="text-slate-400 font-normal">Unassigned</span>}</span>
                           </span>
                         </div>
                         <div className="text-[11px] text-slate-500 mt-0.5 truncate">

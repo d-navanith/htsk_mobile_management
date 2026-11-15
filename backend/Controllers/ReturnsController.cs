@@ -57,9 +57,9 @@ public class ReturnsController : ControllerBase
         var total = await _db.MobileDevices.CountAsync(d => d.IsActive);
         var missing = await _db.MobileDevices.CountAsync(d => d.IsActive && d.CurrentStatus == "Missing");
         var assigned = await _db.MobileDevices.CountAsync(d =>
-            d.IsActive && d.CurrentStatus != "Missing" && d.PhoneNumber != null && d.PhoneNumber != "");
+            d.IsActive && d.CurrentStatus != "Missing" && d.AssignedEmployeeName != null && d.AssignedEmployeeName != "");
         var available = await _db.MobileDevices.CountAsync(d =>
-            d.IsActive && d.CurrentStatus != "Missing" && (d.PhoneNumber == null || d.PhoneNumber == ""));
+            d.IsActive && d.CurrentStatus != "Missing" && (d.AssignedEmployeeName == null || d.AssignedEmployeeName == ""));
 
         return new ReturnReplacementCountsDto(
             TotalDevices: total,
@@ -107,8 +107,8 @@ public class ReturnsController : ControllerBase
     {
         var activeDevices = await _db.MobileDevices
             .Include(d => d.Group)
-            .Where(d => d.IsActive && d.PhoneNumber != null && d.PhoneNumber != "")
-            .OrderBy(d => d.PhoneNumber)
+            .Where(d => d.IsActive && d.AssignedEmployeeName != null && d.AssignedEmployeeName != "")
+            .OrderBy(d => d.AssignedEmployeeName)
             .ThenBy(d => d.MobileCode)
             .ToListAsync();
 
@@ -120,7 +120,7 @@ public class ReturnsController : ControllerBase
 
         foreach (var d in activeDevices)
         {
-            var empName = d.PhoneNumber!.Trim();
+            var empName = d.AssignedEmployeeName!.Trim();
             if (!employeeMap.TryGetValue(empName, out var opt))
             {
                 var empTx = recentTransactions.FirstOrDefault(t =>
@@ -213,7 +213,7 @@ public class ReturnsController : ControllerBase
             .Include(d => d.Group)
             .Include(d => d.CheckRecords)
                 .ThenInclude(c => c.CheckedByUser)
-            .Where(d => d.IsActive && d.CurrentStatus != "Missing" && (d.PhoneNumber == null || d.PhoneNumber == ""));
+            .Where(d => d.IsActive && d.CurrentStatus != "Missing" && (d.AssignedEmployeeName == null || d.AssignedEmployeeName == ""));
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -242,7 +242,7 @@ public class ReturnsController : ControllerBase
                 Brand: d.Brand,
                 Model: d.Model,
                 IMEI: d.IMEI,
-                PhoneNumber: null,
+                PhoneNumber: d.PhoneNumber,
                 SerialNumber: d.SerialNumber,
                 Description: d.Description,
                 CurrentStatus: "Available",
@@ -252,7 +252,9 @@ public class ReturnsController : ControllerBase
                 UpdatedAtColombo: _timeService.FormatColombo(d.UpdatedAtUtc),
                 LastCheckedAtColombo: lastCheck != null ? _timeService.FormatColombo(lastCheck.CheckedAtUtc) : null,
                 LastCheckedByAdmin: lastCheck?.CheckedByUser?.FullName ?? lastCheck?.CheckedByUser?.Username,
-                IdentificationNumber: d.IdentificationNumber > 0 ? d.IdentificationNumber : d.DeviceId
+                IdentificationNumber: d.IdentificationNumber > 0 ? d.IdentificationNumber : d.DeviceId,
+                BankAccountName: d.BankAccountName ?? d.PhoneNumber,
+                AssignedEmployeeName: null
             );
         }).ToList();
 
@@ -311,15 +313,15 @@ public class ReturnsController : ControllerBase
             }
 
             // Prevent duplicate returns: verify the device is currently assigned
-            if (string.IsNullOrWhiteSpace(device.PhoneNumber))
+            if (string.IsNullOrWhiteSpace(device.AssignedEmployeeName))
             {
                 return BadRequest(new
                 {
-                    message = $"Duplicate return prevented: Device '{device.MobileCode}' is already returned and in Available inventory."
+                    message = $"Duplicate return prevented: Device '{device.MobileCode}' is not currently assigned to any employee."
                 });
             }
 
-            var currentHolder = device.PhoneNumber.Trim();
+            var currentHolder = device.AssignedEmployeeName.Trim();
             if (!string.Equals(currentHolder, request.EmployeeName.Trim(), StringComparison.OrdinalIgnoreCase))
             {
                 return BadRequest(new
@@ -345,9 +347,9 @@ public class ReturnsController : ControllerBase
 
             var targetStatus = isDamaged ? "UnderMaintenance" : "Available";
 
-            device.PhoneNumber = null;
             device.AssignedEmployeeName = null;
             device.AssignedEmployeeId = null;
+            device.EmployeeId = null;
             device.CurrentStatus = targetStatus;
             device.LastReturnDateUtc = nowUtc;
             device.UpdatedAtUtc = nowUtc;
@@ -464,11 +466,11 @@ public class ReturnsController : ControllerBase
                 });
             }
 
-            if (!string.IsNullOrWhiteSpace(replacementDevice.PhoneNumber))
+            if (!string.IsNullOrWhiteSpace(replacementDevice.AssignedEmployeeName))
             {
                 return BadRequest(new
                 {
-                    message = $"Duplicate assignment prevented: Device '{replacementDevice.MobileCode}' is already assigned to '{replacementDevice.PhoneNumber}'."
+                    message = $"Duplicate assignment prevented: Device '{replacementDevice.MobileCode}' is already assigned to '{replacementDevice.AssignedEmployeeName}'."
                 });
             }
 
@@ -501,7 +503,6 @@ public class ReturnsController : ControllerBase
             }
 
             // Update replacement device status from Available -> Active / Assigned
-            replacementDevice.PhoneNumber = empName;
             replacementDevice.AssignedEmployeeName = empName;
             replacementDevice.AssignedEmployeeId = empId;
             replacementDevice.CurrentStatus = "Assigned";
@@ -658,7 +659,7 @@ public class ReturnsController : ControllerBase
                 return NotFound(new { message = "Returned mobile device was not found or is inactive." });
             }
 
-            if (string.IsNullOrWhiteSpace(returnedDevice.PhoneNumber))
+            if (string.IsNullOrWhiteSpace(returnedDevice.AssignedEmployeeName))
             {
                 return BadRequest(new
                 {
@@ -666,7 +667,7 @@ public class ReturnsController : ControllerBase
                 });
             }
 
-            var currentHolder = returnedDevice.PhoneNumber.Trim();
+            var currentHolder = returnedDevice.AssignedEmployeeName.Trim();
             if (!string.Equals(currentHolder, request.EmployeeName.Trim(), StringComparison.OrdinalIgnoreCase))
             {
                 return BadRequest(new
@@ -692,11 +693,11 @@ public class ReturnsController : ControllerBase
                 });
             }
 
-            if (!string.IsNullOrWhiteSpace(replacementDevice.PhoneNumber))
+            if (!string.IsNullOrWhiteSpace(replacementDevice.AssignedEmployeeName))
             {
                 return BadRequest(new
                 {
-                    message = $"Device '{replacementDevice.MobileCode}' is already assigned to '{replacementDevice.PhoneNumber}'. Only Available devices can be assigned."
+                    message = $"Device '{replacementDevice.MobileCode}' is already assigned to '{replacementDevice.AssignedEmployeeName}'. Only Available devices can be assigned."
                 });
             }
 
@@ -715,13 +716,16 @@ public class ReturnsController : ControllerBase
                 : (replacementDevice.MobileName ?? "Mobile Device");
 
             // Step 1: Receive Returned Device -> becomes Available
-            returnedDevice.PhoneNumber = null;
+            returnedDevice.AssignedEmployeeName = null;
+            returnedDevice.AssignedEmployeeId = null;
+            returnedDevice.EmployeeId = null;
             returnedDevice.CurrentStatus = "Available";
             returnedDevice.UpdatedAtUtc = nowUtc;
 
             // Step 2: Assign Replacement Device -> becomes Active / Assigned
-            replacementDevice.PhoneNumber = currentHolder;
-            replacementDevice.CurrentStatus = "Available";
+            replacementDevice.AssignedEmployeeName = currentHolder;
+            replacementDevice.AssignedEmployeeId = empId;
+            replacementDevice.CurrentStatus = "Assigned";
             replacementDevice.UpdatedAtUtc = nowUtc;
 
             var txRecord = new DeviceReturnReplacement

@@ -13,7 +13,8 @@ import {
   MapPin,
   History,
   Check,
-  ArrowLeftRight
+  ArrowLeftRight,
+  CreditCard
 } from 'lucide-react';
 import { api } from '../api';
 
@@ -56,6 +57,7 @@ export default function DevicesView({
     brand: '',
     imei: '',
     serialNumber: '',
+    bankAccountName: '',
     assignedTo: '',
     location: '',
     currentStatus: 'Available'
@@ -120,6 +122,7 @@ export default function DevicesView({
       brand: '',
       imei: '',
       serialNumber: '',
+      bankAccountName: '',
       assignedTo: '',
       location: '',
       currentStatus: 'Available'
@@ -142,7 +145,8 @@ export default function DevicesView({
       brand: device.brand || '',
       imei: device.imei || '',
       serialNumber: device.serialNumber || '',
-      assignedTo: device.phoneNumber || '',
+      bankAccountName: device.bankAccountName || device.phoneNumber || '',
+      assignedTo: device.assignedEmployeeName || '',
       location: device.description || '',
       currentStatus: device.currentStatus || 'Available'
     });
@@ -184,7 +188,9 @@ export default function DevicesView({
         model: formData.deviceName.trim() || null,
         imei: formData.imei.trim() || null,
         serialNumber: formData.serialNumber.trim() || formData.imei.trim() || null,
-        phoneNumber: formData.assignedTo.trim() || null,
+        bankAccountName: formData.bankAccountName.trim() || null,
+        phoneNumber: formData.bankAccountName.trim() || null,
+        assignedEmployeeName: formData.assignedTo.trim() || null,
         description: formData.location.trim() || null,
         currentStatus: formData.currentStatus || 'Available'
       };
@@ -212,8 +218,10 @@ export default function DevicesView({
           brand: '',
           imei: '',
           serialNumber: '',
+          bankAccountName: '',
           assignedTo: '',
-          location: ''
+          location: '',
+          currentStatus: 'Available'
         });
       }
     } catch (err) {
@@ -582,6 +590,7 @@ export default function DevicesView({
                 <thead>
                   <tr className="bg-slate-50/80 border-y border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                     <th className="py-2.5 px-3">UNIQUE ID (CATEGORY)</th>
+                    <th className="py-2.5 px-3">BANK ACCOUNT / DETAILS</th>
                     <th className="py-2.5 px-3">ASSIGNED EMPLOYEE</th>
                     <th className="py-2.5 px-3">GROUP</th>
                     <th className="py-2.5 px-3">DEVICE &amp; IMEI / SERIAL</th>
@@ -626,12 +635,24 @@ export default function DevicesView({
                         </td>
                         <td className="py-3 px-3">
                           <div className="font-bold text-slate-900 flex items-center space-x-1.5">
-                            <UserCheck className="w-3.5 h-3.5 text-[#1a6e3c] shrink-0" />
-                            <span>{d.phoneNumber || 'Unassigned'}</span>
+                            <CreditCard className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                            <span>{d.bankAccountName || d.phoneNumber || '—'}</span>
                           </div>
                           <div className="text-[10px] text-slate-400">
-                            Updated {d.updatedAtColombo?.split(' ')[0] || 'Today'}
+                            Bank Transaction Profile
                           </div>
+                        </td>
+                        <td className="py-3 px-3">
+                          {d.assignedEmployeeName ? (
+                            <div className="font-bold text-slate-900 flex items-center space-x-1.5">
+                              <UserCheck className="w-3.5 h-3.5 text-[#1a6e3c] shrink-0" />
+                              <span>{d.assignedEmployeeName}</span>
+                            </div>
+                          ) : (
+                            <span className="inline-block px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-500">
+                              Unassigned
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-3">
                           <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 font-bold text-[11px]">
@@ -652,7 +673,7 @@ export default function DevicesView({
                               <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
                               <span>MISSING</span>
                             </span>
-                          ) : d.phoneNumber && d.phoneNumber.trim() ? (
+                          ) : d.assignedEmployeeName && d.assignedEmployeeName.trim() ? (
                             <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#c4f5fc] text-slate-900 border border-cyan-300">
                               <Check className="w-3 h-3 stroke-[2.5]" />
                               <span>Active / Assigned</span>
@@ -812,24 +833,56 @@ export default function DevicesView({
                 />
               </div>
 
-              {/* Assigned Employee * */}
+              {/* Bank Account / Details Identification */}
+              <div>
+                <label
+                  htmlFor="panel-bank-account"
+                  className="block text-xs font-semibold text-slate-700 mb-1"
+                >
+                  Bank Account / Profile Name (Transaction ID)
+                </label>
+                <div className="relative">
+                  <CreditCard className="w-3.5 h-3.5 text-blue-600 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    id="panel-bank-account"
+                    type="text"
+                    placeholder="e.g. Everyway Solutions Pty, Hayden Llewellynne"
+                    value={formData.bankAccountName}
+                    onChange={(e) =>
+                      setFormData({ ...formData, bankAccountName: e.target.value })
+                    }
+                    className="w-full pl-8 pr-3.5 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#68c73a]"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Unique name for mobile device identification of bank details for bank transaction tasks.
+                </p>
+              </div>
+
+              {/* Manually Entered Assigned Employee */}
               <div>
                 <label
                   htmlFor="panel-assigned"
                   className="block text-xs font-semibold text-slate-700 mb-1"
                 >
-                  Assigned Employee (Current User)
+                  Assigned Employee / Operator (Mobile Phone User)
                 </label>
-                <input
-                  id="panel-assigned"
-                  type="text"
-                  placeholder="e.g. David joseph, Olivia Oimin"
-                  value={formData.assignedTo}
-                  onChange={(e) =>
-                    setFormData({ ...formData, assignedTo: e.target.value })
-                  }
-                  className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#68c73a]"
-                />
+                <div className="relative">
+                  <UserCheck className="w-3.5 h-3.5 text-[#1a6e3c] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    id="panel-assigned"
+                    type="text"
+                    placeholder="Enter employee / staff name (or leave empty if in stock)"
+                    value={formData.assignedTo}
+                    onChange={(e) =>
+                      setFormData({ ...formData, assignedTo: e.target.value })
+                    }
+                    className="w-full pl-8 pr-3.5 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#68c73a]"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Staff member manually assigned to operate this bank transaction mobile phone.
+                </p>
               </div>
 
               {/* Group * */}

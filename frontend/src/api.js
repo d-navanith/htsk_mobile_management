@@ -134,6 +134,19 @@ export const api = {
     });
   },
 
+  async assignDevice(id, data) {
+    return request(`/devices/${id}/assign`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async unassignDevice(id) {
+    return request(`/devices/${id}/unassign`, {
+      method: 'POST',
+    });
+  },
+
   async deactivateDevice(id) {
     return request(`/devices/${id}`, {
       method: 'DELETE',

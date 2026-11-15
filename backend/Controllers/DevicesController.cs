@@ -104,7 +104,9 @@ public class DevicesController : ControllerBase
                 UpdatedAtColombo: _timeService.FormatColombo(d.UpdatedAtUtc),
                 LastCheckedAtColombo: lastCheck != null ? _timeService.FormatColombo(lastCheck.CheckedAtUtc) : null,
                 LastCheckedByAdmin: lastCheck?.CheckedByUser?.FullName ?? lastCheck?.CheckedByUser?.Username,
-                IdentificationNumber: d.IdentificationNumber > 0 ? d.IdentificationNumber : d.DeviceId
+                IdentificationNumber: d.IdentificationNumber > 0 ? d.IdentificationNumber : d.DeviceId,
+                BankAccountName: d.BankAccountName ?? d.PhoneNumber,
+                AssignedEmployeeName: d.AssignedEmployeeName
             );
         }).ToList();
 
@@ -145,7 +147,9 @@ public class DevicesController : ControllerBase
             UpdatedAtColombo: _timeService.FormatColombo(d.UpdatedAtUtc),
             LastCheckedAtColombo: lastCheck != null ? _timeService.FormatColombo(lastCheck.CheckedAtUtc) : null,
             LastCheckedByAdmin: lastCheck?.CheckedByUser?.FullName ?? lastCheck?.CheckedByUser?.Username,
-            IdentificationNumber: d.IdentificationNumber > 0 ? d.IdentificationNumber : d.DeviceId
+            IdentificationNumber: d.IdentificationNumber > 0 ? d.IdentificationNumber : d.DeviceId,
+            BankAccountName: d.BankAccountName ?? d.PhoneNumber,
+            AssignedEmployeeName: d.AssignedEmployeeName
         ));
     }
 
@@ -209,6 +213,14 @@ public class DevicesController : ControllerBase
         var maxId = await _db.MobileDevices.MaxAsync(d => (int?)d.IdentificationNumber) ?? 0;
         int nextIdNum = maxId + 1;
 
+        var bankAccount = !string.IsNullOrWhiteSpace(request.BankAccountName)
+            ? request.BankAccountName.Trim()
+            : request.PhoneNumber?.Trim();
+
+        var assignedEmployee = !string.IsNullOrWhiteSpace(request.AssignedEmployeeName)
+            ? request.AssignedEmployeeName.Trim()
+            : null;
+
         var device = new MobileDevice
         {
             IdentificationNumber = nextIdNum,
@@ -218,7 +230,9 @@ public class DevicesController : ControllerBase
             Brand = request.Brand?.Trim(),
             Model = request.Model?.Trim(),
             IMEI = request.IMEI?.Trim(),
-            PhoneNumber = request.PhoneNumber?.Trim(),
+            PhoneNumber = bankAccount,
+            BankAccountName = bankAccount,
+            AssignedEmployeeName = assignedEmployee,
             SerialNumber = request.SerialNumber?.Trim(),
             Description = request.Description?.Trim(),
             CurrentStatus = "Available",
@@ -241,15 +255,14 @@ public class DevicesController : ControllerBase
             device.ModelId = modelEntity.ModelId;
         }
 
-        // BCNF Normalization: Employee linkage
-        if (!string.IsNullOrWhiteSpace(device.PhoneNumber))
+        // BCNF Normalization: Manual Employee linkage
+        if (!string.IsNullOrWhiteSpace(assignedEmployee))
         {
-            var empName = device.PhoneNumber.Trim();
-            var empEntity = await _db.Employees.FirstOrDefaultAsync(e => e.FullName.ToLower() == empName.ToLower());
+            var empEntity = await _db.Employees.FirstOrDefaultAsync(e => e.FullName.ToLower() == assignedEmployee.ToLower());
             if (empEntity == null)
             {
                 var empCount = await _db.Employees.CountAsync();
-                empEntity = new Employee { EmployeeCode = $"EMP-{(empCount + 1):D4}", FullName = empName, Department = "Operations", CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow };
+                empEntity = new Employee { EmployeeCode = $"EMP-{(empCount + 1):D4}", FullName = assignedEmployee, Department = "Operations", CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow };
                 _db.Employees.Add(empEntity);
                 await _db.SaveChangesAsync();
             }
@@ -293,7 +306,9 @@ public class DevicesController : ControllerBase
             UpdatedAtColombo: _timeService.FormatColombo(device.UpdatedAtUtc),
             LastCheckedAtColombo: null,
             LastCheckedByAdmin: null,
-            IdentificationNumber: device.IdentificationNumber
+            IdentificationNumber: device.IdentificationNumber,
+            BankAccountName: device.BankAccountName ?? device.PhoneNumber,
+            AssignedEmployeeName: device.AssignedEmployeeName
         ));
     }
 
@@ -433,7 +448,42 @@ public class DevicesController : ControllerBase
         device.Brand = request.Brand?.Trim();
         device.Model = request.Model?.Trim();
         device.IMEI = request.IMEI?.Trim();
-        device.PhoneNumber = request.PhoneNumber?.Trim();
+
+        var bankAccount = !string.IsNullOrWhiteSpace(request.BankAccountName)
+            ? request.BankAccountName.Trim()
+            : request.PhoneNumber?.Trim();
+
+        if (bankAccount != null)
+        {
+            device.BankAccountName = bankAccount;
+            device.PhoneNumber = bankAccount;
+        }
+
+        if (request.AssignedEmployeeName != null)
+        {
+            var empName = request.AssignedEmployeeName.Trim();
+            if (string.IsNullOrWhiteSpace(empName) || empName.Equals("Unassigned", StringComparison.OrdinalIgnoreCase))
+            {
+                device.AssignedEmployeeName = null;
+                device.AssignedEmployeeId = null;
+                device.EmployeeId = null;
+            }
+            else
+            {
+                var empEntity = await _db.Employees.FirstOrDefaultAsync(e => e.FullName.ToLower() == empName.ToLower());
+                if (empEntity == null)
+                {
+                    var empCount = await _db.Employees.CountAsync();
+                    empEntity = new Employee { EmployeeCode = $"EMP-{(empCount + 1):D4}", FullName = empName, Department = "Operations", CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow };
+                    _db.Employees.Add(empEntity);
+                    await _db.SaveChangesAsync();
+                }
+                device.EmployeeId = empEntity.EmployeeId;
+                device.AssignedEmployeeName = empEntity.FullName;
+                device.AssignedEmployeeId = empEntity.EmployeeCode;
+            }
+        }
+
         device.SerialNumber = request.SerialNumber?.Trim();
         device.Description = request.Description?.Trim();
         device.IsActive = request.IsActive;
@@ -519,6 +569,140 @@ public class DevicesController : ControllerBase
         await _db.SaveChangesAsync();
 
         return Ok(new { message = $"Device {device.MobileCode} has been deleted." });
+    }
+
+    [HttpPost("{id}/assign")]
+    public async Task<ActionResult> AssignEmployee(int id, [FromBody] AssignEmployeeRequest request)
+    {
+        if (!await _permissionService.HasPermissionAsync(GetCurrentRole(), "manage_mobile_phones"))
+        {
+            return StatusCode(403, new { message = "Manage mobile phones permission is currently disabled for your role." });
+        }
+
+        var device = await _db.MobileDevices.FindAsync(id);
+        if (device == null) return NotFound();
+
+        var empName = request.EmployeeName?.Trim();
+        if (string.IsNullOrWhiteSpace(empName))
+        {
+            return BadRequest(new { message = "Employee name is required." });
+        }
+
+        var prevEmp = device.AssignedEmployeeName ?? "Unassigned";
+
+        // Find or create employee entity
+        var empEntity = await _db.Employees.FirstOrDefaultAsync(e => e.FullName.ToLower() == empName.ToLower());
+        if (empEntity == null)
+        {
+            var empCount = await _db.Employees.CountAsync();
+            empEntity = new Employee
+            {
+                EmployeeCode = $"EMP-{(empCount + 1):D4}",
+                FullName = empName,
+                Department = request.Department?.Trim() ?? "Operations",
+                IsActive = true,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            };
+            _db.Employees.Add(empEntity);
+            await _db.SaveChangesAsync();
+        }
+
+        device.EmployeeId = empEntity.EmployeeId;
+        device.AssignedEmployeeName = empEntity.FullName;
+        device.AssignedEmployeeId = empEntity.EmployeeCode;
+        if (!string.IsNullOrWhiteSpace(request.Department))
+        {
+            device.Department = request.Department.Trim();
+        }
+        device.LastAssignmentDateUtc = _timeService.UtcNow;
+        device.UpdatedAtUtc = _timeService.UtcNow;
+
+        var currentUserId = GetCurrentUserId();
+        var currentUsername = User.Identity?.Name ?? "Administrator";
+
+        // Record movement / handover history
+        _db.DeviceMovements.Add(new DeviceMovement
+        {
+            DeviceId = device.DeviceId,
+            MovementType = "Assignment",
+            FromStatus = "InStock",
+            ToStatus = "Assigned",
+            FromEmployee = prevEmp,
+            ToEmployee = empEntity.FullName,
+            Reason = request.Notes ?? "Manual assignment to employee",
+            MovementDateUtc = _timeService.UtcNow,
+            PerformedByUserId = currentUserId,
+            PerformedByName = currentUsername,
+            CreatedAtUtc = _timeService.UtcNow
+        });
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            UserId = currentUserId,
+            UserName = currentUsername,
+            UserRole = GetCurrentRole(),
+            Action = "AssignDevice",
+            EntityName = "MobileDevice",
+            EntityId = device.DeviceId.ToString(),
+            Details = $"Assigned Device #{device.IdentificationNumber} ({device.MobileCode}, Bank: {device.BankAccountName}) to Employee '{empEntity.FullName}' (was: {prevEmp})",
+            TimestampUtc = DateTime.UtcNow
+        });
+
+        await _db.SaveChangesAsync();
+        return Ok(new { message = $"Device #{device.IdentificationNumber} successfully assigned to {empEntity.FullName}." });
+    }
+
+    [HttpPost("{id}/unassign")]
+    public async Task<ActionResult> UnassignEmployee(int id)
+    {
+        if (!await _permissionService.HasPermissionAsync(GetCurrentRole(), "manage_mobile_phones"))
+        {
+            return StatusCode(403, new { message = "Manage mobile phones permission is currently disabled for your role." });
+        }
+
+        var device = await _db.MobileDevices.FindAsync(id);
+        if (device == null) return NotFound();
+
+        var prevEmp = device.AssignedEmployeeName ?? "Unassigned";
+        device.AssignedEmployeeName = null;
+        device.AssignedEmployeeId = null;
+        device.EmployeeId = null;
+        device.LastReturnDateUtc = _timeService.UtcNow;
+        device.UpdatedAtUtc = _timeService.UtcNow;
+
+        var currentUserId = GetCurrentUserId();
+        var currentUsername = User.Identity?.Name ?? "Administrator";
+
+        _db.DeviceMovements.Add(new DeviceMovement
+        {
+            DeviceId = device.DeviceId,
+            MovementType = "Unassignment",
+            FromStatus = "Assigned",
+            ToStatus = "InStock",
+            FromEmployee = prevEmp,
+            ToEmployee = "Unassigned (Company Stock)",
+            Reason = "Manual unassignment / return to stock",
+            MovementDateUtc = _timeService.UtcNow,
+            PerformedByUserId = currentUserId,
+            PerformedByName = currentUsername,
+            CreatedAtUtc = _timeService.UtcNow
+        });
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            UserId = currentUserId,
+            UserName = currentUsername,
+            UserRole = GetCurrentRole(),
+            Action = "UnassignDevice",
+            EntityName = "MobileDevice",
+            EntityId = device.DeviceId.ToString(),
+            Details = $"Unassigned Device #{device.IdentificationNumber} ({device.MobileCode}, Bank: {device.BankAccountName}) from Employee '{prevEmp}' - returned to inventory stock",
+            TimestampUtc = DateTime.UtcNow
+        });
+
+        await _db.SaveChangesAsync();
+        return Ok(new { message = $"Device #{device.IdentificationNumber} returned to inventory as unassigned stock." });
     }
 
     [HttpPost("seed-excel")]

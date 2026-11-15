@@ -75,7 +75,9 @@ public record DeviceDto(
     string UpdatedAtColombo,
     string? LastCheckedAtColombo,
     string? LastCheckedByAdmin = null,
-    int IdentificationNumber = 0
+    int IdentificationNumber = 0,
+    string? BankAccountName = null,
+    string? AssignedEmployeeName = null
 );
 
 public record CreateDeviceRequest(
@@ -88,7 +90,9 @@ public record CreateDeviceRequest(
     string? PhoneNumber,
     string? SerialNumber,
     string? Description,
-    string? GroupName = null
+    string? GroupName = null,
+    string? BankAccountName = null,
+    string? AssignedEmployeeName = null
 );
 
 public record UpdateDeviceRequest(
@@ -103,7 +107,15 @@ public record UpdateDeviceRequest(
     bool IsActive,
     string? MobileCode = null,
     string? GroupName = null,
-    string? CurrentStatus = null
+    string? CurrentStatus = null,
+    string? BankAccountName = null,
+    string? AssignedEmployeeName = null
+);
+
+public record AssignEmployeeRequest(
+    string EmployeeName,
+    string? Department = null,
+    string? Notes = null
 );
 
 // --- Session & Checking DTOs ---
@@ -139,7 +151,9 @@ public record DeviceSessionCheckDto(
     string? LastSessionSummary = null,
     string? PhoneNumber = null,
     string? IMEI = null,
-    string? SerialNumber = null
+    string? SerialNumber = null,
+    string? BankAccountName = null,
+    string? AssignedEmployeeName = null
 );
 
 public record SessionDetailsDto(
@@ -193,7 +207,9 @@ public record MissingIncidentDto(
     string? AssignedTo = null,
     string? LastKnownLocation = null,
     string? PreviousAssignmentDetails = null,
-    string? LastVerifiedAtColombo = null
+    string? LastVerifiedAtColombo = null,
+    string? BankAccountName = null,
+    string? AssignedEmployeeName = null
 );
 
 public record UpdateIncidentActionRequest(

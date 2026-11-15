@@ -74,12 +74,14 @@ public class IncidentsController : ControllerBase
                 Model: i.Device?.Model,
                 IMEI: i.Device?.IMEI,
                 SerialNumber: i.Device?.SerialNumber,
-                AssignedTo: i.Device?.PhoneNumber,
+                AssignedTo: i.Device?.AssignedEmployeeName,
                 LastKnownLocation: i.Device?.Description,
                 PreviousAssignmentDetails: i.Notes,
                 LastVerifiedAtColombo: lastVerifiedRec != null
                     ? _timeService.FormatColombo(lastVerifiedRec.CheckedAtUtc)
-                    : (i.Device != null ? _timeService.FormatColombo(i.Device.CreatedAtUtc) : null)
+                    : (i.Device != null ? _timeService.FormatColombo(i.Device.CreatedAtUtc) : null),
+                BankAccountName: i.Device?.BankAccountName ?? i.Device?.PhoneNumber,
+                AssignedEmployeeName: i.Device?.AssignedEmployeeName
             );
         }).ToList();
 
@@ -174,7 +176,17 @@ public class IncidentsController : ControllerBase
             RecoveredAtColombo: _timeService.FormatColombo(incident.RecoveredAtUtc),
             ActionTaken: incident.ActionTaken,
             Notes: incident.Notes,
-            IsEscalated: incident.IncidentStatus == "Escalated" || (incident.IncidentStatus == "Open" && incident.ConsecutiveMissingCount >= 2)
+            IsEscalated: incident.IncidentStatus == "Escalated" || (incident.IncidentStatus == "Open" && incident.ConsecutiveMissingCount >= 2),
+            Brand: device.Brand,
+            Model: device.Model,
+            IMEI: device.IMEI,
+            SerialNumber: device.SerialNumber,
+            AssignedTo: device.AssignedEmployeeName,
+            LastKnownLocation: device.Description,
+            PreviousAssignmentDetails: incident.Notes,
+            LastVerifiedAtColombo: _timeService.FormatColombo(incident.FirstMissingAtUtc),
+            BankAccountName: device.BankAccountName ?? device.PhoneNumber,
+            AssignedEmployeeName: device.AssignedEmployeeName
         ));
     }
 

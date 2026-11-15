@@ -351,7 +351,9 @@ public class CheckSessionService : ICheckSessionService
                 LastSessionSummary: lastSummary,
                 PhoneNumber: d.PhoneNumber,
                 IMEI: d.IMEI,
-                SerialNumber: d.SerialNumber
+                SerialNumber: d.SerialNumber,
+                BankAccountName: d.BankAccountName ?? d.PhoneNumber,
+                AssignedEmployeeName: d.AssignedEmployeeName
             );
         }).OrderBy(d => d.GroupName).ThenBy(d => d.MobileCode).ToList();
 
@@ -431,8 +433,8 @@ public class CheckSessionService : ICheckSessionService
         var availableDevices = await _db.MobileDevices.CountAsync(d => d.IsActive && d.CurrentStatus == "Available");
         var missingDevices = await _db.MobileDevices.CountAsync(d => d.IsActive && d.CurrentStatus == "Missing");
         var notCheckedDevices = await _db.MobileDevices.CountAsync(d => d.IsActive && d.CurrentStatus == "NotChecked");
-        var assignedDevices = await _db.MobileDevices.CountAsync(d => d.IsActive && d.CurrentStatus != "Missing" && d.PhoneNumber != null && d.PhoneNumber != "");
-        var availableUnassignedDevices = await _db.MobileDevices.CountAsync(d => d.IsActive && d.CurrentStatus != "Missing" && (d.PhoneNumber == null || d.PhoneNumber == ""));
+        var assignedDevices = await _db.MobileDevices.CountAsync(d => d.IsActive && d.CurrentStatus != "Missing" && d.AssignedEmployeeName != null && d.AssignedEmployeeName != "");
+        var availableUnassignedDevices = await _db.MobileDevices.CountAsync(d => d.IsActive && d.CurrentStatus != "Missing" && (d.AssignedEmployeeName == null || d.AssignedEmployeeName == ""));
         var totalGroups = await _db.Groups.CountAsync(g => g.IsActive);
         var totalSessions = await _db.CheckSessions.CountAsync();
 
@@ -490,12 +492,14 @@ public class CheckSessionService : ICheckSessionService
                 Model: i.Device?.Model,
                 IMEI: i.Device?.IMEI,
                 SerialNumber: i.Device?.SerialNumber,
-                AssignedTo: i.Device?.PhoneNumber,
+                AssignedTo: i.Device?.AssignedEmployeeName,
                 LastKnownLocation: i.Device?.Description,
                 PreviousAssignmentDetails: i.Notes,
                 LastVerifiedAtColombo: lastVerifiedRec != null
                     ? _time.FormatColombo(lastVerifiedRec.CheckedAtUtc)
-                    : (i.Device != null ? _time.FormatColombo(i.Device.CreatedAtUtc) : null)
+                    : (i.Device != null ? _time.FormatColombo(i.Device.CreatedAtUtc) : null),
+                BankAccountName: i.Device?.BankAccountName ?? i.Device?.PhoneNumber,
+                AssignedEmployeeName: i.Device?.AssignedEmployeeName
             );
         }).ToList();
 

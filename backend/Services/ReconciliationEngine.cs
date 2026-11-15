@@ -487,8 +487,8 @@ public class ReconciliationEngine
 
         // 5. Build Mathematical Balance Report (Section 15)
         var totalReg = allDevices.Count(d => d.IsActive);
-        var avail = allDevices.Count(d => d.IsActive && (d.CurrentStatus == "Available" || (d.PhoneNumber == null || d.PhoneNumber == "")));
-        var assigned = allDevices.Count(d => d.IsActive && d.CurrentStatus != "Available" && d.CurrentStatus != "Missing" && !string.IsNullOrWhiteSpace(d.PhoneNumber));
+        var avail = allDevices.Count(d => d.IsActive && (d.CurrentStatus == "Available" || string.IsNullOrWhiteSpace(d.AssignedEmployeeName)));
+        var assigned = allDevices.Count(d => d.IsActive && d.CurrentStatus != "Available" && d.CurrentStatus != "Missing" && !string.IsNullOrWhiteSpace(d.AssignedEmployeeName));
         var underMaint = allDevices.Count(d => d.IsActive && d.CurrentStatus == "UnderMaintenance");
         var underInvest = allDevices.Count(d => d.IsActive && (d.CurrentStatus == "UnderInvestigation" || d.CurrentStatus == "Missing"));
         var lost = allDevices.Count(d => d.IsActive && d.CurrentStatus == "ConfirmedLost");

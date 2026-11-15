@@ -50,6 +50,7 @@ public class MobileDevice
     public string? Model { get; set; }
     public string? IMEI { get; set; }
     public string? PhoneNumber { get; set; }
+    public string? BankAccountName { get; set; } // Bank account name / profile for bank transactions
     public string? SerialNumber { get; set; }
     public string? Description { get; set; }
     public string CurrentStatus { get; set; } = "NotChecked"; // Available, Assigned, UnderMaintenance, UnderInvestigation, ConfirmedLost, Retired

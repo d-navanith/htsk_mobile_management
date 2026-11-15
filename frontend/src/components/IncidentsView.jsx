@@ -11,7 +11,8 @@ import {
   X,
   UserCheck,
   MapPin,
-  Clock
+  Clock,
+  CreditCard
 } from 'lucide-react';
 import { api } from '../api';
 import IncidentModal from './IncidentModal';
@@ -253,7 +254,8 @@ export default function IncidentsView({ user, onDataChange }) {
               <thead className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider">
                 <tr>
                   <th className="py-3 px-4 text-left">Unique Device ID &amp; Model</th>
-                  <th className="py-3 px-4 text-left">Last Assigned Employee</th>
+                  <th className="py-3 px-4 text-left">Bank Profile</th>
+                  <th className="py-3 px-4 text-left">Last Assigned Staff</th>
                   <th className="py-3 px-4 text-left">Last Known Location</th>
                   <th className="py-3 px-4 text-left">Previous Assignment &amp; Notes</th>
                   <th className="py-3 px-4 text-left">Last Physical Verification</th>
@@ -266,8 +268,8 @@ export default function IncidentsView({ user, onDataChange }) {
                   <tr
                     key={incident.incidentId}
                     className={`hover:bg-slate-50/80 transition ${
-                      incident.isEscalated ? 'bg-rose-50/40' : ''
-                    }`}
+                    incident.isEscalated ? 'bg-rose-50/40' : ''
+                  }`}
                   >
                     <td className="py-3.5 px-4">
                       <div className="font-extrabold text-xs text-slate-900">
@@ -284,8 +286,18 @@ export default function IncidentsView({ user, onDataChange }) {
 
                     <td className="py-3.5 px-4">
                       <div className="font-bold text-slate-900 flex items-center space-x-1.5">
+                        <CreditCard className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                        <span>{incident.bankAccountName || '—'}</span>
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        Bank Transaction Profile
+                      </div>
+                    </td>
+
+                    <td className="py-3.5 px-4">
+                      <div className="font-bold text-slate-900 flex items-center space-x-1.5">
                         <UserCheck className="w-3.5 h-3.5 text-[#1a6e3c] shrink-0" />
-                        <span>{incident.assignedTo || 'Unassigned'}</span>
+                        <span>{incident.assignedEmployeeName || incident.assignedTo || 'Unassigned'}</span>
                       </div>
                       <div className="text-[10px] text-slate-400">
                         Group {incident.groupName}
@@ -420,7 +432,7 @@ export default function IncidentsView({ user, onDataChange }) {
                   <option value="">Select a registered device...</option>
                   {devices.map((d) => (
                     <option key={d.deviceId} value={d.deviceId}>
-                      {d.mobileCode} — {d.phoneNumber || 'Unassigned'} (Group {d.groupName})
+                      {d.mobileCode} — [Bank: {d.bankAccountName || d.phoneNumber || '—'}] {d.assignedEmployeeName ? `(Operator: ${d.assignedEmployeeName})` : '(Unassigned)'} (Group {d.groupName})
                     </option>
                   ))}
                 </select>

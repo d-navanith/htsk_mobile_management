@@ -227,6 +227,11 @@ public static class DbInitializer
             BEGIN
                 ALTER TABLE [dbo].[MobileDevices] ADD [EmployeeId] INT NULL;
             END
+
+            IF COL_LENGTH('dbo.MobileDevices', 'BankAccountName') IS NULL
+            BEGIN
+                ALTER TABLE [dbo].[MobileDevices] ADD [BankAccountName] NVARCHAR(200) NULL;
+            END
         ");
 
         // Execute post-schema updates in dynamic SQL batches to avoid compilation errors on newly added columns
@@ -234,6 +239,13 @@ public static class DbInitializer
             IF COL_LENGTH('dbo.MobileDevices', 'IdentificationNumber') IS NOT NULL
             BEGIN
                 EXEC sp_executesql N'UPDATE [dbo].[MobileDevices] SET [IdentificationNumber] = [DeviceId] WHERE [IdentificationNumber] IS NULL OR [IdentificationNumber] = 0;';
+            END
+
+            IF COL_LENGTH('dbo.MobileDevices', 'BankAccountName') IS NOT NULL
+            BEGIN
+                EXEC sp_executesql N'UPDATE [dbo].[MobileDevices] SET [BankAccountName] = [PhoneNumber] WHERE [BankAccountName] IS NULL AND [PhoneNumber] IS NOT NULL;';
+                EXEC sp_executesql N'UPDATE [dbo].[MobileDevices] SET [AssignedEmployeeName] = NULL WHERE [AssignedEmployeeName] = [PhoneNumber];';
+                EXEC sp_executesql N'UPDATE [dbo].[MobileDevices] SET [EmployeeId] = NULL WHERE [AssignedEmployeeName] IS NULL;';
             END
 
             IF OBJECT_ID('dbo.CheckSessions', 'U') IS NOT NULL
@@ -764,6 +776,7 @@ public static class DbInitializer
                 Model = model,
                 IMEI = imei1,
                 PhoneNumber = employeeName,
+                BankAccountName = employeeName,
                 SerialNumber = serial,
                 Description = location,
                 CurrentStatus = "Available",

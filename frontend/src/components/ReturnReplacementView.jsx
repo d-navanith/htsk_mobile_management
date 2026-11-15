@@ -93,11 +93,11 @@ export default function ReturnReplacementView({
       setAvailableDevices(safeAvail);
       setHistory(safeHist);
 
-      if (initialDevice && initialDevice.phoneNumber) {
+      if (initialDevice && (initialDevice.assignedEmployeeName || initialDevice.phoneNumber)) {
+        const targetName = (initialDevice.assignedEmployeeName || initialDevice.phoneNumber).trim().toLowerCase();
         const matchEmp = safeEmployees.find(
           (e) =>
-            e.employeeName.toLowerCase() ===
-            initialDevice.phoneNumber.trim().toLowerCase()
+            e.employeeName.toLowerCase() === targetName
         );
         if (matchEmp) {
           setSelectedEmployee(matchEmp);

@@ -74,9 +74,15 @@ export default function IncidentModal({ isOpen, onClose, onSave, incident }) {
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">Last Assigned Employee:</span>
+              <span className="text-slate-500">Bank Account / Profile:</span>
+              <span className="font-bold text-blue-900">
+                {incident.bankAccountName || '—'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Last Assigned Staff:</span>
               <span className="font-bold text-slate-900">
-                {incident.assignedTo || 'Unassigned'} (Group {incident.groupName})
+                {incident.assignedEmployeeName || incident.assignedTo || 'Unassigned'} (Group {incident.groupName})
               </span>
             </div>
             <div className="flex justify-between">

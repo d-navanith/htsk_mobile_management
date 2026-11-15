@@ -7,7 +7,12 @@ import {
   EyeOff,
   ChevronLeft,
   ChevronRight,
-  AlertTriangle
+  AlertTriangle,
+  UserPlus,
+  Edit,
+  X,
+  CreditCard,
+  UserCheck
 } from 'lucide-react';
 import { api } from '../api';
 
@@ -22,7 +27,8 @@ export default function DashboardView({
   onNavigateToHistory,
   onNavigateToDevices,
   onNavigateToReturns,
-  onStartSession
+  onStartSession,
+  onDataChange
 }) {
   const [devices, setDevices] = useState([]);
   const [loadingDevices, setLoadingDevices] = useState(true);
@@ -33,6 +39,18 @@ export default function DashboardView({
   const [showRawImei, setShowRawImei] = useState(() => isPrivileged);
   const [page, setPage] = useState(1);
   const pageSize = 10;
+
+  // Manual Assign Modal State
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [selectedDeviceForAssign, setSelectedDeviceForAssign] = useState(null);
+  const [manualAssigneeName, setManualAssigneeName] = useState('');
+  const [manualDepartment, setManualDepartment] = useState('Operations');
+  const [assignSaving, setAssignSaving] = useState(false);
+  const [assignError, setAssignError] = useState('');
+
+  const canManagePhones =
+    user?.role === 'Developer' ||
+    (user?.role === 'ITAdmin' && (userPermissions?.manage_mobile_phones ?? true));
 
   // Live 1-hour / 2-hour countdown timer state
   const [secondsLeft, setSecondsLeft] = useState(3540); // 00:59:00 default matching mockup
@@ -140,25 +158,52 @@ export default function DashboardView({
   const computedAssignedCount = devices.filter(
     (d) =>
       d.currentStatus !== 'Missing' &&
-      d.phoneNumber &&
-      d.phoneNumber.trim().length > 0
+      d.assignedEmployeeName &&
+      d.assignedEmployeeName.trim().length > 0
   ).length;
   const computedAvailableStockCount = devices.filter(
     (d) =>
       d.currentStatus !== 'Missing' &&
-      (!d.phoneNumber || d.phoneNumber.trim().length === 0)
+      (!d.assignedEmployeeName || d.assignedEmployeeName.trim().length === 0)
   ).length;
 
-  const assignedPhonesCount =
-    typeof dtoAssignedDevices === 'number' && dtoAssignedDevices >= 0
-      ? dtoAssignedDevices
-      : computedAssignedCount;
-  const availableUnassignedCount =
-    typeof dtoAvailableUnassignedDevices === 'number' &&
-    dtoAvailableUnassignedDevices >= 0
-      ? dtoAvailableUnassignedDevices
-      : computedAvailableStockCount;
+  const assignedPhonesCount = computedAssignedCount;
+  const availableUnassignedCount = computedAvailableStockCount;
   const activeOrFoundCount = assignedPhonesCount;
+
+  const openAssignModal = (dev) => {
+    setSelectedDeviceForAssign(dev);
+    setManualAssigneeName(dev.assignedEmployeeName || '');
+    setManualDepartment(dev.department || 'Operations');
+    setAssignError('');
+    setAssignModalOpen(true);
+  };
+
+  const handleSaveManualAssign = async (e) => {
+    e.preventDefault();
+    if (!selectedDeviceForAssign) return;
+    setAssignSaving(true);
+    setAssignError('');
+    try {
+      if (!manualAssigneeName.trim()) {
+        await api.unassignDevice(selectedDeviceForAssign.deviceId);
+      } else {
+        await api.assignDevice(selectedDeviceForAssign.deviceId, {
+          employeeName: manualAssigneeName.trim(),
+          department: manualDepartment.trim()
+        });
+      }
+      setAssignModalOpen(false);
+      // Reload devices list
+      const list = await api.getDevices({ isActive: true });
+      setDevices(Array.isArray(list) ? list : []);
+      if (onDataChange) onDataChange();
+    } catch (err) {
+      setAssignError(err.message || 'Failed to save assignee');
+    } finally {
+      setAssignSaving(false);
+    }
+  };
 
   // Unique groups for quick filter
   const uniqueGroups = Array.from(
@@ -516,7 +561,7 @@ export default function DashboardView({
                     #
                   </th>
                   <th className="border border-slate-300 py-2.5 px-4 text-center font-bold uppercase tracking-wide text-slate-900 bg-white">
-                    PHONE NUMBER / ID
+                    PHONE ID
                   </th>
                   <th className="border border-slate-300 py-2.5 px-4 text-center font-bold uppercase tracking-wide text-slate-900 bg-white">
                     GROUP
@@ -526,6 +571,9 @@ export default function DashboardView({
                   </th>
                   <th className="border border-slate-300 py-2.5 px-4 text-center font-bold uppercase tracking-wide text-slate-900 bg-white">
                     Device name
+                  </th>
+                  <th className="border border-slate-300 py-2.5 px-4 text-center font-bold uppercase tracking-wide text-slate-900 bg-white">
+                    Bank Account / Details
                   </th>
                   <th className="border border-slate-300 py-2.5 px-4 text-center font-bold uppercase tracking-wide text-slate-900 bg-white">
                     Assigned To
@@ -580,10 +628,40 @@ export default function DashboardView({
                         {d.mobileName || d.model || 'iPhone 15'}
                       </td>
                       <td className="border border-slate-200/90 py-3 px-4 text-center font-semibold text-slate-900">
-                        {d.phoneNumber || (
-                          <span className="text-emerald-700 font-bold">
-                            Available (In Stock)
-                          </span>
+                        <div className="font-bold text-slate-900 flex items-center justify-center space-x-1.5">
+                          <CreditCard className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                          <span>{d.bankAccountName || d.phoneNumber || '—'}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-medium">
+                          Bank Details
+                        </div>
+                      </td>
+                      <td className="border border-slate-200/90 py-3 px-4 text-center font-semibold text-slate-900">
+                        {d.assignedEmployeeName ? (
+                          <div className="inline-flex items-center space-x-1.5">
+                            <span className="font-bold text-slate-900">{d.assignedEmployeeName}</span>
+                            {canManagePhones && (
+                              <button
+                                type="button"
+                                onClick={() => openAssignModal(d)}
+                                title="Edit assigned employee"
+                                className="p-1 text-slate-400 hover:text-slate-800 transition cursor-pointer"
+                              >
+                                <Edit className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        ) : canManagePhones ? (
+                          <button
+                            type="button"
+                            onClick={() => openAssignModal(d)}
+                            className="px-2.5 py-1 text-[11px] font-bold text-slate-900 bg-[#c8f53b] hover:bg-[#b8e629] rounded-lg transition cursor-pointer inline-flex items-center space-x-1 shadow-2xs"
+                          >
+                            <UserPlus className="w-3 h-3" />
+                            <span>+ Assign</span>
+                          </button>
+                        ) : (
+                          <span className="text-slate-400 font-medium text-[11px]">Unassigned</span>
                         )}
                       </td>
                       <td className="border border-slate-200/90 py-3 px-4 text-center">
@@ -591,7 +669,7 @@ export default function DashboardView({
                           <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
                             <span>MISSING</span>
                           </span>
-                        ) : d.phoneNumber ? (
+                        ) : d.assignedEmployeeName ? (
                           <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#c4f5fc] text-slate-900">
                             <Check className="w-3 h-3 stroke-[2.5]" />
                             <span>ACTIVE / ASSIGNED</span>
@@ -778,6 +856,151 @@ export default function DashboardView({
           )}
         </div>
       </div>
+
+      {/* Manual Employee Assignment Modal */}
+      {assignModalOpen && selectedDeviceForAssign && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in duration-150">
+            <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 rounded-lg bg-[#c8f53b]/40 text-slate-950 flex items-center justify-center">
+                  <UserPlus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900">
+                    Assign Mobile Device to Staff
+                  </h3>
+                  <p className="text-[10px] text-slate-500">
+                    Manual staff assignment &amp; custody tracking
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAssignModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveManualAssign} className="p-6 space-y-4 text-xs">
+              {/* Phone Details Banner */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/90 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="font-extrabold text-slate-950 text-sm">
+                    {selectedDeviceForAssign.mobileCode}
+                  </div>
+                  <span className="px-2 py-0.5 rounded bg-slate-200/80 text-slate-800 font-bold text-[10px]">
+                    Group {selectedDeviceForAssign.groupName || '—'}
+                  </span>
+                </div>
+                <div className="text-slate-600 text-[11px]">
+                  {selectedDeviceForAssign.mobileName || selectedDeviceForAssign.model || 'iPhone 15'} · IMEI: <span className="font-mono font-bold text-slate-800">{selectedDeviceForAssign.imei || '—'}</span>
+                </div>
+
+                {/* Bank Account Identification Callout */}
+                <div className="mt-2 pt-2 border-t border-slate-200/80">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-blue-700 flex items-center space-x-1">
+                    <CreditCard className="w-3 h-3" />
+                    <span>Bank Transaction Profile:</span>
+                  </div>
+                  <div className="text-xs font-black text-slate-900 mt-0.5">
+                    {selectedDeviceForAssign.bankAccountName || selectedDeviceForAssign.phoneNumber || '—'}
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">
+                    This phone is dedicated to transactions for this bank entity. Assign the operator below.
+                  </div>
+                </div>
+              </div>
+
+              {/* Form Input: Staff Name */}
+              <div>
+                <label className="block font-bold text-slate-800 mb-1">
+                  Assigned Employee / Operator Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Jonney, Kahn, Joy, Pinnay, Ury"
+                  value={manualAssigneeName}
+                  onChange={(e) => setManualAssigneeName(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 font-medium placeholder-slate-400 focus:outline-none focus:border-[#1a6e3c] focus:ring-1 focus:ring-[#1a6e3c]"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  Leave empty and save to unassign and return phone to Available inventory.
+                </span>
+              </div>
+
+              {/* Form Input: Department */}
+              <div>
+                <label className="block font-bold text-slate-800 mb-1">
+                  Department / Team
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Operations, Finance, IT"
+                  value={manualDepartment}
+                  onChange={(e) => setManualDepartment(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 font-medium placeholder-slate-400 focus:outline-none focus:border-[#1a6e3c]"
+                />
+              </div>
+
+              {assignError && (
+                <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
+                  {assignError}
+                </div>
+              )}
+
+              {/* Modal Buttons */}
+              <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+                {selectedDeviceForAssign.assignedEmployeeName ? (
+                  <button
+                    type="button"
+                    disabled={assignSaving}
+                    onClick={() => {
+                      setManualAssigneeName('');
+                      setTimeout(() => {
+                        const form = document.querySelector('form');
+                        if (form) form.requestSubmit();
+                      }, 0);
+                    }}
+                    className="px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg transition cursor-pointer"
+                  >
+                    Unassign Phone
+                  </button>
+                ) : (
+                  <div />
+                )}
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    disabled={assignSaving}
+                    onClick={() => setAssignModalOpen(false)}
+                    className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={assignSaving}
+                    className="px-4 py-1.5 text-xs font-extrabold text-slate-950 bg-[#c8f53b] hover:bg-[#b8e629] rounded-lg shadow-2xs transition cursor-pointer inline-flex items-center space-x-1"
+                  >
+                    {assignSaving ? (
+                      <span>Saving...</span>
+                    ) : (
+                      <>
+                        <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                        <span>Save Assignment</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

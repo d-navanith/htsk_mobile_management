@@ -617,16 +617,9 @@ async function getDashboardKPIs() {
   const activeCount = activeRecords.length;
 
   // Available in Stock:
-  // Every active taking device reduces available stock by 1 (-1)
-  // Every standalone return device returned to inventory increases available stock by 1 (+1)
-  // Standalone return device = record with return_device present and taking_device empty
-  const standaloneReturns = records.filter(r => {
-    const hasReturn = r.return_device && r.return_device.trim() !== '';
-    const hasTaking = r.taking_device && r.taking_device.trim() !== '';
-    return hasReturn && !hasTaking;
-  }).length;
-
-  const availableStock = Math.max(0, totalStock - activeCount + standaloneReturns);
+  // Invariant: Available in Stock + Active Mobile Phones = Total Inventory Stock
+  // When activeCount = 4, availableStock = 159 - 4 = 155 (155 + 4 = 159 tally)
+  const availableStock = Math.max(0, totalStock - activeCount);
 
   // Need an Update:
   // Count of records where sign == 'Pending' or not returned/handed over after shift!

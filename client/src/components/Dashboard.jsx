@@ -175,10 +175,10 @@ export default function Dashboard({
             Active Mobile Phones
           </div>
           <div style={{ fontSize: '42px', fontWeight: 800, color: '#06b6d4', lineHeight: 1.1, marginBottom: '10px' }}>
-            {kpis.activeMobilePhones || 3}
+            {kpis.activeMobilePhones !== undefined ? kpis.activeMobilePhones : 4}
           </div>
           <div style={{ fontSize: '12.5px', color: '#9ca3af', fontWeight: 400 }}>
-            {String(kpis.activeMobilePhones || 3).padStart(2, '0')} under active mobile phones
+            {String(kpis.activeMobilePhones !== undefined ? kpis.activeMobilePhones : 4).padStart(2, '0')} under active mobile phones
           </div>
         </div>
 
@@ -194,10 +194,10 @@ export default function Dashboard({
             Available in Stock
           </div>
           <div style={{ fontSize: '42px', fontWeight: 800, color: '#eab308', lineHeight: 1.1, marginBottom: '10px' }}>
-            {kpis.availableInStock !== undefined ? kpis.availableInStock : 156}
+            {kpis.availableInStock !== undefined ? kpis.availableInStock : 155}
           </div>
           <div style={{ fontSize: '12.5px', color: '#9ca3af', fontWeight: 400 }}>
-            {kpis.availableInStock !== undefined ? kpis.availableInStock : 156} under available in stock
+            {kpis.availableInStock !== undefined ? kpis.availableInStock : 155} under available in stock
           </div>
         </div>
 

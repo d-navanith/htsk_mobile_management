@@ -214,6 +214,7 @@ export default function App() {
           dashboardData={dashboardData}
           mobileMenuOpen={mobileMenuOpen}
           setMobileMenuOpen={setMobileMenuOpen}
+          onLogout={handleLogout}
         />
 
         {/* Right Workspace Column */}

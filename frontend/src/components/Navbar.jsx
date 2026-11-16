@@ -26,7 +26,8 @@ export function Sidebar({
   setActiveTab,
   dashboardData,
   mobileMenuOpen = false,
-  setMobileMenuOpen = () => {}
+  setMobileMenuOpen = () => {},
+  onLogout = () => {}
 }) {
   const activeIncidentsCount =
     dashboardData?.activeIncidentsCount ?? dashboardData?.missingDevices ?? 0;
@@ -183,6 +184,44 @@ export function Sidebar({
           {adminNav.map(renderNavButton)}
         </div>
       )}
+
+      {/* Admin Profile & Logout Section at bottom of Sidebar */}
+      <div className="mt-auto pt-6 border-t border-slate-200/80">
+        <div className="p-3 bg-white rounded-2xl border border-slate-200/80 shadow-2xs">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-9 h-9 rounded-xl bg-slate-900 text-[#c8f53b] font-black text-xs flex items-center justify-center shrink-0 shadow-2xs">
+              {(user?.fullName || user?.username || 'AD').slice(0, 2).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-extrabold text-slate-900 truncate">
+                {user?.fullName || user?.username || 'Administrator'}
+              </div>
+              <div className="flex items-center space-x-1 mt-0.5">
+                <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-[#c8f53b] text-slate-950 uppercase tracking-tight">
+                  {user?.role === 'Developer' ? 'DEV ADMIN' : 'IT ADMIN'}
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono truncate">
+                  Active
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onLogout}
+            className="w-full mt-3 py-2 px-3 rounded-xl bg-[#f8faf6] hover:bg-rose-50 border border-slate-200/80 hover:border-rose-200 text-slate-700 hover:text-rose-700 text-xs font-bold transition flex items-center justify-between cursor-pointer group"
+          >
+            <span className="flex items-center space-x-2">
+              <LogOut className="w-3.5 h-3.5 text-slate-400 group-hover:text-rose-500 transition" />
+              <span>Sign Out</span>
+            </span>
+            <span className="text-[10px] text-slate-400 group-hover:text-rose-400 font-mono">
+              Logout
+            </span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 
@@ -292,6 +331,17 @@ export function TopHeader({
               className="w-44 sm:w-72 md:w-80 px-3.5 py-1.5 bg-[#ecefee] focus:bg-white border border-slate-300/90 rounded-md text-xs text-slate-800 placeholder-slate-400 focus:outline-none transition"
             />
           </div>
+
+          {/* Explicit Logout Button in Top Header */}
+          <button
+            type="button"
+            onClick={onLogout}
+            className="px-3 py-1.5 rounded-xl bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-300 text-slate-700 hover:text-rose-700 text-xs font-bold transition flex items-center space-x-1.5 shadow-2xs cursor-pointer"
+            title="Sign out of Admin Session"
+          >
+            <LogOut className="w-3.5 h-3.5 text-rose-500" />
+            <span className="hidden sm:inline">Logout</span>
+          </button>
 
           {/* User Profile Avatar Circle matching mockup */}
           <div className="relative">

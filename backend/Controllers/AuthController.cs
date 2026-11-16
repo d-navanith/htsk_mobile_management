@@ -54,9 +54,11 @@ public class AuthController : ControllerBase
             return BadRequest(new { message = "Username and password are required." });
         }
 
+        var trimmedUser = request.Username.Trim().ToLower();
         var user = await _db.Users
             .Include(u => u.Role)
-            .FirstOrDefaultAsync(u => u.Username.ToLower() == request.Username.Trim().ToLower());
+            .FirstOrDefaultAsync(u => u.Username.ToLower() == trimmedUser ||
+                                      (trimmedUser == "admin" && u.Username.ToLower() == "itadmin"));
 
         if (user == null || !user.IsActive)
         {
@@ -70,7 +72,20 @@ public class AuthController : ControllerBase
         }
 
         var actualRole = user.Role?.RoleName ?? "Employee";
-        if (!string.IsNullOrWhiteSpace(expectedRole) &&
+        
+        // Admin-only restriction check: if admin portal is requested, only ITAdmin and Developer roles are permitted
+        if (string.Equals(expectedRole, "Admin", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(expectedRole, "ITAdmin", StringComparison.OrdinalIgnoreCase))
+        {
+            if (actualRole == "Employee")
+            {
+                return StatusCode(403, new
+                {
+                    message = "Access restricted: This portal is exclusively for System Administrators. Staff / Employee accounts are not permitted."
+                });
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(expectedRole) &&
             !string.Equals(actualRole, expectedRole.Trim(), StringComparison.OrdinalIgnoreCase))
         {
             var portalLabel = expectedRole.Trim() switch

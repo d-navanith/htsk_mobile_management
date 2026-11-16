@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { api, getStoredUser } from './api';
 import { Sidebar, TopHeader } from './components/Navbar';
-import LoginModal, { detectPortalFromLocation, PORTAL_CONFIGS } from './components/LoginModal';
+import LoginModal from './components/LoginModal';
 import DashboardView from './components/DashboardView';
 import CheckingSessionView from './components/CheckingSessionView';
 import DevicesView from './components/DevicesView';
@@ -34,7 +34,7 @@ class WorkspaceErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-6">
+        <div className="min-h-screen bg-[#f4f9f2] flex items-center justify-center p-6">
           <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 p-6 shadow-sm text-center space-y-4">
             <h2 className="text-base font-bold text-slate-900">
               Workspace View Reload Needed
@@ -49,7 +49,7 @@ class WorkspaceErrorBoundary extends React.Component {
                   this.setState({ hasError: false, error: null });
                   window.location.reload();
                 }}
-                className="px-4 py-2 bg-[#1e4e8c] text-white rounded-lg text-xs font-semibold"
+                className="px-4 py-2 bg-[#1a6e3c] text-white rounded-lg text-xs font-semibold"
               >
                 Reload Page
               </button>
@@ -77,9 +77,8 @@ export default function App() {
     try {
       const u = getStoredUser();
       if (!u || !u.role) return null;
-      const urlPortal = detectPortalFromLocation();
-      // Enforce strict URL-to-role isolation: if opening a different role's URL, require sign-in for that role
-      if (urlPortal && u.role !== urlPortal) {
+      // Admin-only restriction: staff accounts are blocked from accessing the admin workspace
+      if (u.role === 'Employee') {
         api.logout();
         return null;
       }
@@ -91,7 +90,6 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [dashboardData, setDashboardData] = useState(null);
   const [permissionsList, setPermissionsList] = useState([]);
-  const [lastRolePortal, setLastRolePortal] = useState(() => detectPortalFromLocation());
   const [globalSearch, setGlobalSearch] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [initialReturnDevice, setInitialReturnDevice] = useState(null);
@@ -166,34 +164,24 @@ export default function App() {
     return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
   }, []);
 
-  const handleLogin = async (username, password, expectedRole) => {
+  const handleLogin = async (username, password, expectedRole = 'ITAdmin') => {
     const data = await api.login(username, password, expectedRole);
-    setLastRolePortal(data.role);
+    if (data.role === 'Employee') {
+      api.logout();
+      throw new Error(
+        'Access restricted: This portal is exclusively for System Administrators. Staff / Employee accounts are not permitted.'
+      );
+    }
     setUser(data);
     setActiveTab('dashboard');
-    const portalCfg = PORTAL_CONFIGS[data.role] || PORTAL_CONFIGS.Employee;
-    try {
-      window.history.replaceState(null, '', portalCfg.path);
-    } catch {
-      window.location.hash = portalCfg.hash;
-    }
   };
 
   const handleLogout = () => {
-    const previousRole = user?.role || lastRolePortal || detectPortalFromLocation();
     api.logout();
     setUser(null);
     setDashboardData(null);
     setPermissionsList([]);
     setActiveTab('dashboard');
-    setLastRolePortal(previousRole);
-
-    const portalCfg = PORTAL_CONFIGS[previousRole] || PORTAL_CONFIGS.Employee;
-    try {
-      window.history.replaceState(null, '', portalCfg.path);
-    } catch {
-      window.location.hash = portalCfg.hash;
-    }
   };
 
   const handleStartSessionFromDashboard = async () => {
@@ -209,7 +197,7 @@ export default function App() {
   if (!user) {
     return (
       <WorkspaceErrorBoundary>
-        <LoginModal onLogin={handleLogin} initialPortal={lastRolePortal} />
+        <LoginModal onLogin={handleLogin} />
       </WorkspaceErrorBoundary>
     );
   }

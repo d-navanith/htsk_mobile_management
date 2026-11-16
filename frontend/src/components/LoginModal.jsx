@@ -5,151 +5,30 @@ import {
   User,
   AlertCircle,
   ShieldCheck,
-  Terminal,
   Eye,
   EyeOff,
   Clock,
+  ArrowRight,
   CheckCircle2,
-  Building2,
-  Globe
+  KeyRound
 } from 'lucide-react';
 
 export const PORTAL_CONFIGS = {
-  Employee: {
-    role: 'Employee',
-    path: '/emp',
-    hash: '#/emp',
-    subdomainExample: 'htsk-mobile-mgmt-emp.runasp.net',
-    badge: 'Employee Access Portal',
-    code: 'EMP-PORTAL',
-    title: 'Employee Sign In',
-    subtitle: 'Read-only access to mobile phone availability, group assignments, and checking history.',
-    icon: Building2,
-    accentBg: 'from-emerald-600 to-teal-700',
-    accentLight: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-    buttonClass: 'bg-emerald-600 hover:bg-emerald-500 focus-visible:outline-emerald-500 shadow-emerald-950/50',
-    ringClass: 'focus:ring-emerald-500',
-    features: [
-      'View live availability of all company mobile phones',
-      'Inspect department & employee group status',
-      'Browse historical 2-hour checking records & daily reports'
-    ],
-    placeholderUser: 'Enter your Employee username'
-  },
   ITAdmin: {
     role: 'ITAdmin',
-    path: '/adm002',
-    hash: '#/adm002',
-    subdomainExample: 'htsk-mobile-mgmt-adm002.runasp.net',
-    badge: 'IT Admin Operations Portal',
-    code: 'ADM002-PORTAL',
-    title: 'IT Admin Sign In',
-    subtitle: 'Conduct mandatory 2-hour physical phone inspections, manage inventory, and handle missing incidents.',
-    icon: ShieldCheck,
-    accentBg: 'from-blue-600 to-indigo-700',
-    accentLight: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
-    buttonClass: 'bg-blue-600 hover:bg-blue-500 focus-visible:outline-blue-500 shadow-blue-950/50',
-    ringClass: 'focus:ring-blue-500',
-    features: [
-      'Start & complete 2-hour mobile checking sessions',
-      'Register mobile devices and organize employee groups',
-      'Investigate & resolve escalated missing-phone incidents'
-    ],
-    placeholderUser: 'Enter your IT Admin username'
-  },
-  Developer: {
-    role: 'Developer',
-    path: '/dev001',
-    hash: '#/dev001',
-    subdomainExample: 'htsk-mobile-mgmt-dev001.runasp.net',
-    badge: 'Developer System Console',
-    code: 'DEV001-PORTAL',
-    title: 'Developer Sign In',
-    subtitle: 'Full system administration, CRUD operations across all modules, role governance, and configuration.',
-    icon: Terminal,
-    accentBg: 'from-purple-600 to-violet-800',
-    accentLight: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
-    buttonClass: 'bg-purple-600 hover:bg-purple-500 focus-visible:outline-purple-500 shadow-purple-950/50',
-    ringClass: 'focus:ring-purple-500',
-    features: [
-      'Full CRUD control over all system modules & records',
-      'Manage user accounts, role permissions, & system settings',
-      'Audit sessions, notifications, incidents, & history'
-    ],
-    placeholderUser: 'Enter your Developer username'
+    path: '/',
+    hash: '#/',
+    badge: 'Administrator Portal',
+    code: 'ADMIN-PORTAL',
+    title: 'Admin Sign In'
   }
 };
 
-/**
- * Detects which isolated role login portal is requested from:
- * 1. Hostname / Subdomain (e.g. htsk-mobile-mgmt-dev001.runasp.net, htsk-mobile-mgmt-adm002.runasp.net, htsk-mobile-mgmt-emp.runasp.net)
- * 2. Clean URL Path on a single website (e.g. /dev001, /adm002, /emp)
- * 3. URL Hash fallback (e.g. #/dev001, #/adm002, #/emp)
- *
- * Defaults to 'Employee' when visiting the root URL '/' so administrative portals (/dev001, /adm002) remain unexposed.
- */
 export function detectPortalFromLocation() {
-  const host = (window.location.hostname || '').toLowerCase();
-  const path = (window.location.pathname || '').toLowerCase();
-  const hash = (window.location.hash || '').toLowerCase();
-  const search = (window.location.search || '').toLowerCase();
-
-  // 1. Check Subdomain / Hostname
-  if (host.includes('dev001') || host.includes('-dev') || host.startsWith('dev.')) {
-    return 'Developer';
-  }
-  if (host.includes('adm002') || host.includes('-adm') || host.includes('-admin') || host.startsWith('adm.') || host.startsWith('admin.')) {
-    return 'ITAdmin';
-  }
-  if (host.includes('-emp') || host.startsWith('emp.')) {
-    return 'Employee';
-  }
-
-  // 2. Check Clean URL Pathname (for single MonsterASP.NET website with unique role URLs)
-  if (
-    path.startsWith('/dev001') ||
-    path.startsWith('/dev-001') ||
-    path.startsWith('/developer') ||
-    path.startsWith('/login/developer')
-  ) {
-    return 'Developer';
-  }
-  if (
-    path.startsWith('/adm002') ||
-    path.startsWith('/adm-002') ||
-    path.startsWith('/itadmin') ||
-    path.startsWith('/admin') ||
-    path.startsWith('/login/itadmin')
-  ) {
-    return 'ITAdmin';
-  }
-  if (
-    path.startsWith('/emp') ||
-    path.startsWith('/employee') ||
-    path.startsWith('/login/employee')
-  ) {
-    return 'Employee';
-  }
-
-  // 3. Check Hash or Query string
-  if (hash.includes('dev001') || hash.includes('developer') || search.includes('portal=dev')) {
-    return 'Developer';
-  }
-  if (hash.includes('adm002') || hash.includes('itadmin') || search.includes('portal=adm')) {
-    return 'ITAdmin';
-  }
-  if (hash.includes('emp') || hash.includes('employee') || search.includes('portal=emp')) {
-    return 'Employee';
-  }
-
-  // Default root URL ('/') strictly to Employee portal for security isolation
-  return 'Employee';
+  return 'ITAdmin';
 }
 
-export default function LoginModal({ onLogin, initialPortal = null }) {
-  const [selectedPortal, setSelectedPortal] = useState(() => {
-    return detectPortalFromLocation() || initialPortal || 'Employee';
-  });
+export default function LoginModal({ onLogin }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -161,29 +40,10 @@ export default function LoginModal({ onLogin, initialPortal = null }) {
   const errorBannerRef = useRef(null);
 
   useEffect(() => {
-    const syncPortalFromUrl = () => {
-      const detected = detectPortalFromLocation();
-      setSelectedPortal(detected);
-      setError('');
-      setUsername('');
-      setPassword('');
-      setShowPassword(false);
-    };
-
-    window.addEventListener('popstate', syncPortalFromUrl);
-    window.addEventListener('hashchange', syncPortalFromUrl);
-    return () => {
-      window.removeEventListener('popstate', syncPortalFromUrl);
-      window.removeEventListener('hashchange', syncPortalFromUrl);
-    };
+    usernameInputRef.current?.focus();
   }, []);
 
-  useEffect(() => {
-    if (selectedPortal && usernameInputRef.current) {
-      usernameInputRef.current.focus();
-    }
-  }, [selectedPortal]);
-
+  // Synchronized Colombo SLST Live Clock
   useEffect(() => {
     const updateClock = () => {
       const now = new Date();
@@ -206,16 +66,28 @@ export default function LoginModal({ onLogin, initialPortal = null }) {
     return () => clearInterval(timer);
   }, []);
 
+  const handleQuickFill = () => {
+    setUsername('itadmin');
+    setPassword('Admin@123');
+    setError('');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedPortal) return;
+    if (!username.trim() || !password) {
+      setError('Please enter both admin username and password.');
+      return;
+    }
 
     setError('');
     setLoading(true);
     try {
-      await onLogin(username, password, selectedPortal);
+      await onLogin(username.trim(), password, 'ITAdmin');
     } catch (err) {
-      setError(err.message || 'Sign in failed. Please check your credentials.');
+      setError(
+        err.message ||
+          'Sign in failed. Please verify your administrator credentials.'
+      );
       setTimeout(() => {
         errorBannerRef.current?.focus();
       }, 50);
@@ -224,66 +96,64 @@ export default function LoginModal({ onLogin, initialPortal = null }) {
     }
   };
 
-  const activeConfig = PORTAL_CONFIGS[selectedPortal] || PORTAL_CONFIGS.Employee;
-  const PortalIcon = activeConfig.icon;
-  const currentUrlDisplay = `${window.location.origin}${activeConfig.path}`;
-
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col justify-between relative overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-slate-950 pointer-events-none" />
+    <div className="min-h-screen bg-[#f4f9f2] text-slate-900 flex flex-col justify-between relative overflow-hidden font-sans selection:bg-[#c8f53b] selection:text-slate-950">
+      {/* Theme Decorative Glow Elements */}
+      <div className="absolute -top-32 -left-32 w-96 h-96 bg-[#c8f53b]/25 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-[#1a6e3c]/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-white/40 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Top Navigation Bar */}
-      <header className="relative z-10 border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      {/* Top Navbar */}
+      <header className="relative z-10 border-b border-slate-200/80 bg-white/80 backdrop-blur-md">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-[#0f2942] rounded-xl flex items-center justify-center shadow-lg border border-slate-700">
-              <Smartphone className="w-5 h-5 text-white" />
+            <div className="text-3xl sm:text-[34px] leading-none font-black tracking-widest bg-gradient-to-r from-[#c8f53b] via-[#7ed321] to-[#1b6b3a] bg-clip-text text-transparent select-none">
+              HTSK
             </div>
-            <div>
-              <span className="font-bold text-base tracking-tight text-white">HTSK MOBILE MANAGEMENT</span>
-              <span className={`hidden sm:inline-block text-xs font-semibold ml-3 px-2.5 py-0.5 rounded-full border ${activeConfig.accentLight}`}>
-                {activeConfig.code}
-              </span>
+            <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+            <div className="hidden sm:block">
+              <div className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
+                Mobile Device Management
+              </div>
+              <div className="text-[10px] text-slate-500">
+                Company Fleet &amp; Physical Verification System
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2 text-xs font-mono text-slate-300 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800">
-            <Clock className="w-3.5 h-3.5 text-amber-400" />
-            <span>{colomboTime}</span>
+          <div className="flex items-center space-x-2 text-xs font-mono text-slate-700 bg-white px-3.5 py-1.5 rounded-full border border-slate-200/90 shadow-2xs">
+            <Clock className="w-3.5 h-3.5 text-[#1a6e3c]" />
+            <span>{colomboTime || 'Colombo SLST'}</span>
           </div>
         </div>
       </header>
 
-      {/* Dedicated Single-Role Sign-In Card (Strict Role URL Isolation) */}
-      <main className="relative z-10 flex-1 flex items-center justify-center px-4 py-10">
-        <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
-          {/* Role Banner Header */}
-          <div className={`bg-gradient-to-r ${activeConfig.accentBg} p-6 text-white`}>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider bg-black/25 px-3 py-1 rounded-full border border-white/15">
-                {activeConfig.badge}
-              </span>
-              <PortalIcon className="w-7 h-7 text-white/90" />
+      {/* Main Admin Sign-In Section */}
+      <main className="relative z-10 flex-1 flex items-center justify-center px-4 py-8 sm:py-12">
+        <div className="w-full max-w-[440px] bg-white rounded-[32px] border-2 border-slate-100 shadow-xl shadow-slate-900/5 p-7 sm:p-10 transition-all">
+          {/* Admin Portal Header Badge */}
+          <div className="text-center">
+            <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider bg-[#f6f9f4] border border-[#c8f53b] text-[#1a6e3c] mb-3">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#1a6e3c]" />
+              <span>ADMINISTRATOR PORTAL</span>
             </div>
-            <h1 id="portal-signin-heading" className="text-2xl font-bold mt-3">
-              {activeConfig.title}
+            <h1
+              id="admin-login-heading"
+              className="text-2xl sm:text-[28px] font-black text-slate-950 tracking-tight"
+            >
+              Admin Sign In
             </h1>
-            <p className="text-xs text-white/90 mt-1.5 leading-relaxed">
-              {activeConfig.subtitle}
+            <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+              Authorized admin access only. Manage company device inventory,
+              physical audits, and missing incidents.
             </p>
-            <div className="mt-3 pt-3 border-t border-white/15 flex items-center space-x-2 text-xs font-mono text-white/90">
-              <Globe className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">{currentUrlDisplay}</span>
-            </div>
           </div>
 
-          {/* Sign-In Form */}
+          {/* Form */}
           <form
-            method="post"
-            action={`/api/auth/login/${activeConfig.role.toLowerCase()}`}
-            aria-labelledby="portal-signin-heading"
             onSubmit={handleSubmit}
-            className="p-6 sm:p-8 space-y-5"
+            aria-labelledby="admin-login-heading"
+            className="mt-6 space-y-4"
           >
             {error && (
               <div
@@ -291,19 +161,20 @@ export default function LoginModal({ onLogin, initialPortal = null }) {
                 tabIndex={-1}
                 role="alert"
                 aria-live="polite"
-                className="bg-rose-950/70 border border-rose-500/60 rounded-xl p-3.5 text-rose-200 text-xs flex items-start space-x-2.5 focus:outline-none"
+                className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-rose-800 text-xs flex items-start space-x-2 focus:outline-none"
               >
-                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
-                <span>{error}</span>
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
+                <span className="font-medium leading-relaxed">{error}</span>
               </div>
             )}
 
+            {/* Username Input */}
             <div className="space-y-1.5">
               <label
-                htmlFor="username"
-                className="block text-xs font-semibold text-slate-200 tracking-wide"
+                htmlFor="admin-username"
+                className="block text-xs font-bold text-slate-800"
               >
-                Username <span aria-hidden="true" className="text-rose-400">*</span>
+                Admin Username <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -311,7 +182,7 @@ export default function LoginModal({ onLogin, initialPortal = null }) {
                 </div>
                 <input
                   ref={usernameInputRef}
-                  id="username"
+                  id="admin-username"
                   name="username"
                   type="text"
                   required
@@ -319,82 +190,123 @@ export default function LoginModal({ onLogin, initialPortal = null }) {
                   autoCorrect="off"
                   autoCapitalize="none"
                   spellCheck={false}
-                  enterKeyHint="next"
                   value={username}
                   onChange={(e) => {
                     setUsername(e.target.value);
                     if (error) setError('');
                   }}
-                  aria-invalid={error ? 'true' : 'false'}
-                  style={{ fontSize: 'max(1rem, 1em)' }}
-                  className={`block w-full min-h-[48px] pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 ${activeConfig.ringClass} focus:border-transparent`}
-                  placeholder={activeConfig.placeholderUser}
+                  className="w-full pl-10 pr-4 py-3 bg-[#f8faf6] border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#1a6e3c] focus:ring-2 focus:ring-[#c8f53b]/40 transition"
+                  placeholder="e.g. itadmin or admin"
                 />
               </div>
             </div>
 
+            {/* Password Input */}
             <div className="space-y-1.5">
-              <label
-                htmlFor="current-password"
-                className="block text-xs font-semibold text-slate-200 tracking-wide"
-              >
-                Password <span aria-hidden="true" className="text-rose-400">*</span>
-              </label>
+              <div className="flex items-center justify-between">
+                <label
+                  htmlFor="admin-password"
+                  className="block text-xs font-bold text-slate-800"
+                >
+                  Password <span className="text-rose-500">*</span>
+                </label>
+                <span className="text-[10px] text-slate-400 font-medium">
+                  Case-sensitive
+                </span>
+              </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                   <Lock className="w-4 h-4" />
                 </div>
                 <input
-                  id="current-password"
+                  id="admin-password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
                   required
                   autoComplete="current-password"
-                  enterKeyHint="done"
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value);
                     if (error) setError('');
                   }}
-                  aria-invalid={error ? 'true' : 'false'}
-                  style={{ fontSize: 'max(1rem, 1em)' }}
-                  className={`block w-full min-h-[48px] pl-10 pr-12 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 ${activeConfig.ringClass} focus:border-transparent`}
-                  placeholder="Enter your password"
+                  className="w-full pl-10 pr-11 py-3 bg-[#f8faf6] border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#1a6e3c] focus:ring-2 focus:ring-[#c8f53b]/40 transition"
+                  placeholder="Enter admin password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  aria-pressed={showPassword}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  className="absolute inset-y-0 right-0 px-3.5 flex items-center text-slate-400 hover:text-slate-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400 rounded-r-xl"
+                  className="absolute inset-y-0 right-0 px-3 flex items-center text-slate-400 hover:text-slate-700 cursor-pointer"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
                 </button>
               </div>
             </div>
 
+            {/* Quick Demo Fill Helper */}
+            <div className="pt-1">
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#f6f9f4] border border-slate-200/90 text-xs">
+                <div className="flex items-center space-x-2 text-slate-600">
+                  <KeyRound className="w-3.5 h-3.5 text-[#1a6e3c] shrink-0" />
+                  <span className="text-[11px] font-medium">
+                    Default Admin: <strong className="text-slate-900">itadmin</strong>
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleQuickFill}
+                  className="px-2.5 py-1 text-[10px] font-extrabold text-slate-900 bg-[#c8f53b] hover:bg-[#b8e629] rounded-lg shadow-2xs transition cursor-pointer"
+                >
+                  Auto Fill
+                </button>
+              </div>
+            </div>
+
+            {/* Submit Button in signature HTSK Lime */}
             <div className="pt-2">
               <button
                 type="submit"
                 disabled={loading}
-                className={`w-full min-h-[48px] flex items-center justify-center py-3 px-4 border border-transparent rounded-xl shadow-lg text-sm font-semibold text-white transition disabled:opacity-50 ${activeConfig.buttonClass}`}
+                className="w-full py-3.5 px-4 bg-[#c8f53b] hover:bg-[#b8e629] active:bg-[#a8d619] text-slate-950 font-black rounded-xl shadow-sm hover:shadow transition flex items-center justify-center space-x-2 text-sm disabled:opacity-50 cursor-pointer"
               >
-                {loading ? 'Authenticating...' : `Sign In as ${activeConfig.role}`}
+                {loading ? (
+                  <span>Authenticating Admin...</span>
+                ) : (
+                  <>
+                    <span>Sign In to Admin Workspace</span>
+                    <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+                  </>
+                )}
               </button>
             </div>
 
-            <ul className="pt-4 border-t border-slate-800 space-y-2">
-              {activeConfig.features.map((feat, idx) => (
-                <li key={idx} className="flex items-start space-x-2 text-xs text-slate-400">
-                  <CheckCircle2 className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
-                  <span>{feat}</span>
-                </li>
-              ))}
-            </ul>
+            {/* Admin Features Checkmarks */}
+            <div className="pt-4 border-t border-slate-100 space-y-2">
+              <div className="flex items-center space-x-2 text-[11px] text-slate-600">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>Physical inspection sessions &amp; inventory reconciliation</span>
+              </div>
+              <div className="flex items-center space-x-2 text-[11px] text-slate-600">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>Device handover, replacements &amp; bank profile management</span>
+              </div>
+              <div className="flex items-center space-x-2 text-[11px] text-slate-600">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>Missing device investigations &amp; executive reports</span>
+              </div>
+            </div>
 
-            <div className="pt-3 border-t border-slate-800 text-center">
-              <p className="text-xs text-slate-400">
-                Isolated endpoint restricted to <strong className="text-slate-200">{activeConfig.role}</strong> accounts only.
+            {/* Security Notice */}
+            <div className="pt-3 text-center">
+              <p className="text-[10px] text-slate-400 font-medium flex items-center justify-center space-x-1">
+                <Lock className="w-3 h-3 text-[#1a6e3c]" />
+                <span>
+                  Admin-only access. Non-admin accounts are strictly restricted.
+                </span>
               </p>
             </div>
           </form>
@@ -402,8 +314,8 @@ export default function LoginModal({ onLogin, initialPortal = null }) {
       </main>
 
       {/* Footer */}
-      <footer className="relative z-10 border-t border-slate-900 py-4 text-center text-xs text-slate-500">
-        HTSK Mobile Management • Dedicated {activeConfig.badge} • Sri Lanka Standard Time (UTC+05:30)
+      <footer className="relative z-10 border-t border-slate-200/80 bg-white/60 backdrop-blur-md py-4 text-center text-xs text-slate-500">
+        HTSK Mobile Device Management System • Administrator Console • Colombo (UTC+05:30)
       </footer>
     </div>
   );

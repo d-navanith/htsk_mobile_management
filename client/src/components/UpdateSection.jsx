@@ -292,7 +292,7 @@ export default function UpdateSection({ onImportSuccess = () => {}, onDownloadTe
                       <td style={{ padding: '10px 14px', fontSize: '13px' }}>{row.shift || 'Day'}</td>
                       <td style={{ padding: '10px 14px', fontSize: '13px' }}>{row.group || 'Group D'}</td>
                       <td style={{ padding: '10px 14px', fontSize: '12.5px' }}>{row.issued_at || '7.30 A.M.'}</td>
-                      <td style={{ padding: '10px 14px', fontSize: '12.5px' }}>{row.return_time || '09.55 P.M.'}</td>
+                      <td style={{ padding: '10px 14px', fontSize: '12.5px' }}>{row.return_time || '—'}</td>
                       <td style={{ padding: '10px 14px', fontSize: '12.5px' }}>{row.return_device || '—'}</td>
                       <td style={{ padding: '10px 14px', fontSize: '12.5px' }}>{row.taking_device || '—'}</td>
                       <td style={{ padding: '10px 14px', fontSize: '12.5px' }}>{row.handover_to || '—'}</td>

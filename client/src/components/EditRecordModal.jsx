@@ -17,7 +17,7 @@ export default function EditRecordModal({ isOpen, onClose, onUpdate, record }) {
   const [shift, setShift] = useState('Day');
   const [group, setGroup] = useState('Group D');
   const [issuedAt, setIssuedAt] = useState('7.30 A.M.');
-  const [returnTime, setReturnTime] = useState('09.55 P.M.');
+  const [returnTime, setReturnTime] = useState('');
   const [returnDevice, setReturnDevice] = useState('');
   const [takingDevice, setTakingDevice] = useState('');
   const [handoverTo, setHandoverTo] = useState('');
@@ -36,7 +36,7 @@ export default function EditRecordModal({ isOpen, onClose, onUpdate, record }) {
       setShift(record.shift || 'Day');
       setGroup(record.group_name || record.group || 'Group D');
       setIssuedAt(record.issued_at || record.time || '7.30 A.M.');
-      setReturnTime(record.return_time || '09.55 P.M.');
+      setReturnTime(record.return_time !== undefined && record.return_time !== null ? record.return_time : '');
       setReturnDevice(record.return_device || '');
       setTakingDevice(record.taking_device || '');
       setHandoverTo(record.handover_to || '');
@@ -261,20 +261,32 @@ export default function EditRecordModal({ isOpen, onClose, onUpdate, record }) {
                 <label style={{ fontSize: '13px', fontWeight: 700, color: '#374151' }}>
                   Return Time
                 </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const t = formatCurrentTime();
-                    setReturnTime(t);
-                    setSign('Done');
-                  }}
-                  style={{ fontSize: '11px', color: '#16a34a', cursor: 'pointer' }}
-                >
-                  Mark Returned
-                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {returnTime ? (
+                    <button
+                      type="button"
+                      onClick={() => setReturnTime('')}
+                      style={{ fontSize: '11px', color: '#ef4444', cursor: 'pointer' }}
+                    >
+                      Clear
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const t = formatCurrentTime();
+                      setReturnTime(t);
+                      setSign('Done');
+                    }}
+                    style={{ fontSize: '11px', color: '#16a34a', cursor: 'pointer' }}
+                  >
+                    Mark Returned
+                  </button>
+                </div>
               </div>
               <input
                 type="text"
+                placeholder="e.g. 09.55 P.M. (or leave empty)"
                 value={returnTime}
                 onChange={e => setReturnTime(e.target.value)}
                 style={{

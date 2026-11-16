@@ -20,7 +20,7 @@ export default function ManualEntryModal({ isOpen, onClose, onSave, groups = [] 
   const [shift, setShift] = useState('Day');
   const [group, setGroup] = useState('Group D');
   const [issuedAt, setIssuedAt] = useState('7.30 A.M.');
-  const [returnTime, setReturnTime] = useState('09.55 P.M.');
+  const [returnTime, setReturnTime] = useState('');
   const [returnDevice, setReturnDevice] = useState('');
   const [takingDevice, setTakingDevice] = useState('');
   const [handoverTo, setHandoverTo] = useState('');
@@ -112,7 +112,7 @@ export default function ManualEntryModal({ isOpen, onClose, onSave, groups = [] 
         shift: shift.trim() || 'Day',
         group: group.trim() || 'Group D',
         issued_at: issuedAt.trim() || '7.30 A.M.',
-        return_time: returnTime.trim() || '09.55 P.M.',
+        return_time: returnTime ? returnTime.trim() : '',
         return_device: returnDevice.trim(),
         taking_device: takingDevice.trim(),
         handover_to: handoverTo.trim(),
@@ -376,11 +376,11 @@ export default function ManualEntryModal({ isOpen, onClose, onSave, groups = [] 
 
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
-                Return Time
+                Return Time (Optional)
               </label>
               <input
                 type="text"
-                placeholder="09.55 P.M."
+                placeholder="e.g. 09.55 P.M. (or leave empty)"
                 value={returnTime}
                 onChange={e => setReturnTime(e.target.value)}
                 style={{

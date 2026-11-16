@@ -150,7 +150,7 @@ async function initDatabase() {
       shift TEXT NOT NULL DEFAULT 'Day',
       group_name TEXT NOT NULL DEFAULT 'Group D',
       issued_at TEXT NOT NULL DEFAULT '7.30 A.M.',
-      return_time TEXT DEFAULT '09.55 P.M.',
+      return_time TEXT DEFAULT '',
       return_device TEXT DEFAULT '',
       taking_device TEXT DEFAULT '',
       device_details TEXT DEFAULT '',
@@ -176,7 +176,7 @@ async function initDatabase() {
         shift TEXT NOT NULL DEFAULT 'Day',
         group_name TEXT NOT NULL DEFAULT 'Group D',
         issued_at TEXT NOT NULL DEFAULT '7.30 A.M.',
-        return_time TEXT DEFAULT '09.55 P.M.',
+        return_time TEXT DEFAULT '',
         return_device TEXT DEFAULT '',
         taking_device TEXT DEFAULT '',
         device_details TEXT DEFAULT '',
@@ -197,7 +197,7 @@ async function initDatabase() {
     { name: 'shift', type: "TEXT DEFAULT 'Day'" },
     { name: 'group_name', type: "TEXT DEFAULT 'Group D'" },
     { name: 'issued_at', type: "TEXT DEFAULT '7.30 A.M.'" },
-    { name: 'return_time', type: "TEXT DEFAULT '09.55 P.M.'" },
+    { name: 'return_time', type: "TEXT DEFAULT ''" },
     { name: 'return_device', type: "TEXT DEFAULT ''" },
     { name: 'taking_device', type: "TEXT DEFAULT ''" },
     { name: 'device_details', type: "TEXT DEFAULT ''" },
@@ -438,7 +438,7 @@ async function insertDeviceRecord({
   shift = 'Day',
   group = 'Group D',
   issued_at = '7.30 A.M.',
-  return_time = '09.55 P.M.',
+  return_time = '',
   return_device = '',
   taking_device = '',
   handover_to = '',
@@ -449,7 +449,7 @@ async function insertDeviceRecord({
   const cleanShift = (shift || 'Day').trim();
   const cleanGroup = (group || 'Group D').trim();
   const cleanIssuedAt = (issued_at || '7.30 A.M.').trim();
-  const cleanReturnTime = (return_time || '09.55 P.M.').trim();
+  const cleanReturnTime = return_time !== undefined && return_time !== null ? String(return_time).trim() : '';
   const cleanReturnDevice = (return_device || '').trim();
   const cleanTakingDevice = (taking_device || '').trim();
   const cleanHandoverTo = (handover_to || '').trim();
@@ -601,12 +601,32 @@ async function getDashboardKPIs() {
   const records = await dbAll(`SELECT * FROM device_records`);
 
   // Active Mobile Phones:
-  // Count distinct taking devices currently held by employees, or records that are actively in use
-  const activeRecords = records.filter(r => r.taking_device && r.taking_device.trim() !== '');
+  // A device is active if an employee is currently holding and using it.
+  // 1) If taking_device is present:
+  //    - If handover_to is present: it's in use by the handover recipient (Active: true)
+  //    - If handover_to is empty:
+  //      - If return_time is filled and sign is Done: employee returned it to stock (Active: false)
+  //      - If return_time is empty or sign is Pending: employee is still using it (Active: true)
+  const activeRecords = records.filter(r => {
+    if (!r.taking_device || r.taking_device.trim() === '') return false;
+    const hasHandover = r.handover_to && r.handover_to.trim() !== '';
+    if (hasHandover) return true;
+    const isReturned = (r.return_time && r.return_time.trim() !== '') && (r.sign && r.sign.toLowerCase() === 'done');
+    return !isReturned;
+  });
   const activeCount = activeRecords.length;
 
   // Available in Stock:
-  const availableStock = Math.max(0, totalStock - activeCount);
+  // Every active taking device reduces available stock by 1 (-1)
+  // Every standalone return device returned to inventory increases available stock by 1 (+1)
+  // Standalone return device = record with return_device present and taking_device empty
+  const standaloneReturns = records.filter(r => {
+    const hasReturn = r.return_device && r.return_device.trim() !== '';
+    const hasTaking = r.taking_device && r.taking_device.trim() !== '';
+    return hasReturn && !hasTaking;
+  }).length;
+
+  const availableStock = Math.max(0, totalStock - activeCount + standaloneReturns);
 
   // Need an Update:
   // Count of records where sign == 'Pending' or not returned/handed over after shift!
@@ -638,6 +658,12 @@ async function getActiveDevicesList() {
       updated_at
     FROM device_records
     WHERE taking_device IS NOT NULL AND taking_device != ''
+      AND (
+        (handover_to IS NOT NULL AND handover_to != '')
+        OR return_time IS NULL
+        OR return_time = ''
+        OR LOWER(sign) = 'pending'
+      )
     ORDER BY id ASC
   `);
   return rows;

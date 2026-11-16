@@ -131,7 +131,7 @@ function mapRowToRecord(rawRow) {
     normalized['expectedreturn'] ||
     normalized['expectedreturnat'] ||
     normalized['return'] ||
-    '09.55 P.M.';
+    '';
 
   const return_device =
     normalized['returndevice'] ||
@@ -208,7 +208,7 @@ function parseTextToRecords(fullText) {
       const shift = parts[1] || 'Day';
       const group = parts[2] || 'Group D';
       const issued_at = parts[3] || '7.30 A.M.';
-      const return_time = parts[4] || '09.55 P.M.';
+      const return_time = parts[4] || '';
       const devDetails = parts[5] || '';
       const handover_to = parts[6] || '';
       const rawSign = parts[7] || '';
@@ -286,7 +286,7 @@ app.post('/api/records', async (req, res) => {
       shift: shift || 'Day',
       group: group || 'Group D',
       issued_at: issued_at || '7.30 A.M.',
-      return_time: return_time || '09.55 P.M.',
+      return_time: return_time !== undefined && return_time !== null ? return_time.trim() : '',
       return_device: return_device || '',
       taking_device: taking_device || '',
       handover_to: handover_to || '',
@@ -686,7 +686,7 @@ app.post('/api/upload/confirm', async (req, res) => {
         shift: row.shift || 'Day',
         group: row.group || 'Group D',
         issued_at: row.issued_at || '7.30 A.M.',
-        return_time: row.return_time || '09.55 P.M.',
+        return_time: row.return_time ? row.return_time.trim() : '',
         return_device: row.return_device || '',
         taking_device: row.taking_device || '',
         handover_to: row.handover_to || '',

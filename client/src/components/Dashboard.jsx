@@ -457,7 +457,7 @@ export default function Dashboard({
 
                       {/* Return Time */}
                       <td style={{ padding: '16px 14px', fontSize: '13px', color: '#374151', borderRight: '1px solid #e5e7eb' }}>
-                        {r.return_time || '09.55 P.M.'}
+                        {r.return_time || ''}
                       </td>
 
                       {/* Device Details (Stacked Return & Taking pills matching Image 4) */}

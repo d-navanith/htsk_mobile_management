@@ -1,0 +1,16 @@
+{
+  "name": "htsk-mobile-management",
+  "version": "1.0.0",
+  "description": "HTSK Mobile Management System with 3NF Relational Database and Sheet Auto-Import",
+  "scripts": {
+    "install:all": "cd server && npm install && cd ../client && npm install",
+    "build": "cd client && npm run build",
+    "start": "node server/index.js",
+    "dev:server": "cd server && node index.js",
+    "dev:client": "cd client && npm run dev",
+    "dev": "npm run start"
+  },
+  "keywords": ["mobile-management", "3nf-database", "htsk", "sheet-import"],
+  "author": "HTSK Engineering",
+  "license": "ISC"
+}

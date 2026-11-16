@@ -1,19 +1,15 @@
 # Node / Frontend
 node_modules/
-frontend/node_modules/
-frontend/dist/
+client/dist/
 .vite/
 
-# .NET / Backend build artifacts
-backend/bin/
-backend/obj/
-publish/
-*.user
-*.suo
-.vs/
-.idea/
+# Local database & uploads
+server/*.sqlite
+server/uploads/
+*.log
 
-# OS / Logs
+# OS / IDE
 .DS_Store
 Thumbs.db
-*.log
+.vs/
+.idea/

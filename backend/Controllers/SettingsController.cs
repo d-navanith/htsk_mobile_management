@@ -32,7 +32,7 @@ public class SettingsController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Developer")]
+    [Authorize(Roles = "Developer,ITAdmin")]
     public async Task<ActionResult<SystemSetting>> CreateSetting([FromBody] CreateSettingRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.SettingKey))
@@ -60,7 +60,7 @@ public class SettingsController : ControllerBase
     }
 
     [HttpPut("{key}")]
-    [Authorize(Roles = "Developer")]
+    [Authorize(Roles = "Developer,ITAdmin")]
     public async Task<ActionResult> UpdateSetting(string key, [FromBody] SystemSetting update)
     {
         var setting = await _db.SystemSettings.FirstOrDefaultAsync(s => s.SettingKey.ToLower() == key.ToLower());
@@ -76,7 +76,7 @@ public class SettingsController : ControllerBase
     }
 
     [HttpDelete("{key}")]
-    [Authorize(Roles = "Developer")]
+    [Authorize(Roles = "Developer,ITAdmin")]
     public async Task<ActionResult> DeleteSetting(string key)
     {
         var setting = await _db.SystemSettings.FirstOrDefaultAsync(s => s.SettingKey.ToLower() == key.ToLower());

@@ -351,7 +351,7 @@ export default function App() {
               <PermissionsView onPermissionsChange={fetchPermissions} />
             )}
 
-            {activeTab === 'settings' && user?.role === 'Developer' && (
+            {activeTab === 'settings' && (user?.role === 'Developer' || user?.role === 'ITAdmin') && (
               <SettingsView onSettingsChange={fetchDashboard} />
             )}
           </main>

@@ -81,9 +81,10 @@ export function Sidebar({
     { id: 'users', label: 'User Management', icon: Users }
   ];
 
-  // Admin operational management (Developer console items hidden!)
+  // Admin operational management & settings
   const adminNav = [
-    { id: 'users', label: 'Staff & Accounts', icon: Users }
+    { id: 'users', label: 'User Management', icon: Users },
+    { id: 'settings', label: 'Settings', icon: Settings }
   ];
 
   const handleSelectTab = (tabId) => {
@@ -179,7 +180,7 @@ export function Sidebar({
       {isAdmin && (
         <div className="mt-6 space-y-1">
           <div className="px-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-            OPERATIONS
+            ADMINISTRATION
           </div>
           {adminNav.map(renderNavButton)}
         </div>

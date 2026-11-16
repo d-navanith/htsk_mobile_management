@@ -705,6 +705,210 @@ public class DevicesController : ControllerBase
         return Ok(new { message = $"Device #{device.IdentificationNumber} returned to inventory as unassigned stock." });
     }
 
+    [HttpPost("{id}/handover")]
+    public async Task<ActionResult> ExecuteShiftHandover(int id, [FromBody] DeviceShiftHandoverRequest request)
+    {
+        var device = await _db.MobileDevices.FindAsync(id);
+        if (device == null) return NotFound(new { message = $"Device with ID {id} not found." });
+
+        var currentUserId = GetCurrentUserId();
+        var currentUsername = User.Identity?.Name ?? "Administrator";
+        var outgoing = request.OutgoingEmployeeName.Trim();
+        var incoming = request.IncomingEmployeeName.Trim();
+
+        // Ensure incoming employee entity exists
+        var emp = await _db.Employees.FirstOrDefaultAsync(e => e.FullName.ToLower() == incoming.ToLower());
+        if (emp == null)
+        {
+            var count = await _db.Employees.CountAsync();
+            emp = new Employee
+            {
+                EmployeeCode = $"EMP-{(count + 1):D4}",
+                FullName = incoming,
+                Department = request.IncomingGroup ?? "Operations",
+                IsActive = true,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            };
+            _db.Employees.Add(emp);
+            await _db.SaveChangesAsync();
+        }
+
+        // Two-party confirmation check (Test A, E vs F)
+        var isConfirmed = (request.OutgoingConfirmed && request.IncomingConfirmed) || (request.OutgoingConfirmed && request.AdminConfirmed);
+
+        if (isConfirmed)
+        {
+            // Direct employee-to-employee handover: device remains In Use / Assigned!
+            device.EmployeeId = emp.EmployeeId;
+            device.AssignedEmployeeName = emp.FullName;
+            device.AssignedEmployeeId = emp.EmployeeCode;
+            device.CurrentStatus = "Assigned";
+            device.LastAssignmentDateUtc = _timeService.UtcNow;
+            device.UpdatedAtUtc = _timeService.UtcNow;
+
+            _db.DeviceMovements.Add(new DeviceMovement
+            {
+                DeviceId = device.DeviceId,
+                MovementType = "ShiftHandover",
+                FromStatus = "Assigned",
+                ToStatus = "Assigned",
+                FromEmployee = outgoing,
+                ToEmployee = incoming,
+                Reason = $"Direct Shift Handover: {request.OutgoingShift} ➔ {request.IncomingShift} at {request.HandoverTime ?? DateTime.UtcNow.ToString("hh:mm tt")}. Condition: {request.Condition}. Notes: {request.HandoverNotes}",
+                MovementDateUtc = _timeService.UtcNow,
+                PerformedByUserId = currentUserId,
+                PerformedByName = currentUsername,
+                CreatedAtUtc = _timeService.UtcNow
+            });
+
+            _db.AuditLogs.Add(new AuditLog
+            {
+                UserId = currentUserId,
+                UserName = currentUsername,
+                UserRole = GetCurrentRole(),
+                Action = "ShiftHandoverCompleted",
+                EntityName = "MobileDevice",
+                EntityId = device.DeviceId.ToString(),
+                Details = $"Device #{device.IdentificationNumber} ({device.MobileCode}) handed over from {outgoing} ({request.OutgoingShift}) to {incoming} ({request.IncomingShift})",
+                TimestampUtc = DateTime.UtcNow
+            });
+
+            await _db.SaveChangesAsync();
+            return Ok(new
+            {
+                success = true,
+                status = "Handover Completed",
+                currentCustodian = incoming,
+                shift = request.IncomingShift,
+                message = $"Device #{device.IdentificationNumber} successfully transferred to {incoming} for {request.IncomingShift}."
+            });
+        }
+        else
+        {
+            // Test F: Outgoing initiated handover, but receiver has not yet confirmed physical receipt!
+            // Outgoing remains the last documented custodian!
+            _db.DeviceMovements.Add(new DeviceMovement
+            {
+                DeviceId = device.DeviceId,
+                MovementType = "ShiftHandoverPending",
+                FromStatus = "Assigned",
+                ToStatus = "HandoverPending",
+                FromEmployee = outgoing,
+                ToEmployee = incoming,
+                Reason = $"Handover Initiated: {outgoing} offered {device.MobileCode} to {incoming}, awaiting physical receipt confirmation.",
+                MovementDateUtc = _timeService.UtcNow,
+                PerformedByUserId = currentUserId,
+                PerformedByName = currentUsername,
+                CreatedAtUtc = _timeService.UtcNow
+            });
+
+            _db.AuditLogs.Add(new AuditLog
+            {
+                UserId = currentUserId,
+                UserName = currentUsername,
+                UserRole = GetCurrentRole(),
+                Action = "ShiftHandoverPending",
+                EntityName = "MobileDevice",
+                EntityId = device.DeviceId.ToString(),
+                Details = $"Device #{device.IdentificationNumber} handover pending confirmation by {incoming}. Last confirmed custodian remains {outgoing}.",
+                TimestampUtc = DateTime.UtcNow
+            });
+
+            await _db.SaveChangesAsync();
+            return Ok(new
+            {
+                success = true,
+                status = "Handover Pending",
+                currentCustodian = outgoing,
+                message = $"Handover initiated. Incoming employee ({incoming}) must confirm physical receipt to complete custody transfer."
+            });
+        }
+    }
+
+    [HttpPost("{id}/late-handover")]
+    public async Task<ActionResult> RecordLateHandover(int id, [FromBody] DeviceLateHandoverRequest request)
+    {
+        var device = await _db.MobileDevices.FindAsync(id);
+        if (device == null) return NotFound(new { message = $"Device with ID {id} not found." });
+
+        var currentUserId = GetCurrentUserId();
+        var currentUsername = User.Identity?.Name ?? "Administrator";
+        var prevEmp = device.AssignedEmployeeName ?? "Previous Custodian";
+        var receiver = request.ActualReceiver.Trim();
+
+        var emp = await _db.Employees.FirstOrDefaultAsync(e => e.FullName.ToLower() == receiver.ToLower());
+        if (emp == null)
+        {
+            var count = await _db.Employees.CountAsync();
+            emp = new Employee
+            {
+                EmployeeCode = $"EMP-{(count + 1):D4}",
+                FullName = receiver,
+                Department = "Operations",
+                IsActive = true,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            };
+            _db.Employees.Add(emp);
+            await _db.SaveChangesAsync();
+        }
+
+        device.EmployeeId = emp.EmployeeId;
+        device.AssignedEmployeeName = emp.FullName;
+        device.AssignedEmployeeId = emp.EmployeeCode;
+        device.CurrentStatus = "Assigned";
+        device.LastAssignmentDateUtc = _timeService.UtcNow;
+        device.UpdatedAtUtc = _timeService.UtcNow;
+
+        _db.DeviceMovements.Add(new DeviceMovement
+        {
+            DeviceId = device.DeviceId,
+            MovementType = "LateHandover",
+            FromStatus = "Assigned",
+            ToStatus = "Assigned",
+            FromEmployee = prevEmp,
+            ToEmployee = receiver,
+            Reason = $"[LATE HANDOVER ENTRY] Approved by {request.ApprovedBy}. Reason: {request.Reason}. Actual Time: {request.ActualTime}. Entered by: {request.EnteredBy}. Notes: {request.Notes}",
+            MovementDateUtc = _timeService.UtcNow,
+            PerformedByUserId = currentUserId,
+            PerformedByName = currentUsername,
+            CreatedAtUtc = _timeService.UtcNow
+        });
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            UserId = currentUserId,
+            UserName = currentUsername,
+            UserRole = GetCurrentRole(),
+            Action = "LateHandoverApproved",
+            EntityName = "MobileDevice",
+            EntityId = device.DeviceId.ToString(),
+            Details = $"Approved late handover for Device #{device.IdentificationNumber} from {prevEmp} to {receiver}. Approved by: {request.ApprovedBy}",
+            TimestampUtc = DateTime.UtcNow
+        });
+
+        await _db.SaveChangesAsync();
+        return Ok(new
+        {
+            success = true,
+            status = "Handover Completed",
+            currentCustodian = receiver,
+            message = $"Late handover recorded for Device #{device.IdentificationNumber} with full audit trail and approval from {request.ApprovedBy}."
+        });
+    }
+
+    [HttpGet("{id}/custody-history")]
+    public async Task<ActionResult> GetCustodyHistory(int id)
+    {
+        var movements = await _db.DeviceMovements
+            .Where(m => m.DeviceId == id)
+            .OrderByDescending(m => m.MovementDateUtc)
+            .ToListAsync();
+
+        return Ok(movements);
+    }
+
     [HttpPost("seed-excel")]
     [Authorize(Roles = "Developer,ITAdmin")]
     public async Task<ActionResult> SeedExcelInventory()

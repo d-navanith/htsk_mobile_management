@@ -532,4 +532,32 @@ public record ReturnReplacementOperationResponse(
     ReturnReplacementCountsDto Counts
 );
 
+// --- Shift Handover & Employee Accountability DTOs ---
+public record DeviceShiftHandoverRequest(
+    string OutgoingEmployeeName,
+    string IncomingEmployeeName,
+    string? IncomingGroup = "Group D",
+    string? OutgoingShift = "Morning Shift",
+    string? IncomingShift = "Night Shift",
+    string? HandoverTime = null,
+    string? Condition = "Working",
+    string? IssuesRemarks = "None",
+    string? Accessories = null,
+    string? HandoverNotes = null,
+    bool OutgoingConfirmed = true,
+    bool IncomingConfirmed = true,
+    bool AdminConfirmed = false,
+    string? AdminApprover = null
+);
+
+public record DeviceLateHandoverRequest(
+    string ActualReceiver,
+    string? ActualTime,
+    string Reason,
+    string EnteredBy,
+    string ApprovedBy,
+    string? Notes = null
+);
+
+
 

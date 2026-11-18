@@ -399,9 +399,15 @@ export default function DailyTaskSection({
               }}
             >
               <option value="All Groups">All Groups</option>
-              {groups.map(g => (
-                <option key={g} value={g}>{g}</option>
-              ))}
+              {groups.map((g, idx) => {
+                const groupName = typeof g === 'object' && g !== null ? (g.group_name || g.name || '') : String(g);
+                if (!groupName) return null;
+                return (
+                  <option key={g.id || groupName || idx} value={groupName}>
+                    {groupName}
+                  </option>
+                );
+              })}
             </select>
             <ChevronDown
               size={14}

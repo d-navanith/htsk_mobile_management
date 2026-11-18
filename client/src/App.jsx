@@ -10,6 +10,36 @@ import SettingsSection from './components/SettingsSection';
 import UserManageSection from './components/UserManageSection';
 import DailyTaskSection from './components/DailyTaskSection';
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('ErrorBoundary caught error:', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '40px', textAlign: 'center', fontFamily: 'system-ui, sans-serif' }}>
+          <h2 style={{ color: '#ef4444', fontSize: '20px', fontWeight: 800 }}>Section Error</h2>
+          <p style={{ color: '#6b7280', margin: '8px 0' }}>{this.state.error?.message || 'Error loading content.'}</p>
+          <button
+            onClick={() => this.setState({ hasError: false, error: null })}
+            style={{ marginTop: '12px', padding: '8px 20px', borderRadius: '8px', backgroundColor: '#84cc16', color: '#000', fontWeight: 800, border: 'none', cursor: 'pointer' }}
+          >
+            Reload Section
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
     return localStorage.getItem('htsk_admin_authenticated') === 'true';
@@ -201,45 +231,47 @@ export default function App() {
 
       {/* Main Workspace View */}
       <main className="main-content">
-        {activeTab === 'dashboard' && (
-          <Dashboard
-            records={records}
-            loading={loading}
-            onOpenAddModal={() => setIsAddModalOpen(true)}
-            onOpenEditModal={record => setEditingRecord(record)}
-            onDeleteRecord={handleDeleteRecord}
-            onQuickReturn={handleQuickReturn}
-            onDownloadTemplate={handleDownloadTemplate}
-            onExportExcel={handleExportExcel}
-            groups={groups}
-            refreshRecords={fetchRecords}
-            onLogout={handleAdminLogout}
-          />
-        )}
+        <ErrorBoundary>
+          {activeTab === 'dashboard' && (
+            <Dashboard
+              records={records}
+              loading={loading}
+              onOpenAddModal={() => setIsAddModalOpen(true)}
+              onOpenEditModal={record => setEditingRecord(record)}
+              onDeleteRecord={handleDeleteRecord}
+              onQuickReturn={handleQuickReturn}
+              onDownloadTemplate={handleDownloadTemplate}
+              onExportExcel={handleExportExcel}
+              groups={groups}
+              refreshRecords={fetchRecords}
+              onLogout={handleAdminLogout}
+            />
+          )}
 
-        {activeTab === 'update' && (
-          <UpdateSection
-            onImportSuccess={handleImportSuccess}
-            onDownloadTemplate={handleDownloadTemplate}
-          />
-        )}
+          {activeTab === 'update' && (
+            <UpdateSection
+              onImportSuccess={handleImportSuccess}
+              onDownloadTemplate={handleDownloadTemplate}
+            />
+          )}
 
-        {activeTab === 'history' && <HistorySection />}
+          {activeTab === 'history' && <HistorySection />}
 
-        {activeTab === 'usermanage' && <UserManageSection />}
+          {activeTab === 'usermanage' && <UserManageSection />}
 
-        {activeTab === 'dailytask' && (
-          <DailyTaskSection
-            onOpenAddModal={() => setIsAddModalOpen(true)}
-            onOpenEditModal={record => setEditingRecord(record)}
-            onDeleteRecord={handleDeleteRecord}
-            groups={groups}
-            refreshRecords={fetchRecords}
-            onLogout={handleAdminLogout}
-          />
-        )}
+          {activeTab === 'dailytask' && (
+            <DailyTaskSection
+              onOpenAddModal={() => setIsAddModalOpen(true)}
+              onOpenEditModal={record => setEditingRecord(record)}
+              onDeleteRecord={handleDeleteRecord}
+              groups={groups}
+              refreshRecords={fetchRecords}
+              onLogout={handleAdminLogout}
+            />
+          )}
 
-        {activeTab === 'settings' && <SettingsSection />}
+          {activeTab === 'settings' && <SettingsSection />}
+        </ErrorBoundary>
       </main>
 
       {/* Manual Entry Modal */}

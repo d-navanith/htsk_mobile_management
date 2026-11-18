@@ -21,6 +21,14 @@ export default function Sidebar({ activeTab, setActiveTab, onLogout = () => {} }
           </button>
 
           <button
+            className={`nav-item ${activeTab === 'dailytask' ? 'active' : ''}`}
+            onClick={() => setActiveTab('dailytask')}
+          >
+            <ClipboardCheck />
+            <span>Daily Task</span>
+          </button>
+
+          <button
             className={`nav-item ${activeTab === 'update' ? 'active' : ''}`}
             onClick={() => setActiveTab('update')}
           >
@@ -42,14 +50,6 @@ export default function Sidebar({ activeTab, setActiveTab, onLogout = () => {} }
           >
             <User />
             <span>User manage</span>
-          </button>
-
-          <button
-            className={`nav-item ${activeTab === 'dailytask' ? 'active' : ''}`}
-            onClick={() => setActiveTab('dailytask')}
-          >
-            <ClipboardCheck />
-            <span>Daily Task</span>
           </button>
 
           <button

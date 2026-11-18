@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Search,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Edit2,
   Trash2,
   Plus,
@@ -20,9 +22,15 @@ export default function DailyTaskSection({
   refreshRecords = () => {},
   onLogout = () => {}
 }) {
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  const weekDays = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+
+  const [currentYear, setCurrentYear] = useState(2026);
+  const [currentMonthIndex, setCurrentMonthIndex] = useState(7); // August (0-indexed: 7)
   const [selectedDay, setSelectedDay] = useState(17);
-  const [selectedMonth, setSelectedMonth] = useState('August');
-  const [selectedYear, setSelectedYear] = useState('2026');
 
   const [selectedGroup, setSelectedGroup] = useState('All Groups');
   const [selectedShift, setSelectedShift] = useState('All Shift');
@@ -95,54 +103,78 @@ export default function DailyTaskSection({
     }
   };
 
-  // Calendar dates layout matching the user's image exactly (August 2026)
-  const calendarRows = [
-    [
-      { day: 31, isCurrentMonth: false },
-      { day: 1, isCurrentMonth: true },
-      { day: 2, isCurrentMonth: true },
-      { day: 3, isCurrentMonth: true },
-      { day: 4, isCurrentMonth: true },
-      { day: 5, isCurrentMonth: true },
-      { day: 6, isCurrentMonth: true }
-    ],
-    [
-      { day: 7, isCurrentMonth: true },
-      { day: 8, isCurrentMonth: true },
-      { day: 9, isCurrentMonth: true },
-      { day: 10, isCurrentMonth: true },
-      { day: 11, isCurrentMonth: true },
-      { day: 12, isCurrentMonth: true },
-      { day: 13, isCurrentMonth: true }
-    ],
-    [
-      { day: 14, isCurrentMonth: true },
-      { day: 15, isCurrentMonth: true },
-      { day: 16, isCurrentMonth: true },
-      { day: 17, isCurrentMonth: true },
-      { day: 18, isCurrentMonth: true },
-      { day: 19, isCurrentMonth: true },
-      { day: 2, isCurrentMonth: false }
-    ],
-    [
-      { day: 20, isCurrentMonth: true },
-      { day: 21, isCurrentMonth: true },
-      { day: 22, isCurrentMonth: true },
-      { day: 23, isCurrentMonth: true },
-      { day: 24, isCurrentMonth: true },
-      { day: 25, isCurrentMonth: true },
-      { day: 26, isCurrentMonth: true }
-    ],
-    [
-      { day: 27, isCurrentMonth: true },
-      { day: 28, isCurrentMonth: true },
-      { day: 29, isCurrentMonth: true },
-      { day: 30, isCurrentMonth: true },
-      { day: 1, isCurrentMonth: false },
-      { day: 2, isCurrentMonth: false },
-      { day: 3, isCurrentMonth: false }
-    ]
-  ];
+  // Month navigation handlers
+  const handlePrevMonth = () => {
+    if (currentMonthIndex === 0) {
+      setCurrentMonthIndex(11);
+      setCurrentYear(prev => prev - 1);
+    } else {
+      setCurrentMonthIndex(prev => prev - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (currentMonthIndex === 11) {
+      setCurrentMonthIndex(0);
+      setCurrentYear(prev => prev + 1);
+    } else {
+      setCurrentMonthIndex(prev => prev + 1);
+    }
+  };
+
+  // Build accurate dynamic calendar grid based on real calendar math
+  const calendarRows = useMemo(() => {
+    const daysInMonth = new Date(currentYear, currentMonthIndex + 1, 0).getDate();
+    const firstDayIndex = new Date(currentYear, currentMonthIndex, 1).getDay(); // 0 is Sunday
+    const prevDaysInMonth = new Date(currentYear, currentMonthIndex, 0).getDate();
+
+    const cells = [];
+    // Previous month padding
+    for (let i = firstDayIndex - 1; i >= 0; i--) {
+      cells.push({
+        day: prevDaysInMonth - i,
+        isCurrentMonth: false,
+        monthOffset: -1
+      });
+    }
+    // Current month days
+    for (let d = 1; d <= daysInMonth; d++) {
+      cells.push({
+        day: d,
+        isCurrentMonth: true,
+        monthOffset: 0
+      });
+    }
+    // Next month padding to fill out complete 7-day rows (at least 35 cells, up to 42 cells)
+    let nextDay = 1;
+    while (cells.length % 7 !== 0 || cells.length < 35) {
+      cells.push({
+        day: nextDay++,
+        isCurrentMonth: false,
+        monthOffset: 1
+      });
+    }
+
+    // Split into rows of 7
+    const rows = [];
+    for (let i = 0; i < cells.length; i += 7) {
+      rows.push(cells.slice(i, i + 7));
+    }
+    return rows;
+  }, [currentYear, currentMonthIndex]);
+
+  // Handle cell selection
+  const handleSelectCell = (cell) => {
+    if (cell.monthOffset === -1) {
+      handlePrevMonth();
+      setSelectedDay(cell.day);
+    } else if (cell.monthOffset === 1) {
+      handleNextMonth();
+      setSelectedDay(cell.day);
+    } else {
+      setSelectedDay(cell.day);
+    }
+  };
 
   // Format day string (e.g. 17 -> 17th August)
   const formatDayString = (day) => {
@@ -150,7 +182,7 @@ export default function DailyTaskSection({
     if (day === 1 || day === 21 || day === 31) suffix = 'st';
     else if (day === 2 || day === 22) suffix = 'nd';
     else if (day === 3 || day === 23) suffix = 'rd';
-    return `${day}${suffix} ${selectedMonth}`;
+    return `${day}${suffix} ${monthNames[currentMonthIndex]}`;
   };
 
   // Helper to split multi-devices
@@ -296,14 +328,58 @@ export default function DailyTaskSection({
           backgroundColor: '#ffffff',
           borderRadius: '18px',
           border: '1px solid #e5e7eb',
-          padding: '20px 24px',
+          padding: '18px 22px',
           boxShadow: '0 2px 10px rgba(0,0,0,0.02)'
         }}>
-          {/* Calendar Header */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '14px', textAlign: 'right' }}>
-            <div>
+          {/* Calendar Header with Month Navigation and Selected Date */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button
+                type="button"
+                onClick={handlePrevMonth}
+                style={{
+                  background: '#f3f4f6',
+                  border: 'none',
+                  borderRadius: '6px',
+                  width: '26px',
+                  height: '26px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#4b5563'
+                }}
+                title="Previous Month"
+              >
+                <ChevronLeft size={15} />
+              </button>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#1f2937', minWidth: '105px', textAlign: 'center' }}>
+                {monthNames[currentMonthIndex]} {currentYear}
+              </span>
+              <button
+                type="button"
+                onClick={handleNextMonth}
+                style={{
+                  background: '#f3f4f6',
+                  border: 'none',
+                  borderRadius: '6px',
+                  width: '26px',
+                  height: '26px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#4b5563'
+                }}
+                title="Next Month"
+              >
+                <ChevronRight size={15} />
+              </button>
+            </div>
+
+            <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: '13.5px', fontWeight: 700, color: '#374151', lineHeight: 1.2 }}>
-                {selectedYear}
+                {currentYear}
               </div>
               <div style={{ fontSize: '11px', color: '#9ca3af' }}>
                 {formatDayString(selectedDay)}
@@ -311,8 +387,23 @@ export default function DailyTaskSection({
             </div>
           </div>
 
+          {/* Weekday Header Row */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '4px' }}>
+            {weekDays.map(w => (
+              <div key={w} style={{
+                textAlign: 'center',
+                fontSize: '11px',
+                fontWeight: 700,
+                color: '#9ca3af',
+                padding: '2px 0'
+              }}>
+                {w}
+              </div>
+            ))}
+          </div>
+
           {/* Calendar Grid */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             {calendarRows.map((row, rIdx) => (
               <div key={rIdx} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
                 {row.map((cell, cIdx) => {
@@ -321,18 +412,14 @@ export default function DailyTaskSection({
                     <button
                       key={cIdx}
                       type="button"
-                      onClick={() => {
-                        if (cell.isCurrentMonth) {
-                          setSelectedDay(cell.day);
-                        }
-                      }}
+                      onClick={() => handleSelectCell(cell)}
                       style={{
                         height: '28px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         fontSize: '11.5px',
-                        fontWeight: isSelected ? 700 : 500,
+                        fontWeight: isSelected ? 700 : (cell.isCurrentMonth ? 500 : 400),
                         color: isSelected
                           ? '#ffffff'
                           : cell.isCurrentMonth
@@ -341,7 +428,7 @@ export default function DailyTaskSection({
                         backgroundColor: isSelected ? '#3b82f6' : 'transparent',
                         borderRadius: '6px',
                         border: 'none',
-                        cursor: cell.isCurrentMonth ? 'pointer' : 'default',
+                        cursor: 'pointer',
                         transition: 'all 0.1s ease'
                       }}
                     >
@@ -476,7 +563,10 @@ export default function DailyTaskSection({
 
           {/* Lime Green Add Button matching Image 2 */}
           <button
-            onClick={() => onOpenAddModal({ task_number: selectedDay, task_date: `2026-08-${String(selectedDay).padStart(2, '0')}` })}
+            onClick={() => onOpenAddModal({
+              task_number: selectedDay,
+              task_date: `${currentYear}-${String(currentMonthIndex + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`
+            })}
             style={{
               backgroundColor: '#84cc16',
               color: '#000000',

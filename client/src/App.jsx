@@ -9,6 +9,7 @@ import AdminLogin from './components/AdminLogin';
 import SettingsSection from './components/SettingsSection';
 import UserManageSection from './components/UserManageSection';
 import DailyTaskSection from './components/DailyTaskSection';
+import InventorySection from './components/InventorySection';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -269,6 +270,8 @@ export default function App() {
               onLogout={handleAdminLogout}
             />
           )}
+
+          {activeTab === 'inventory' && <InventorySection onLogout={handleAdminLogout} />}
 
           {activeTab === 'settings' && <SettingsSection />}
         </ErrorBoundary>

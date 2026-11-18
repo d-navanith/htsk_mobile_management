@@ -36,6 +36,10 @@ const {
   createUploadBatch,
   getAllBatches,
   logHistoryEvent,
+  getAllInventoryItems,
+  addInventoryItem,
+  updateInventoryItem,
+  deleteInventoryItem,
   dbRun,
   dbGet,
   dbAll
@@ -406,6 +410,50 @@ app.get('/api/active-devices', async (req, res) => {
     res.json({ success: true, data: active });
   } catch (err) {
     console.error('Error fetching active devices:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 6b. Inventory Management API
+app.get('/api/inventory', async (req, res) => {
+  try {
+    const data = await getAllInventoryItems();
+    res.json({ success: true, ...data });
+  } catch (err) {
+    console.error('Error fetching inventory:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/inventory', async (req, res) => {
+  try {
+    const { device_tag, series, model_name, storage_location, condition_status, notes } = req.body;
+    if (!device_tag || !device_tag.trim()) {
+      return res.status(400).json({ success: false, error: 'Device tag is required' });
+    }
+    const newId = await addInventoryItem({ device_tag, series, model_name, storage_location, condition_status, notes });
+    res.status(201).json({ success: true, id: newId, message: `Device ${device_tag} added to inventory successfully!` });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.put('/api/inventory/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updated = await updateInventoryItem(id, req.body);
+    res.json({ success: true, data: updated, message: `Device #${id} updated successfully!` });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/inventory/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await deleteInventoryItem(id);
+    res.json({ success: true, message: `Device #${id} removed from inventory` });
+  } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Sparkles, History, Settings, LogOut, User, ClipboardCheck } from 'lucide-react';
+import { LayoutDashboard, Sparkles, History, Settings, LogOut, User, ClipboardCheck, Package } from 'lucide-react';
 
 export default function Sidebar({ activeTab, setActiveTab, onLogout = () => {} }) {
   return (
@@ -10,7 +10,7 @@ export default function Sidebar({ activeTab, setActiveTab, onLogout = () => {} }
           HTSK
         </div>
 
-        {/* Navigation Menu */}
+        {/* Navigation Menu matching user mockup order */}
         <nav className="nav-menu">
           <button
             className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
@@ -29,14 +29,6 @@ export default function Sidebar({ activeTab, setActiveTab, onLogout = () => {} }
           </button>
 
           <button
-            className={`nav-item ${activeTab === 'update' ? 'active' : ''}`}
-            onClick={() => setActiveTab('update')}
-          >
-            <Sparkles />
-            <span>Update</span>
-          </button>
-
-          <button
             className={`nav-item ${activeTab === 'history' ? 'active' : ''}`}
             onClick={() => setActiveTab('history')}
           >
@@ -50,6 +42,22 @@ export default function Sidebar({ activeTab, setActiveTab, onLogout = () => {} }
           >
             <User />
             <span>User manage</span>
+          </button>
+
+          <button
+            className={`nav-item ${activeTab === 'update' ? 'active' : ''}`}
+            onClick={() => setActiveTab('update')}
+          >
+            <Sparkles />
+            <span>Update</span>
+          </button>
+
+          <button
+            className={`nav-item ${activeTab === 'inventory' ? 'active' : ''}`}
+            onClick={() => setActiveTab('inventory')}
+          >
+            <Package />
+            <span>Inventory</span>
           </button>
 
           <button

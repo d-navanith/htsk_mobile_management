@@ -930,6 +930,139 @@ async function getAllBatches() {
   return await dbAll(`SELECT * FROM upload_batches ORDER BY id DESC LIMIT 50`);
 }
 
+// Inventory Management
+async function getAllInventoryItems() {
+  const items = await dbAll(`SELECT * FROM inventory_items ORDER BY series ASC, id ASC`);
+  const records = await dbAll(`
+    SELECT * FROM device_records 
+    WHERE taking_device IS NOT NULL AND taking_device != ''
+      AND (
+        (handover_to IS NOT NULL AND handover_to != '')
+        OR return_time IS NULL
+        OR return_time = ''
+        OR LOWER(sign) = 'pending'
+      )
+  `);
+
+  const activeMap = new Map();
+  for (const r of records) {
+    const devs = parseDevices(r.taking_device);
+    for (const d of devs) {
+      const key = d.toLowerCase().replace(/\s+/g, '');
+      activeMap.set(key, {
+        holder: r.active_user || r.name,
+        shift: r.shift,
+        issued_at: r.issued_at,
+        task_number: r.task_number || 17
+      });
+    }
+  }
+
+  let inUse = 0, available = 0, maintenance = 0, missing = 0;
+
+  const catalog = items.map(item => {
+    const key = item.device_tag.toLowerCase().replace(/\s+/g, '');
+    let status = 'Available';
+    let holder = item.storage_location || 'Charging Station';
+    let shift = '—';
+    let issued_at = '—';
+    let task_number = '—';
+
+    if (item.manual_status && item.manual_status !== 'Auto') {
+      status = item.manual_status;
+      if (status === 'Maintenance') maintenance++;
+      else if (status === 'Missing') missing++;
+      else if (status === 'In Use') inUse++;
+      else if (status === 'Available') available++;
+    } else if (activeMap.has(key)) {
+      status = 'In Use';
+      const act = activeMap.get(key);
+      holder = act.holder;
+      shift = act.shift;
+      issued_at = act.issued_at;
+      task_number = act.task_number;
+      inUse++;
+    } else {
+      status = 'Available';
+      available++;
+    }
+
+    return {
+      ...item,
+      status,
+      holder,
+      shift,
+      issued_at,
+      task_number
+    };
+  });
+
+  return {
+    items: catalog,
+    kpis: {
+      totalStock: catalog.length,
+      availableStock: available,
+      inUseStock: inUse,
+      maintenanceStock: maintenance,
+      missingStock: missing
+    }
+  };
+}
+
+async function addInventoryItem({ device_tag, series, model_name, storage_location, condition_status, notes }) {
+  const cleanTag = (device_tag || '').trim();
+  if (!cleanTag) throw new Error('Device Tag is required');
+
+  let detectedSeries = series || 'PN Series';
+  if (cleanTag.toLowerCase().startsWith('new')) detectedSeries = 'NEW Series';
+  else if (cleanTag.toLowerCase().startsWith('cass')) detectedSeries = 'CASS Series';
+
+  const res = await dbRun(`
+    INSERT INTO inventory_items (device_tag, series, model_name, storage_location, condition_status, manual_status, notes)
+    VALUES (?, ?, ?, ?, ?, 'Auto', ?)
+  `, [
+    cleanTag,
+    detectedSeries,
+    model_name || 'Samsung / Android Mobile Unit',
+    storage_location || 'Charging Station A',
+    condition_status || 'Good',
+    notes || ''
+  ]);
+  return res.lastID;
+}
+
+async function updateInventoryItem(id, updates = {}) {
+  const existing = await dbGet(`SELECT * FROM inventory_items WHERE id = ?`, [id]);
+  if (!existing) throw new Error(`Inventory item #${id} not found`);
+
+  const device_tag = updates.device_tag !== undefined ? updates.device_tag.trim() : existing.device_tag;
+  const series = updates.series !== undefined ? updates.series.trim() : existing.series;
+  const model_name = updates.model_name !== undefined ? updates.model_name.trim() : existing.model_name;
+  const storage_location = updates.storage_location !== undefined ? updates.storage_location.trim() : existing.storage_location;
+  const condition_status = updates.condition_status !== undefined ? updates.condition_status.trim() : existing.condition_status;
+  const manual_status = updates.manual_status !== undefined ? updates.manual_status.trim() : existing.manual_status;
+  const notes = updates.notes !== undefined ? updates.notes.trim() : existing.notes;
+
+  await dbRun(`
+    UPDATE inventory_items SET
+      device_tag = ?,
+      series = ?,
+      model_name = ?,
+      storage_location = ?,
+      condition_status = ?,
+      manual_status = ?,
+      notes = ?,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `, [device_tag, series, model_name, storage_location, condition_status, manual_status, notes, id]);
+
+  return await dbGet(`SELECT * FROM inventory_items WHERE id = ?`, [id]);
+}
+
+async function deleteInventoryItem(id) {
+  return await dbRun(`DELETE FROM inventory_items WHERE id = ?`, [id]);
+}
+
 module.exports = {
   db,
   initDatabase,
@@ -959,6 +1092,10 @@ module.exports = {
   createUploadBatch,
   getAllBatches,
   logHistoryEvent,
+  getAllInventoryItems,
+  addInventoryItem,
+  updateInventoryItem,
+  deleteInventoryItem,
   dbRun,
   dbGet,
   dbAll

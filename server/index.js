@@ -215,7 +215,7 @@ function parseTextToRecords(fullText) {
     if (parts.length >= 2) {
       const name = parts[0] || '';
       const shift = parts[1] || 'Day';
-      const group = parts[2] || 'Group D';
+      const group = parts[2] || '';
       const issued_at = parts[3] || '7.30 A.M.';
       const return_time = parts[4] || '';
       const devDetails = parts[5] || '';
@@ -324,7 +324,7 @@ app.post('/api/records', async (req, res) => {
     const record = await insertDeviceRecord({
       name: name.trim(),
       shift: shift || 'Day',
-      group: group || 'Group D',
+      group: group || '',
       issued_at: issued_at || '7.30 A.M.',
       return_time: return_time !== undefined && return_time !== null ? return_time.trim() : '',
       return_device: return_device || '',
@@ -793,7 +793,7 @@ app.post('/api/upload/confirm', async (req, res) => {
       await insertDeviceRecord({
         name: row.name.trim(),
         shift: row.shift || 'Day',
-        group: row.group || 'Group D',
+        group: row.group || '',
         issued_at: row.issued_at || '7.30 A.M.',
         return_time: row.return_time ? row.return_time.trim() : '',
         return_device: row.return_device || '',

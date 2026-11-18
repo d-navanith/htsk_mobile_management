@@ -1067,7 +1067,7 @@ export default function UpdateSection({
                     </td>
 
                     <td style={{ padding: '10px 14px', fontSize: '13px', color: row.group ? '#111827' : '#9ca3af', borderRight: '1px solid #e5e7eb' }}>
-                      {row.group || '(Empty)'}
+                      {row.group || '—'}
                     </td>
 
                     <td style={{ padding: '10px 14px', fontSize: '12.5px', color: '#4b5563', borderRight: '1px solid #e5e7eb' }}>

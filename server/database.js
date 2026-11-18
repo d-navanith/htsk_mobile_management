@@ -762,7 +762,7 @@ async function getDailyTaskKPIs(taskNumber = 17, taskDate = null) {
     activeMobilePhones: activeInShiftCount,
     needAnUpdate: missingCount,
     taskNumber: taskNumber,
-    taskDate: taskDate || `${taskNumber}th August 2026`
+    taskDate: taskDate || `${taskNumber}th November 2026`
   };
 }
 

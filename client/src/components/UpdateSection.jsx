@@ -94,16 +94,52 @@ export default function UpdateSection({
   // Tab mode: 'quick' (Daily Mobile List) vs 'sheet' (File Dropzone)
   const [activeMode, setActiveMode] = useState('quick');
 
+  const getTodayDateStr = () => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
   // Quick List Form State
   const [rawText, setRawText] = useState('');
   const [startNumber, setStartNumber] = useState(1);
   const [padZero, setPadZero] = useState(true);
-  const [targetTaskNumber, setTargetTaskNumber] = useState(17);
-  const [targetTaskDate, setTargetTaskDate] = useState('2026-08-17');
+  const [targetTaskDate, setTargetTaskDate] = useState(() => getTodayDateStr());
+  const [targetTaskNumber, setTargetTaskNumber] = useState(() => new Date().getDate());
   const [defaultShift, setDefaultShift] = useState('Day');
   const [defaultGroup, setDefaultGroup] = useState('');
   const [defaultIssuedAt, setDefaultIssuedAt] = useState('7.30 A.M.');
   const [replaceMode, setReplaceMode] = useState(true);
+
+  // Synchronize Task Date <-> Target Daily Task #
+  const handleTaskDateChange = (newDateStr) => {
+    setTargetTaskDate(newDateStr);
+    if (newDateStr) {
+      const parts = newDateStr.split('-');
+      if (parts.length === 3) {
+        const dayNum = parseInt(parts[2], 10);
+        if (!isNaN(dayNum) && dayNum >= 1 && dayNum <= 31) {
+          setTargetTaskNumber(dayNum);
+        }
+      }
+    }
+  };
+
+  const handleTaskNumberChange = (newNum) => {
+    const validNum = parseInt(newNum, 10);
+    setTargetTaskNumber(validNum || 1);
+    if (targetTaskDate && validNum >= 1 && validNum <= 31) {
+      const parts = targetTaskDate.split('-');
+      if (parts.length === 3) {
+        const year = parts[0];
+        const month = parts[1];
+        const day = String(validNum).padStart(2, '0');
+        setTargetTaskDate(`${year}-${month}-${day}`);
+      }
+    }
+  };
 
   // File Upload State (Mode: sheet)
   const [dragActive, setDragActive] = useState(false);
@@ -316,7 +352,10 @@ export default function UpdateSection({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             filename: selectedFile ? selectedFile.name : 'uploaded_sheet.xlsx',
-            rows: previewRows
+            rows: previewRows,
+            task_number: targetTaskNumber,
+            task_date: targetTaskDate,
+            replaceMode
           })
         });
 
@@ -327,8 +366,8 @@ export default function UpdateSection({
 
         setSuccessBanner({
           title: `Successfully imported ${result.insertedCount || previewRows.length} records!`,
-          message: `The records have been confirmed and added to your mobile management database.`,
-          taskNumber: 17,
+          message: `The records have been confirmed and added to your mobile management database for Task ${targetTaskNumber} (${targetTaskDate}).`,
+          taskNumber: targetTaskNumber,
           count: result.insertedCount
         });
         setPreviewRows([]);
@@ -589,7 +628,7 @@ export default function UpdateSection({
                 min="1"
                 max="31"
                 value={targetTaskNumber}
-                onChange={e => setTargetTaskNumber(parseInt(e.target.value, 10) || 17)}
+                onChange={e => handleTaskNumberChange(e.target.value)}
                 style={{
                   width: '100%',
                   padding: '9px 12px',
@@ -601,7 +640,7 @@ export default function UpdateSection({
                   boxSizing: 'border-box'
                 }}
               />
-              <span style={{ fontSize: '11px', color: '#9ca3af' }}>Task Day (e.g. Task 17)</span>
+              <span style={{ fontSize: '11px', color: '#9ca3af' }}>Task Day (e.g. Task {targetTaskNumber})</span>
             </div>
 
             {/* Task Date */}
@@ -612,7 +651,7 @@ export default function UpdateSection({
               <input
                 type="date"
                 value={targetTaskDate}
-                onChange={e => setTargetTaskDate(e.target.value)}
+                onChange={e => handleTaskDateChange(e.target.value)}
                 style={{
                   width: '100%',
                   padding: '8.5px 12px',
@@ -623,7 +662,7 @@ export default function UpdateSection({
                   boxSizing: 'border-box'
                 }}
               />
-              <span style={{ fontSize: '11px', color: '#9ca3af' }}>Record calendar date</span>
+              <span style={{ fontSize: '11px', color: '#84cc16', fontWeight: 600 }}>Syncs Task #{targetTaskNumber}</span>
             </div>
 
             {/* Shift */}

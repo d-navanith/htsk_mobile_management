@@ -28,9 +28,10 @@ export default function DailyTaskSection({
   ];
   const weekDays = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
-  const [currentYear, setCurrentYear] = useState(2026);
-  const [currentMonthIndex, setCurrentMonthIndex] = useState(7); // August (0-indexed: 7)
-  const [selectedDay, setSelectedDay] = useState(17);
+  const today = new Date();
+  const [currentYear, setCurrentYear] = useState(() => today.getFullYear());
+  const [currentMonthIndex, setCurrentMonthIndex] = useState(() => today.getMonth()); // Current month (e.g. November)
+  const [selectedDay, setSelectedDay] = useState(() => today.getDate()); // Current day (e.g. 18)
 
   const [selectedGroup, setSelectedGroup] = useState('All Groups');
   const [selectedShift, setSelectedShift] = useState('All Shift');
@@ -50,15 +51,19 @@ export default function DailyTaskSection({
   const fetchTaskData = async () => {
     setLoading(true);
     try {
+      const monthStr = String(currentMonthIndex + 1).padStart(2, '0');
+      const dayStr = String(selectedDay).padStart(2, '0');
+      const selectedDateStr = `${currentYear}-${monthStr}-${dayStr}`;
+
       // 1. Fetch records for this day / task
-      const recRes = await fetch(`/api/records?task_number=${selectedDay}`);
+      const recRes = await fetch(`/api/records?task_number=${selectedDay}&task_date=${selectedDateStr}`);
       const recData = await recRes.json();
       if (recData.success) {
         setTaskRecords(recData.data || []);
       }
 
       // 2. Fetch KPIs for this daily task
-      const kpiRes = await fetch(`/api/daily-task/kpis?task_number=${selectedDay}`);
+      const kpiRes = await fetch(`/api/daily-task/kpis?task_number=${selectedDay}&task_date=${selectedDateStr}`);
       const kpiData = await kpiRes.json();
       if (kpiData.success && kpiData.data) {
         setKpis(kpiData.data);

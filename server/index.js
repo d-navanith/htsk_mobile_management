@@ -825,9 +825,33 @@ app.get('/api/export', async (req, res) => {
 // Serve static client build if it exists
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
 if (fs.existsSync(clientDist)) {
-  app.use(express.static(clientDist));
+  app.use(express.static(clientDist, {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.html')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+      }
+    }
+  }));
+
   app.use((req, res, next) => {
     if (req.method === 'GET' && !req.path.startsWith('/api')) {
+      // If any stale JS chunk is requested by a cached browser tab, serve the active JS bundle
+      if (req.path.startsWith('/assets/') && req.path.endsWith('.js')) {
+        const assetsDir = path.join(clientDist, 'assets');
+        if (fs.existsSync(assetsDir)) {
+          const jsFiles = fs.readdirSync(assetsDir).filter(f => f.endsWith('.js'));
+          if (jsFiles.length > 0) {
+            res.setHeader('Content-Type', 'application/javascript');
+            return res.sendFile(path.join(assetsDir, jsFiles[0]));
+          }
+        }
+      }
+
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
       return res.sendFile(path.join(clientDist, 'index.html'));
     }
     next();

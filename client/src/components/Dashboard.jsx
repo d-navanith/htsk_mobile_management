@@ -87,7 +87,9 @@ export default function Dashboard({
     const groupMatch = (r.group_name || '').toLowerCase().includes(term);
     const matchesSearch = searchTerm === '' || nameMatch || returnDevMatch || takingDevMatch || handoverMatch || groupMatch;
 
-    const matchesGroup = selectedGroup === 'All Groups' || selectedGroup === 'all' || r.group_name === selectedGroup;
+    const matchesGroup = selectedGroup === 'All Groups' || selectedGroup === 'all' ||
+      (selectedGroup === 'No Group' && (!r.group_name || r.group_name.trim() === '')) ||
+      r.group_name === selectedGroup;
     const matchesShift = selectedShift === 'All Shift' || selectedShift === 'all' || r.shift === selectedShift;
     const matchesStatus =
       selectedStatus === 'All Status' ||
@@ -279,6 +281,7 @@ export default function Dashboard({
               }}
             >
               <option value="All Groups">All Groups</option>
+              <option value="No Group">No Group (Empty)</option>
               <option value="Group A">Group A</option>
               <option value="Group B">Group B</option>
               <option value="Group C">Group C</option>
@@ -445,8 +448,8 @@ export default function Dashboard({
                       {/* Group with dropdown caret */}
                       <td style={{ padding: '16px 14px', fontSize: '13.5px', color: '#111827', borderRight: '1px solid #e5e7eb' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                          <span>{r.group_name || 'Group D'}</span>
-                          <ChevronDown size={13} color="#6b7280" />
+                          <span>{r.group_name || ''}</span>
+                          {r.group_name ? <ChevronDown size={13} color="#6b7280" /> : null}
                         </div>
                       </td>
 

@@ -194,7 +194,9 @@ export default function DailyTaskSection({
 
   // Filter records
   const filteredRecords = taskRecords.filter(r => {
-    const groupMatch = selectedGroup === 'All Groups' || r.group_name === selectedGroup;
+    const groupMatch = selectedGroup === 'All Groups' ||
+      (selectedGroup === 'No Group' && (!r.group_name || r.group_name.trim() === '')) ||
+      r.group_name === selectedGroup;
     const shiftMatch = selectedShift === 'All Shift' || r.shift === selectedShift;
     const statusMatch = selectedStatus === 'All Status' ||
       (selectedStatus === 'Done' && (r.sign || '').toLowerCase() === 'done') ||
@@ -506,6 +508,7 @@ export default function DailyTaskSection({
               }}
             >
               <option value="All Groups">All Groups</option>
+              <option value="No Group">No Group (Empty)</option>
               {groups.map((g, idx) => {
                 const groupName = typeof g === 'object' && g !== null ? (g.group_name || g.name || '') : String(g);
                 if (!groupName) return null;
@@ -689,11 +692,42 @@ export default function DailyTaskSection({
                         </div>
                       </td>
 
-                      {/* Group with dropdown caret */}
+                      {/* Group with inline select or empty space */}
                       <td style={{ padding: '16px 14px', fontSize: '13.5px', color: '#111827', borderRight: '1px solid #e5e7eb' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                          <span>{r.group_name || 'Group D'}</span>
-                          <ChevronDown size={13} color="#6b7280" />
+                        <div style={{ display: 'inline-flex', alignItems: 'center', position: 'relative' }}>
+                          <select
+                            value={r.group_name || ''}
+                            onChange={(e) => handleInlineGroupChange(r.id, e.target.value)}
+                            style={{
+                              appearance: 'none',
+                              WebkitAppearance: 'none',
+                              backgroundColor: 'transparent',
+                              border: 'none',
+                              fontSize: '13.5px',
+                              fontWeight: r.group_name ? 600 : 400,
+                              color: r.group_name ? '#111827' : '#9ca3af',
+                              cursor: 'pointer',
+                              outline: 'none',
+                              paddingRight: '16px',
+                              minWidth: '40px'
+                            }}
+                          >
+                            <option value=""> </option>
+                            {groups.map((g, idx) => {
+                              const groupName = typeof g === 'object' && g !== null ? (g.group_name || g.name || '') : String(g);
+                              if (!groupName) return null;
+                              return (
+                                <option key={g.id || groupName || idx} value={groupName}>
+                                  {groupName}
+                                </option>
+                              );
+                            })}
+                          </select>
+                          <ChevronDown
+                            size={13}
+                            color="#9ca3af"
+                            style={{ position: 'absolute', right: '0', pointerEvents: 'none' }}
+                          />
                         </div>
                       </td>
 

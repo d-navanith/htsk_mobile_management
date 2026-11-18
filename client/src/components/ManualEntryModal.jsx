@@ -18,7 +18,7 @@ export default function ManualEntryModal({ isOpen, onClose, onSave, groups = [] 
   
   const [empName, setEmpName] = useState('');
   const [shift, setShift] = useState('Day');
-  const [group, setGroup] = useState('Group D');
+  const [group, setGroup] = useState('');
   const [issuedAt, setIssuedAt] = useState('7.30 A.M.');
   const [returnTime, setReturnTime] = useState('');
   const [returnDevice, setReturnDevice] = useState('');
@@ -110,7 +110,7 @@ export default function ManualEntryModal({ isOpen, onClose, onSave, groups = [] 
       await onSave({
         name: empName.trim(),
         shift: shift.trim() || 'Day',
-        group: group.trim() || 'Group D',
+        group: (group || '').trim(),
         issued_at: issuedAt.trim() || '7.30 A.M.',
         return_time: returnTime ? returnTime.trim() : '',
         return_device: returnDevice.trim(),
@@ -338,6 +338,7 @@ export default function ManualEntryModal({ isOpen, onClose, onSave, groups = [] 
                     backgroundColor: '#ffffff'
                   }}
                 >
+                  <option value="">(None / Empty)</option>
                   {groupsList.map(g => (
                     <option key={g} value={g}>{g}</option>
                   ))}

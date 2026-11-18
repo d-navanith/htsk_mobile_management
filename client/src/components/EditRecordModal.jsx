@@ -34,7 +34,7 @@ export default function EditRecordModal({ isOpen, onClose, onUpdate, onDelete, r
     if (record) {
       setEmpName(record.name || '');
       setShift(record.shift || 'Day');
-      setGroup(record.group_name || record.group || 'Group D');
+      setGroup(record.group_name !== undefined && record.group_name !== null ? record.group_name : (record.group || ''));
       setIssuedAt(record.issued_at || record.time || '7.30 A.M.');
       setReturnTime(record.return_time !== undefined && record.return_time !== null ? record.return_time : '');
       setReturnDevice(record.return_device || '');
@@ -62,7 +62,7 @@ export default function EditRecordModal({ isOpen, onClose, onUpdate, onDelete, r
       await onUpdate(record.id, {
         name: empName.trim(),
         shift: shift.trim() || 'Day',
-        group: group.trim() || 'Group D',
+        group: (group || '').trim(),
         issued_at: issuedAt.trim(),
         return_time: returnTime.trim(),
         return_device: returnDevice.trim(),
@@ -222,6 +222,7 @@ export default function EditRecordModal({ isOpen, onClose, onUpdate, onDelete, r
                   backgroundColor: '#ffffff'
                 }}
               >
+                <option value="">(None / Empty)</option>
                 {groupsList.map(g => (
                   <option key={g} value={g}>{g}</option>
                 ))}

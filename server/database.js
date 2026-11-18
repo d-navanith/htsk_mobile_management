@@ -450,7 +450,7 @@ async function getRecordById(id) {
 async function insertDeviceRecord({
   name,
   shift = 'Day',
-  group = 'Group D',
+  group = '',
   issued_at = '7.30 A.M.',
   return_time = '',
   return_device = '',
@@ -463,7 +463,7 @@ async function insertDeviceRecord({
 }) {
   const cleanName = (name || '').trim();
   const cleanShift = (shift || 'Day').trim();
-  const cleanGroup = (group || 'Group D').trim();
+  const cleanGroup = group !== undefined && group !== null ? String(group).trim() : '';
   const cleanIssuedAt = (issued_at || '7.30 A.M.').trim();
   const cleanReturnTime = return_time !== undefined && return_time !== null ? String(return_time).trim() : '';
   const cleanReturnDevice = (return_device || '').trim();
@@ -534,7 +534,12 @@ async function updateDeviceRecord(id, updates = {}, admin_user = 'Shanaka') {
 
   const name = updates.name !== undefined ? updates.name.trim() : existing.name;
   const shift = updates.shift !== undefined ? updates.shift.trim() : existing.shift;
-  const group_name = (updates.group || updates.group_name) !== undefined ? (updates.group || updates.group_name).trim() : existing.group_name;
+  let group_name = existing.group_name;
+  if (updates.group !== undefined) {
+    group_name = updates.group !== null ? String(updates.group).trim() : '';
+  } else if (updates.group_name !== undefined) {
+    group_name = updates.group_name !== null ? String(updates.group_name).trim() : '';
+  }
   const issued_at = (updates.issued_at || updates.time) !== undefined ? (updates.issued_at || updates.time).trim() : existing.issued_at;
   const return_time = updates.return_time !== undefined ? updates.return_time.trim() : existing.return_time;
   const return_device = updates.return_device !== undefined ? updates.return_device.trim() : existing.return_device;

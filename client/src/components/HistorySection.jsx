@@ -238,7 +238,7 @@ export default function HistorySection() {
                 </tr>
               ) : (
                 filteredActiveDevices.map((d, idx) => (
-                  <tr key={d.record_id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  <tr key={`${d.record_id}-${d.device_id}-${idx}`} style={{ borderBottom: '1px solid #f3f4f6' }}>
                     <td style={{ padding: '14px 16px', fontSize: '13px', fontWeight: 700, color: '#111827' }}>
                       {idx + 1}.
                     </td>

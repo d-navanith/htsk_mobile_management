@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Sparkles, History, Settings, LogOut, User } from 'lucide-react';
+import { LayoutDashboard, Sparkles, History, Settings, LogOut, User, ClipboardCheck } from 'lucide-react';
 
 export default function Sidebar({ activeTab, setActiveTab, onLogout = () => {} }) {
   return (
@@ -42,6 +42,14 @@ export default function Sidebar({ activeTab, setActiveTab, onLogout = () => {} }
           >
             <User />
             <span>User manage</span>
+          </button>
+
+          <button
+            className={`nav-item ${activeTab === 'dailytask' ? 'active' : ''}`}
+            onClick={() => setActiveTab('dailytask')}
+          >
+            <ClipboardCheck />
+            <span>Daily Task</span>
           </button>
 
           <button

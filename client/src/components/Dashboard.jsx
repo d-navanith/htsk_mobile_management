@@ -460,23 +460,27 @@ export default function Dashboard({
                         {r.return_time || ''}
                       </td>
 
-                      {/* Device Details (Stacked Return & Taking pills matching Image 4) */}
+                      {/* Device Details (Stacked Return & Taking pills matching Image 4 & multi-device support) */}
                       <td style={{ padding: '14px 16px', borderRight: '1px solid #e5e7eb' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                           {/* Return row */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
                             <span style={{ color: '#6b7280', width: '52px' }}>Return:</span>
                             {r.return_device ? (
-                              <span style={{
-                                backgroundColor: '#f1f5f9',
-                                color: '#1f2937',
-                                fontWeight: 600,
-                                padding: '2px 8px',
-                                borderRadius: '6px',
-                                fontSize: '12px'
-                              }}>
-                                {r.return_device}
-                              </span>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                {r.return_device.split(/[,+&/]/).map(d => d.trim()).filter(Boolean).map((dev, i) => (
+                                  <span key={i} style={{
+                                    backgroundColor: '#f1f5f9',
+                                    color: '#1f2937',
+                                    fontWeight: 600,
+                                    padding: '2px 8px',
+                                    borderRadius: '6px',
+                                    fontSize: '12px'
+                                  }}>
+                                    {dev}
+                                  </span>
+                                ))}
+                              </div>
                             ) : null}
                           </div>
 
@@ -484,16 +488,20 @@ export default function Dashboard({
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
                             <span style={{ color: '#6b7280', width: '52px' }}>Taking:</span>
                             {r.taking_device ? (
-                              <span style={{
-                                backgroundColor: '#f1f5f9',
-                                color: '#1f2937',
-                                fontWeight: 600,
-                                padding: '2px 8px',
-                                borderRadius: '6px',
-                                fontSize: '12px'
-                              }}>
-                                {r.taking_device}
-                              </span>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                {r.taking_device.split(/[,+&/]/).map(d => d.trim()).filter(Boolean).map((dev, i) => (
+                                  <span key={i} style={{
+                                    backgroundColor: '#f1f5f9',
+                                    color: '#1f2937',
+                                    fontWeight: 600,
+                                    padding: '2px 8px',
+                                    borderRadius: '6px',
+                                    fontSize: '12px'
+                                  }}>
+                                    {dev}
+                                  </span>
+                                ))}
+                              </div>
                             ) : null}
                           </div>
                         </div>

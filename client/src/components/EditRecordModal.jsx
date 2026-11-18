@@ -320,11 +320,11 @@ export default function EditRecordModal({ isOpen, onClose, onUpdate, onDelete, r
               {/* Return Device Area */}
               <div>
                 <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                  Return Device
+                  Return Device(s) (Returning Phones)
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. PN 56 or Cass 12"
+                  placeholder="e.g. PN 56 or Cass 12, PN 14"
                   value={returnDevice}
                   onChange={e => setReturnDevice(e.target.value)}
                   style={{
@@ -336,16 +336,17 @@ export default function EditRecordModal({ isOpen, onClose, onUpdate, onDelete, r
                     backgroundColor: '#ffffff'
                   }}
                 />
+                <span style={{ fontSize: '11px', color: '#64748b' }}>Return 1 or multiple phones (separated by comma)</span>
               </div>
 
               {/* Taking Device Area */}
               <div>
                 <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                  Taking Device
+                  Taking Device(s) (Issued Phones)
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. New 25 or PN 105"
+                  placeholder="e.g. New 25 or PN 56, NEW 25"
                   value={takingDevice}
                   onChange={e => setTakingDevice(e.target.value)}
                   style={{
@@ -357,6 +358,7 @@ export default function EditRecordModal({ isOpen, onClose, onUpdate, onDelete, r
                     backgroundColor: '#ffffff'
                   }}
                 />
+                <span style={{ fontSize: '11px', color: '#64748b' }}>Take 1 or multiple phones (separated by comma)</span>
               </div>
             </div>
           </div>

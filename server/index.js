@@ -16,6 +16,7 @@ const {
   updateDeviceRecord,
   deleteDeviceRecord,
   getDashboardKPIs,
+  getDailyTaskKPIs,
   getActiveDevicesList,
   getAllGroups,
   addGroup,
@@ -250,8 +251,14 @@ function parseTextToRecords(fullText) {
 // 1. Get all records with filter query params
 app.get('/api/records', async (req, res) => {
   try {
-    const { search, group, shift, sign } = req.query;
-    const records = await getAllRecords({ search, group, shift, sign });
+    const { search, group, shift, sign, task_number } = req.query;
+    const records = await getAllRecords({
+      search,
+      group,
+      shift,
+      sign,
+      task_number: task_number !== undefined && task_number !== 'all' ? parseInt(task_number) : undefined
+    });
     res.json({ success: true, data: records });
   } catch (err) {
     console.error('Error fetching records:', err);
@@ -272,7 +279,9 @@ app.post('/api/records', async (req, res) => {
       taking_device,
       handover_to,
       sign,
-      admin_user
+      admin_user,
+      task_number,
+      task_date
     } = req.body;
 
     if (!name || !name.trim()) {
@@ -291,7 +300,9 @@ app.post('/api/records', async (req, res) => {
       taking_device: taking_device || '',
       handover_to: handover_to || '',
       sign: cleanSign,
-      admin_user: admin_user || 'Shanaka'
+      admin_user: admin_user || 'Shanaka',
+      task_number: task_number ? parseInt(task_number) : 17,
+      task_date: task_date || '2026-08-17'
     });
 
     res.status(201).json({
@@ -321,7 +332,9 @@ app.put('/api/records/:id', async (req, res) => {
       handover_to,
       sign,
       replaceEmpName,
-      admin_user
+      admin_user,
+      task_number,
+      task_date
     } = req.body;
 
     const payload = {};
@@ -336,6 +349,8 @@ app.put('/api/records/:id', async (req, res) => {
     if (handover_to !== undefined) payload.handover_to = handover_to;
     if (sign !== undefined) payload.sign = evaluateSignStatus(sign);
     if (replaceEmpName !== undefined) payload.replaceEmpName = replaceEmpName;
+    if (task_number !== undefined) payload.task_number = parseInt(task_number);
+    if (task_date !== undefined) payload.task_date = task_date;
 
     const updated = await updateDeviceRecord(id, payload, admin_user || 'Shanaka');
     res.json({
@@ -368,6 +383,18 @@ app.get('/api/kpis', async (req, res) => {
     res.json({ success: true, data: kpis });
   } catch (err) {
     console.error('Error fetching KPIs:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5b. Daily Task KPIs metrics (Today Active Mobiles: 70, Active: 3, Need an update: 1)
+app.get('/api/daily-task/kpis', async (req, res) => {
+  try {
+    const taskNumber = req.query.task_number ? parseInt(req.query.task_number) : 17;
+    const kpis = await getDailyTaskKPIs(taskNumber);
+    res.json({ success: true, data: kpis });
+  } catch (err) {
+    console.error('Error fetching Daily Task KPIs:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

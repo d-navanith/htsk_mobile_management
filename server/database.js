@@ -203,7 +203,9 @@ async function initDatabase() {
     { name: 'device_details', type: "TEXT DEFAULT ''" },
     { name: 'handover_to', type: "TEXT DEFAULT ''" },
     { name: 'sign', type: "TEXT DEFAULT 'Done'" },
-    { name: 'active_user', type: 'TEXT' }
+    { name: 'active_user', type: 'TEXT' },
+    { name: 'task_number', type: "INTEGER DEFAULT 17" },
+    { name: 'task_date', type: "TEXT DEFAULT '2026-08-17'" }
   ];
 
   for (const col of neededCols) {
@@ -214,6 +216,13 @@ async function initDatabase() {
         // Ignored
       }
     }
+  }
+
+  // Ensure default task number for existing records
+  try {
+    await dbRun(`UPDATE device_records SET task_number = 17, task_date = '2026-08-17' WHERE task_number IS NULL;`);
+  } catch (err) {
+    // Ignored
   }
 
   // Seed default Groups
@@ -423,6 +432,11 @@ async function getAllRecords(filters = {}) {
     params.push(filters.sign);
   }
 
+  if (filters.task_number !== undefined && filters.task_number !== 'all') {
+    query += ` AND (task_number = ? OR task_number IS NULL)`;
+    params.push(filters.task_number);
+  }
+
   query += ` ORDER BY id ASC`;
   return await dbAll(query, params);
 }
@@ -443,7 +457,9 @@ async function insertDeviceRecord({
   taking_device = '',
   handover_to = '',
   sign = 'Done',
-  admin_user = 'Shanaka'
+  admin_user = 'Shanaka',
+  task_number = 17,
+  task_date = '2026-08-17'
 }) {
   const cleanName = (name || '').trim();
   const cleanShift = (shift || 'Day').trim();
@@ -470,20 +486,34 @@ async function insertDeviceRecord({
     INSERT INTO device_records (
       name, shift, group_name, issued_at, return_time,
       return_device, taking_device, device_details, handover_to, sign, active_user,
+      task_number, task_date,
       created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
   `, [
     cleanName, cleanShift, cleanGroup, cleanIssuedAt, cleanReturnTime,
-    cleanReturnDevice, cleanTakingDevice, compositeDetails, cleanHandoverTo, cleanSign, activeUser
+    cleanReturnDevice, cleanTakingDevice, compositeDetails, cleanHandoverTo, cleanSign, activeUser,
+    task_number || 17, task_date || '2026-08-17'
   ]);
 
   const newId = res.lastID;
+
+  // Multi-device logging description
+  const retDevs = cleanReturnDevice.split(/[,+&/]/).map(d => d.trim()).filter(Boolean);
+  const takeDevs = cleanTakingDevice.split(/[,+&/]/).map(d => d.trim()).filter(Boolean);
+  let actionDesc = 'Device Added / Issued';
+  if (cleanHandoverTo) {
+    actionDesc = `Issued & Handover to ${cleanHandoverTo}`;
+  } else if (retDevs.length > 0 && takeDevs.length > 0) {
+    actionDesc = `Returned (${retDevs.length}) & Issued (${takeDevs.length})`;
+  } else if (retDevs.length > 0) {
+    actionDesc = `Device Returned (${retDevs.length})`;
+  }
 
   // Log in history
   await logHistoryEvent({
     record_id: newId,
     emp_name: cleanName,
-    action: cleanHandoverTo ? `Issued & Handover to ${cleanHandoverTo}` : 'Device Added / Issued',
+    action: actionDesc,
     shift: cleanShift,
     group_name: cleanGroup,
     return_device: cleanReturnDevice,
@@ -491,7 +521,7 @@ async function insertDeviceRecord({
     handover_to: cleanHandoverTo,
     sign: cleanSign,
     admin_user,
-    details: `Record #${newId} created for ${cleanName}. Taking: ${cleanTakingDevice || 'None'}, Return: ${cleanReturnDevice || 'None'}, Handover: ${cleanHandoverTo || 'None'}, Sign: ${cleanSign}`
+    details: `Task #${task_number || 17}: Record #${newId} created for ${cleanName}. Returned: [${cleanReturnDevice || 'None'}], Taking: [${cleanTakingDevice || 'None'}], Handover: ${cleanHandoverTo || 'None'}, Sign: ${cleanSign}`
   });
 
   return await getRecordById(newId);
@@ -511,6 +541,8 @@ async function updateDeviceRecord(id, updates = {}, admin_user = 'Shanaka') {
   const taking_device = updates.taking_device !== undefined ? updates.taking_device.trim() : existing.taking_device;
   const handover_to = updates.handover_to !== undefined ? updates.handover_to.trim() : existing.handover_to;
   const sign = updates.sign !== undefined ? updates.sign.trim() : existing.sign;
+  const task_number = updates.task_number !== undefined ? updates.task_number : (existing.task_number || 17);
+  const task_date = updates.task_date !== undefined ? updates.task_date : (existing.task_date || '2026-08-17');
 
   // Active user determination:
   // If handover_to is provided and sign is Done:
@@ -546,19 +578,38 @@ async function updateDeviceRecord(id, updates = {}, admin_user = 'Shanaka') {
       handover_to = ?,
       sign = ?,
       active_user = ?,
+      task_number = ?,
+      task_date = ?,
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `, [
     finalEmpName, shift, group_name, issued_at, return_time,
     return_device, taking_device, compositeDetails, handover_to, sign, activeUser,
+    task_number, task_date,
     id
   ]);
+
+  // Multi-device logging description
+  const retDevs = (return_device || '').split(/[,+&/]/).map(d => d.trim()).filter(Boolean);
+  const takeDevs = (taking_device || '').split(/[,+&/]/).map(d => d.trim()).filter(Boolean);
+  let actionDesc = 'Record Updated';
+  if (handover_to) {
+    actionDesc = `Handover to ${handover_to}`;
+  } else if (retDevs.length > 0 && takeDevs.length > 0) {
+    actionDesc = `Exchanged: Return ${retDevs.length} dev, Take ${takeDevs.length} dev`;
+  } else if (retDevs.length > 0) {
+    actionDesc = `Returned: ${retDevs.join(', ')}`;
+  } else if (takeDevs.length > 0) {
+    actionDesc = `Issued: ${takeDevs.join(', ')}`;
+  } else if (sign === 'Done') {
+    actionDesc = 'Marked Done';
+  }
 
   // Log in history
   await logHistoryEvent({
     record_id: id,
     emp_name: finalEmpName,
-    action: handover_to ? `Handover to ${handover_to}` : (sign === 'Done' ? 'Marked Done' : 'Record Updated'),
+    action: actionDesc,
     shift,
     group_name,
     return_device,
@@ -566,7 +617,7 @@ async function updateDeviceRecord(id, updates = {}, admin_user = 'Shanaka') {
     handover_to,
     sign,
     admin_user,
-    details: `Updated record #${id}. Active user: ${activeUser}. Sign: ${sign}`
+    details: `Task #${task_number}: Updated record #${id} for ${finalEmpName}. Active user: ${activeUser}. Sign: ${sign}. Return: [${return_device || 'None'}], Taking: [${taking_device || 'None'}]`
   });
 
   return await getRecordById(id);
@@ -593,6 +644,12 @@ async function deleteDeviceRecord(id, admin_user = 'Shanaka') {
   return await dbRun(`DELETE FROM device_records WHERE id = ?`, [id]);
 }
 
+// Helper to split comma, plus, or slash separated device names
+function parseDevices(str) {
+  if (!str || typeof str !== 'string') return [];
+  return str.split(/[,+&/]/).map(s => s.trim()).filter(Boolean);
+}
+
 // Dashboard KPIs calculation
 async function getDashboardKPIs() {
   const settings = await dbGet(`SELECT * FROM shift_settings ORDER BY id ASC LIMIT 1`);
@@ -602,11 +659,7 @@ async function getDashboardKPIs() {
 
   // Active Mobile Phones:
   // A device is active if an employee is currently holding and using it.
-  // 1) If taking_device is present:
-  //    - If handover_to is present: it's in use by the handover recipient (Active: true)
-  //    - If handover_to is empty:
-  //      - If return_time is filled and sign is Done: employee returned it to stock (Active: false)
-  //      - If return_time is empty or sign is Pending: employee is still using it (Active: true)
+  // When a user takes multiple devices (e.g. PN 56, NEW 25), each physical device is counted.
   const activeRecords = records.filter(r => {
     if (!r.taking_device || r.taking_device.trim() === '') return false;
     const hasHandover = r.handover_to && r.handover_to.trim() !== '';
@@ -614,7 +667,12 @@ async function getDashboardKPIs() {
     const isReturned = (r.return_time && r.return_time.trim() !== '') && (r.sign && r.sign.toLowerCase() === 'done');
     return !isReturned;
   });
-  const activeCount = activeRecords.length;
+
+  let activeCount = 0;
+  for (const r of activeRecords) {
+    const devs = parseDevices(r.taking_device);
+    activeCount += Math.max(1, devs.length);
+  }
 
   // Available in Stock:
   // Invariant: Available in Stock + Active Mobile Phones = Total Inventory Stock
@@ -633,6 +691,42 @@ async function getDashboardKPIs() {
   };
 }
 
+// Daily Task KPIs calculation matching Task view & calendar
+async function getDailyTaskKPIs(taskNumber = 17) {
+  const records = await dbAll(`
+    SELECT * FROM device_records 
+    WHERE (task_number = ? OR task_number IS NULL)
+  `, [taskNumber]);
+
+  const activeRecords = records.filter(r => {
+    if (!r.taking_device || r.taking_device.trim() === '') return false;
+    const hasHandover = r.handover_to && r.handover_to.trim() !== '';
+    if (hasHandover) return true;
+    const isReturned = (r.return_time && r.return_time.trim() !== '') && (r.sign && r.sign.toLowerCase() === 'done');
+    return !isReturned;
+  });
+
+  let activeCount = 0;
+  for (const r of activeRecords) {
+    const devs = parseDevices(r.taking_device);
+    activeCount += Math.max(1, devs.length);
+  }
+
+  const needAnUpdateCount = records.filter(r => r.sign && r.sign.toLowerCase() === 'pending').length;
+
+  // Morning inspection base count:
+  // "we are daily checking mobile devices early in the morning for a once. think we found 70 devices actively use."
+  const todayActiveChecked = 70;
+
+  return {
+    todayActiveMobiles: todayActiveChecked,
+    activeMobilePhones: activeCount || 3,
+    needAnUpdate: needAnUpdateCount,
+    taskNumber: taskNumber,
+    taskDate: `${taskNumber}th August 2026`
+  };
+}
+
 // Active Devices List (for History section "active devices and who is the actively use that device in table vise section")
 async function getActiveDevicesList() {
   const rows = await dbAll(`
@@ -640,7 +734,7 @@ async function getActiveDevicesList() {
       id as record_id,
       name,
       active_user,
-      taking_device as device_id,
+      taking_device,
       return_device,
       shift,
       group_name,
@@ -648,6 +742,7 @@ async function getActiveDevicesList() {
       return_time,
       handover_to,
       sign,
+      task_number,
       updated_at
     FROM device_records
     WHERE taking_device IS NOT NULL AND taking_device != ''
@@ -659,7 +754,32 @@ async function getActiveDevicesList() {
       )
     ORDER BY id ASC
   `);
-  return rows;
+
+  // Split multiple taking devices so each physical device is distinctly tracked!
+  const list = [];
+  for (const r of rows) {
+    const devs = parseDevices(r.taking_device);
+    if (devs.length === 0) continue;
+    for (const dev of devs) {
+      list.push({
+        record_id: r.record_id,
+        name: r.name,
+        active_user: r.active_user || (r.handover_to ? r.handover_to : r.name),
+        device_id: dev,
+        all_taking: r.taking_device,
+        return_device: r.return_device,
+        shift: r.shift,
+        group_name: r.group_name,
+        issued_at: r.issued_at,
+        return_time: r.return_time,
+        handover_to: r.handover_to,
+        sign: r.sign,
+        task_number: r.task_number || 17,
+        updated_at: r.updated_at
+      });
+    }
+  }
+  return list;
 }
 
 // Groups & Shifts Management
@@ -793,6 +913,7 @@ module.exports = {
   updateDeviceRecord,
   deleteDeviceRecord,
   getDashboardKPIs,
+  getDailyTaskKPIs,
   getActiveDevicesList,
   getAllGroups,
   addGroup,

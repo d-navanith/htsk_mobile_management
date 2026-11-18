@@ -8,6 +8,7 @@ import EditRecordModal from './components/EditRecordModal';
 import AdminLogin from './components/AdminLogin';
 import SettingsSection from './components/SettingsSection';
 import UserManageSection from './components/UserManageSection';
+import DailyTaskSection from './components/DailyTaskSection';
 
 export default function App() {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
@@ -226,6 +227,17 @@ export default function App() {
         {activeTab === 'history' && <HistorySection />}
 
         {activeTab === 'usermanage' && <UserManageSection />}
+
+        {activeTab === 'dailytask' && (
+          <DailyTaskSection
+            onOpenAddModal={() => setIsAddModalOpen(true)}
+            onOpenEditModal={record => setEditingRecord(record)}
+            onDeleteRecord={handleDeleteRecord}
+            groups={groups}
+            refreshRecords={fetchRecords}
+            onLogout={handleAdminLogout}
+          />
+        )}
 
         {activeTab === 'settings' && <SettingsSection />}
       </main>

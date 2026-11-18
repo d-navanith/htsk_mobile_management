@@ -100,9 +100,9 @@ export default function Dashboard({
   });
 
   return (
-    <div style={{ maxWidth: '1360px', margin: '0 auto', paddingBottom: '40px' }}>
+    <div className="responsive-section-container" style={{ maxWidth: '1360px', margin: '0 auto', paddingBottom: '40px' }}>
       {/* Top Header matching Image 4 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px', paddingBottom: '16px', borderBottom: '1px solid #e5e7eb' }}>
+      <div className="responsive-header" style={{ paddingBottom: '16px', borderBottom: '1px solid #e5e7eb' }}>
         <div>
           <h1 style={{ fontSize: '32px', fontWeight: 700, color: '#111827', margin: 0, letterSpacing: '-0.02em' }}>
             Mobile Management
@@ -113,16 +113,19 @@ export default function Dashboard({
         </div>
 
         {/* Top-Right Profile Pill matching Image 4 */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          padding: '6px 14px 6px 18px',
-          borderRadius: '9999px',
-          border: '1.5px solid #e5e7eb',
-          backgroundColor: '#ffffff',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
-        }}>
+        <div
+          className="desktop-only-profile"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            padding: '6px 14px 6px 18px',
+            borderRadius: '9999px',
+            border: '1.5px solid #e5e7eb',
+            backgroundColor: '#ffffff',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+          }}
+        >
           <span style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937' }}>
             Shanaka
           </span>
@@ -140,12 +143,7 @@ export default function Dashboard({
       </div>
 
       {/* 4 KPI Summary Cards matching Image 4 */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: '20px',
-        marginBottom: '32px'
-      }}>
+      <div className="responsive-kpi-grid-4">
         {/* Card 1: Total Mobile Phones */}
         <div style={{
           backgroundColor: '#ffffff',
@@ -224,14 +222,7 @@ export default function Dashboard({
       </div>
 
       {/* Search and Filters Toolbar matching Image 4 */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '20px',
-        gap: '16px',
-        flexWrap: 'wrap'
-      }}>
+      <div className="responsive-toolbar">
         {/* Search bar pill */}
         <div style={{
           display: 'flex',
@@ -240,8 +231,9 @@ export default function Dashboard({
           backgroundColor: '#f3f4f6',
           borderRadius: '9999px',
           padding: '10px 20px',
-          width: '380px',
-          maxWidth: '100%'
+          width: '100%',
+          maxWidth: '380px',
+          boxSizing: 'border-box'
         }}>
           <Search size={17} color="#9ca3af" />
           <input
@@ -261,7 +253,7 @@ export default function Dashboard({
         </div>
 
         {/* Filters and Add button */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           {/* Groups dropdown */}
           <div style={{ position: 'relative' }}>
             <select
@@ -364,15 +356,8 @@ export default function Dashboard({
       </div>
 
       {/* Main Table matching Image 4 */}
-      <div style={{
-        backgroundColor: '#ffffff',
-        borderRadius: '16px',
-        border: '1px solid #e5e7eb',
-        overflow: 'hidden',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
-      }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+      <div className="responsive-table-wrapper">
+        <table style={{ width: '100%', minWidth: '960px', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                 <th style={{ padding: '16px 14px', fontSize: '13px', fontWeight: 700, color: '#111827', width: '70px', textAlign: 'center', borderRight: '1px solid #e5e7eb' }}>
@@ -589,7 +574,6 @@ export default function Dashboard({
               )}
             </tbody>
           </table>
-        </div>
       </div>
     </div>
   );

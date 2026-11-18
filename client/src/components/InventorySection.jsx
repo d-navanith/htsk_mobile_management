@@ -279,9 +279,9 @@ export default function InventorySection({ onLogout = () => {} }) {
   };
 
   return (
-    <div style={{ padding: '24px 32px', backgroundColor: '#ffffff', minHeight: '100vh', fontFamily: 'system-ui, sans-serif' }}>
+    <div className="responsive-section-container">
       {/* Top Header Row matching system theme */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+      <div className="responsive-header">
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#111827', margin: 0, letterSpacing: '-0.02em' }}>
             Mobile Management
@@ -292,13 +292,13 @@ export default function InventorySection({ onLogout = () => {} }) {
         </div>
 
         {/* Right side: Stock badge & Profile */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
           <div style={{
             backgroundColor: '#f0fdf4',
             border: '1.5px solid #84cc16',
             color: '#3f6212',
             fontWeight: 700,
-            fontSize: '13.5px',
+            fontSize: '13px',
             padding: '6px 16px',
             borderRadius: '8px',
             letterSpacing: '0.01em',
@@ -311,6 +311,7 @@ export default function InventorySection({ onLogout = () => {} }) {
           </div>
 
           <div
+            className="desktop-only-profile"
             onClick={onLogout}
             style={{
               display: 'flex',
@@ -338,12 +339,7 @@ export default function InventorySection({ onLogout = () => {} }) {
       </div>
 
       {/* 4 Inventory KPI Summary Cards matching system theme */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: '20px',
-        marginBottom: '28px'
-      }}>
+      <div className="responsive-kpi-grid-4">
         {/* Card 1: Total Inventory Stock */}
         <div style={{
           backgroundColor: '#ffffff',
@@ -448,14 +444,7 @@ export default function InventorySection({ onLogout = () => {} }) {
       </div>
 
       {/* Control Toolbar: Search, Filters & Add Device */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '20px',
-        gap: '16px',
-        flexWrap: 'wrap'
-      }}>
+      <div className="responsive-toolbar">
         {/* Left: Search Bar */}
         <div style={{
           display: 'flex',
@@ -464,7 +453,9 @@ export default function InventorySection({ onLogout = () => {} }) {
           backgroundColor: '#f3f4f6',
           borderRadius: '8px',
           padding: '8px 16px',
-          width: '320px',
+          width: '100%',
+          maxWidth: '320px',
+          boxSizing: 'border-box',
           boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
         }}>
           <Search size={16} color="#9ca3af" />
@@ -587,15 +578,8 @@ export default function InventorySection({ onLogout = () => {} }) {
       </div>
 
       {/* Main Inventory Table matching system styling */}
-      <div style={{
-        backgroundColor: '#ffffff',
-        borderRadius: '16px',
-        border: '1px solid #e5e7eb',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-        overflow: 'hidden'
-      }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+      <div className="responsive-table-wrapper">
+        <table style={{ width: '100%', minWidth: '960px', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ backgroundColor: '#ffffff', borderBottom: '1.5px solid #e5e7eb' }}>
                 <th style={{ padding: '16px 14px', fontSize: '13px', fontWeight: 800, color: '#111827', width: '60px', textAlign: 'center', borderRight: '1px solid #e5e7eb' }}>
@@ -737,7 +721,6 @@ export default function InventorySection({ onLogout = () => {} }) {
               )}
             </tbody>
           </table>
-        </div>
       </div>
 
       {/* Add Device Modal */}

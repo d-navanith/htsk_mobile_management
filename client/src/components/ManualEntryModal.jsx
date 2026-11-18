@@ -215,7 +215,7 @@ export default function ManualEntryModal({ isOpen, onClose, onSave, groups = [] 
           )}
 
           {/* Row 1: EMP Name & Shift */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px' }}>
+          <div className="form-row-2">
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
                 EMP. Name <span style={{ color: '#ef4444' }}>*</span>
@@ -292,7 +292,7 @@ export default function ManualEntryModal({ isOpen, onClose, onSave, groups = [] 
           </div>
 
           {/* Row 2: Group & Times */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px' }}>
+          <div className="form-row-3">
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                 <label style={{ fontSize: '13px', fontWeight: 700, color: '#374151' }}>
@@ -414,7 +414,7 @@ export default function ManualEntryModal({ isOpen, onClose, onSave, groups = [] 
               Specify returning device (if employee is returning a phone) and taking device (new phone being issued).
             </p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+            <div className="form-row-2">
               {/* Return Device Area */}
               <div>
                 <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
@@ -462,7 +462,7 @@ export default function ManualEntryModal({ isOpen, onClose, onSave, groups = [] 
           </div>
 
           {/* Row 4: Handover to & Sign */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px' }}>
+          <div className="form-row-2">
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
                 Handover to (Optional)

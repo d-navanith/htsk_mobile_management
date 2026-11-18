@@ -205,9 +205,9 @@ export default function DailyTaskSection({
   });
 
   return (
-    <div style={{ padding: '24px 32px', backgroundColor: '#ffffff', minHeight: '100vh', fontFamily: 'system-ui, sans-serif' }}>
+    <div className="responsive-section-container">
       {/* Top Header Row matching screenshots */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+      <div className="responsive-header">
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#111827', margin: 0, letterSpacing: '-0.02em' }}>
             Mobile Management
@@ -218,12 +218,12 @@ export default function DailyTaskSection({
         </div>
 
         {/* Right side: Top task badge & Profile header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
           <div style={{
             backgroundColor: '#ede9fe',
             color: '#7c3aed',
             fontWeight: 700,
-            fontSize: '14.5px',
+            fontSize: '14px',
             padding: '6px 16px',
             borderRadius: '8px',
             letterSpacing: '0.01em'
@@ -232,6 +232,7 @@ export default function DailyTaskSection({
           </div>
 
           <div
+            className="desktop-only-profile"
             onClick={onLogout}
             style={{
               display: 'flex',
@@ -259,15 +260,9 @@ export default function DailyTaskSection({
       </div>
 
       {/* Main KPI Cards & Calendar Section matching Image 2 */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1.8fr 1.2fr',
-        gap: '24px',
-        marginBottom: '28px',
-        alignItems: 'start'
-      }}>
+      <div className="daily-task-top-layout">
         {/* Left: 4 Daily Task KPI Cards in 2x2 Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <div className="daily-task-kpis-grid">
           {/* Card 1: Today Active Mobiles */}
           <div style={{
             backgroundColor: '#ffffff',
@@ -465,14 +460,7 @@ export default function DailyTaskSection({
       </div>
 
       {/* Control Toolbar: Date Pill on Left, Filters & Add on Right matching Image 2 */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '20px',
-        gap: '16px',
-        flexWrap: 'wrap'
-      }}>
+      <div className="responsive-toolbar">
         {/* Left: Date indicator pill badge matching Image 2 */}
         <div style={{
           backgroundColor: '#f9fafb',
@@ -612,14 +600,8 @@ export default function DailyTaskSection({
       </div>
 
       {/* Task Table matching user's Image 2 */}
-      <div style={{
-        border: '1px solid #e5e7eb',
-        borderRadius: '16px',
-        overflow: 'hidden',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
-      }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+      <div className="responsive-table-wrapper">
+        <table style={{ width: '100%', minWidth: '960px', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ backgroundColor: '#ffffff', borderBottom: '1.5px solid #e5e7eb' }}>
                 <th style={{ padding: '16px 14px', fontSize: '13px', fontWeight: 700, color: '#111827', width: '70px', textAlign: 'center', borderRight: '1px solid #e5e7eb' }}>
@@ -867,7 +849,6 @@ export default function DailyTaskSection({
               )}
             </tbody>
           </table>
-        </div>
       </div>
     </div>
   );

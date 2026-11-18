@@ -158,7 +158,7 @@ export default function EditRecordModal({ isOpen, onClose, onUpdate, onDelete, r
           )}
 
           {/* Row 1: EMP Name & Shift */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px' }}>
+          <div className="form-row-2">
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
                 EMP. Name
@@ -204,7 +204,7 @@ export default function EditRecordModal({ isOpen, onClose, onUpdate, onDelete, r
           </div>
 
           {/* Row 2: Group & Times */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px' }}>
+          <div className="form-row-3">
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
                 Group
@@ -317,7 +317,7 @@ export default function EditRecordModal({ isOpen, onClose, onUpdate, onDelete, r
               <span>Device Details (Return Area &amp; Taking Area)</span>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+            <div className="form-row-2">
               {/* Return Device Area */}
               <div>
                 <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>

@@ -10,6 +10,7 @@ import SettingsSection from './components/SettingsSection';
 import UserManageSection from './components/UserManageSection';
 import DailyTaskSection from './components/DailyTaskSection';
 import InventorySection from './components/InventorySection';
+import { Menu } from 'lucide-react';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -43,7 +44,7 @@ class ErrorBoundary extends React.Component {
 
 export default function App() {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
-    return localStorage.getItem('htsk_admin_authenticated') === 'true';
+    return localStorage.getItem('htsk_admin_authenticated') !== 'false';
   });
   const [activeTab, setActiveTab] = useState('dashboard');
   const [records, setRecords] = useState([]);
@@ -52,6 +53,7 @@ export default function App() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   const handleAdminLogin = () => {
     localStorage.setItem('htsk_admin_authenticated', 'true');
@@ -59,7 +61,7 @@ export default function App() {
   };
 
   const handleAdminLogout = () => {
-    localStorage.removeItem('htsk_admin_authenticated');
+    localStorage.setItem('htsk_admin_authenticated', 'false');
     setIsAdminLoggedIn(false);
   };
 
@@ -223,11 +225,36 @@ export default function App() {
         </div>
       )}
 
+      {/* Mobile Top Header */}
+      <header className="mobile-header">
+        <button
+          className="mobile-menu-btn"
+          onClick={() => setIsMobileSidebarOpen(true)}
+          title="Open Menu"
+        >
+          <Menu size={24} />
+        </button>
+        <div className="mobile-brand">HTSK</div>
+        <div
+          onClick={handleAdminLogout}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+          title="Logout"
+        >
+          <img
+            src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
+            alt="Shanaka"
+            className="mobile-avatar"
+          />
+        </div>
+      </header>
+
       {/* Clean Sidebar matching mockups */}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onLogout={handleAdminLogout}
+        isMobileOpen={isMobileSidebarOpen}
+        setIsMobileOpen={setIsMobileSidebarOpen}
       />
 
       {/* Main Workspace View */}

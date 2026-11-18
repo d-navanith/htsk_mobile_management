@@ -1,103 +1,140 @@
 import React from 'react';
-import { LayoutDashboard, Sparkles, History, Settings, LogOut, User, ClipboardCheck, Package } from 'lucide-react';
+import { LayoutDashboard, Sparkles, History, Settings, LogOut, User, ClipboardCheck, Package, X } from 'lucide-react';
 
-export default function Sidebar({ activeTab, setActiveTab, onLogout = () => {} }) {
+export default function Sidebar({
+  activeTab,
+  setActiveTab,
+  onLogout = () => {},
+  isMobileOpen = false,
+  setIsMobileOpen = () => {}
+}) {
+  const handleNavClick = (tab) => {
+    setActiveTab(tab);
+    setIsMobileOpen(false);
+  };
+
   return (
-    <aside className="sidebar" style={{ display: 'flex', flexDirection: 'column', height: '100vh', justifyContent: 'space-between' }}>
-      <div>
-        {/* Brand Logo matching screenshots */}
-        <div className="brand-logo" title="HTSK Mobile Management">
-          HTSK
+    <>
+      {/* Mobile Backdrop */}
+      {isMobileOpen && (
+        <div
+          className="sidebar-backdrop"
+          onClick={() => setIsMobileOpen(false)}
+          title="Close Navigation Menu"
+        />
+      )}
+
+      <aside
+        className={`sidebar ${isMobileOpen ? 'mobile-open' : ''}`}
+        style={{ display: 'flex', flexDirection: 'column', height: '100vh', justifyContent: 'space-between' }}
+      >
+        <div>
+          {/* Brand Logo & Mobile Close button */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <div className="brand-logo" style={{ marginBottom: 0 }} title="HTSK Mobile Management">
+              HTSK
+            </div>
+            <button
+              className="mobile-close-btn"
+              onClick={() => setIsMobileOpen(false)}
+              title="Close Menu"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Navigation Menu matching user mockup order */}
+          <nav className="nav-menu">
+            <button
+              className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+              onClick={() => handleNavClick('dashboard')}
+            >
+              <LayoutDashboard />
+              <span>Dashboard</span>
+            </button>
+
+            <button
+              className={`nav-item ${activeTab === 'dailytask' ? 'active' : ''}`}
+              onClick={() => handleNavClick('dailytask')}
+            >
+              <ClipboardCheck />
+              <span>Daily Task</span>
+            </button>
+
+            <button
+              className={`nav-item ${activeTab === 'history' ? 'active' : ''}`}
+              onClick={() => handleNavClick('history')}
+            >
+              <History />
+              <span>History</span>
+            </button>
+
+            <button
+              className={`nav-item ${activeTab === 'usermanage' ? 'active' : ''}`}
+              onClick={() => handleNavClick('usermanage')}
+            >
+              <User />
+              <span>User manage</span>
+            </button>
+
+            <button
+              className={`nav-item ${activeTab === 'update' ? 'active' : ''}`}
+              onClick={() => handleNavClick('update')}
+            >
+              <Sparkles />
+              <span>Update</span>
+            </button>
+
+            <button
+              className={`nav-item ${activeTab === 'inventory' ? 'active' : ''}`}
+              onClick={() => handleNavClick('inventory')}
+            >
+              <Package />
+              <span>Inventory</span>
+            </button>
+
+            <button
+              className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
+              onClick={() => handleNavClick('settings')}
+            >
+              <Settings />
+              <span>Settings</span>
+            </button>
+          </nav>
         </div>
 
-        {/* Navigation Menu matching user mockup order */}
-        <nav className="nav-menu">
+        {/* Logout button matching Image 1, 2, 3, 4 bottom-left */}
+        <div style={{ paddingBottom: '16px' }}>
           <button
-            className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-            onClick={() => setActiveTab('dashboard')}
+            onClick={() => {
+              setIsMobileOpen(false);
+              onLogout();
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: '#ff5a5f',
+              color: '#ffffff',
+              padding: '10px 18px',
+              borderRadius: '8px',
+              fontWeight: 600,
+              fontSize: '14px',
+              border: 'none',
+              cursor: 'pointer',
+              width: '120px',
+              boxShadow: '0 2px 4px rgba(255, 90, 95, 0.25)',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f43f5e'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = '#ff5a5f'}
+            title="Logout from Mobile Management"
           >
-            <LayoutDashboard />
-            <span>Dashboard</span>
+            <span>Logout</span>
+            <LogOut size={16} />
           </button>
-
-          <button
-            className={`nav-item ${activeTab === 'dailytask' ? 'active' : ''}`}
-            onClick={() => setActiveTab('dailytask')}
-          >
-            <ClipboardCheck />
-            <span>Daily Task</span>
-          </button>
-
-          <button
-            className={`nav-item ${activeTab === 'history' ? 'active' : ''}`}
-            onClick={() => setActiveTab('history')}
-          >
-            <History />
-            <span>History</span>
-          </button>
-
-          <button
-            className={`nav-item ${activeTab === 'usermanage' ? 'active' : ''}`}
-            onClick={() => setActiveTab('usermanage')}
-          >
-            <User />
-            <span>User manage</span>
-          </button>
-
-          <button
-            className={`nav-item ${activeTab === 'update' ? 'active' : ''}`}
-            onClick={() => setActiveTab('update')}
-          >
-            <Sparkles />
-            <span>Update</span>
-          </button>
-
-          <button
-            className={`nav-item ${activeTab === 'inventory' ? 'active' : ''}`}
-            onClick={() => setActiveTab('inventory')}
-          >
-            <Package />
-            <span>Inventory</span>
-          </button>
-
-          <button
-            className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => setActiveTab('settings')}
-          >
-            <Settings />
-            <span>Settings</span>
-          </button>
-        </nav>
-      </div>
-
-      {/* Logout button matching Image 1, 2, 3, 4 bottom-left */}
-      <div style={{ paddingBottom: '16px' }}>
-        <button
-          onClick={onLogout}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            backgroundColor: '#ff5a5f',
-            color: '#ffffff',
-            padding: '10px 18px',
-            borderRadius: '8px',
-            fontWeight: 600,
-            fontSize: '14px',
-            border: 'none',
-            cursor: 'pointer',
-            width: '120px',
-            boxShadow: '0 2px 4px rgba(255, 90, 95, 0.25)',
-            transition: 'all 0.15s ease'
-          }}
-          onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f43f5e'}
-          onMouseLeave={e => e.currentTarget.style.backgroundColor = '#ff5a5f'}
-          title="Logout from Mobile Management"
-        >
-          <span>Logout</span>
-          <LogOut size={16} />
-        </button>
-      </div>
-    </aside>
+        </div>
+      </aside>
+    </>
   );
 }

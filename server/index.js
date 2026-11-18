@@ -282,13 +282,21 @@ function parseTextToRecords(fullText) {
 // 1. Get all records with filter query params
 app.get('/api/records', async (req, res) => {
   try {
-    const { search, group, shift, sign, task_number } = req.query;
+    const { search, group, shift, sign, task_number, task_date, all, current_active } = req.query;
+    
+    // If all === 'true', fetch across all tasks.
+    // If task_number is specified, fetch for that specific task.
+    // Otherwise (e.g. Dashboard view or current_active), default to the latest/current active task!
+    const isCurrentActive = current_active === 'true' || (task_number === undefined && all !== 'true');
+
     const records = await getAllRecords({
       search,
       group,
       shift,
       sign,
-      task_number: task_number !== undefined && task_number !== 'all' ? parseInt(task_number) : undefined
+      task_number: task_number !== undefined && task_number !== 'all' ? parseInt(task_number) : undefined,
+      task_date,
+      current_active: isCurrentActive
     });
     res.json({ success: true, data: records });
   } catch (err) {
@@ -418,11 +426,12 @@ app.get('/api/kpis', async (req, res) => {
   }
 });
 
-// 5b. Daily Task KPIs metrics (Today Active Mobiles: 70, Active: 3, Need an update: 1)
+// 5b. Daily Task KPIs metrics (Today Active Mobiles, Active in Shift, Returned Mobiles, Missing Devices)
 app.get('/api/daily-task/kpis', async (req, res) => {
   try {
     const taskNumber = req.query.task_number ? parseInt(req.query.task_number) : 17;
-    const kpis = await getDailyTaskKPIs(taskNumber);
+    const taskDate = req.query.task_date || null;
+    const kpis = await getDailyTaskKPIs(taskNumber, taskDate);
     res.json({ success: true, data: kpis });
   } catch (err) {
     console.error('Error fetching Daily Task KPIs:', err);
@@ -772,7 +781,7 @@ app.post('/api/upload/parse', upload.single('file'), async (req, res) => {
 // 14. Confirm Upload (Import rows into database)
 app.post('/api/upload/confirm', async (req, res) => {
   try {
-    const { filename, rows } = req.body;
+    const { filename, rows, task_number, task_date, replaceMode } = req.body;
     if (!Array.isArray(rows) || rows.length === 0) {
       return res.status(400).json({ success: false, error: 'No rows provided to import' });
     }
@@ -780,6 +789,16 @@ app.post('/api/upload/confirm', async (req, res) => {
     const validRows = rows.filter(r => r.name && r.name.trim());
     if (validRows.length === 0) {
       return res.status(400).json({ success: false, error: 'No valid rows found' });
+    }
+
+    const tNum = task_number ? parseInt(task_number) : 17;
+    const tDate = task_date || '2026-08-17';
+
+    if (replaceMode) {
+      const dbRunLocal = require('./database').dbRun || null;
+      if (dbRunLocal) {
+        await dbRunLocal(`DELETE FROM device_records WHERE task_number = ?`, [tNum]);
+      }
     }
 
     const batchId = await createUploadBatch(
@@ -800,7 +819,9 @@ app.post('/api/upload/confirm', async (req, res) => {
         taking_device: row.taking_device || '',
         handover_to: row.handover_to || '',
         sign: evaluateSignStatus(row.sign),
-        admin_user: 'Shanaka'
+        admin_user: 'Shanaka',
+        task_number: tNum,
+        task_date: tDate
       });
       insertedCount++;
     }

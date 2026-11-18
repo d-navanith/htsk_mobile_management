@@ -433,8 +433,13 @@ async function getAllRecords(filters = {}) {
   }
 
   if (filters.task_number !== undefined && filters.task_number !== 'all') {
-    query += ` AND (task_number = ? OR task_number IS NULL)`;
+    query += ` AND task_number = ?`;
     params.push(filters.task_number);
+  } else if (filters.task_date) {
+    query += ` AND task_date = ?`;
+    params.push(filters.task_date);
+  } else if (filters.current_active || filters.dashboard_active) {
+    query += ` AND task_number = (SELECT COALESCE(MAX(task_number), 17) FROM device_records)`;
   }
 
   query += ` ORDER BY id ASC`;
@@ -655,16 +660,20 @@ function parseDevices(str) {
   return str.split(/[,+&/]/).map(s => s.trim()).filter(Boolean);
 }
 
-// Dashboard KPIs calculation
+// Dashboard KPIs calculation (Matches the current active mobile list)
 async function getDashboardKPIs() {
   const settings = await dbGet(`SELECT * FROM shift_settings ORDER BY id ASC LIMIT 1`);
   const totalStock = (settings && settings.total_inventory_stock) ? settings.total_inventory_stock : 159;
 
-  const records = await dbAll(`SELECT * FROM device_records`);
+  // Find latest active task number
+  const latestTaskRow = await dbGet(`SELECT MAX(task_number) as latestTask FROM device_records`);
+  const activeTask = (latestTaskRow && latestTaskRow.latestTask) ? latestTaskRow.latestTask : 17;
+
+  // Active records from the current active day/task
+  const records = await dbAll(`SELECT * FROM device_records WHERE task_number = ?`, [activeTask]);
 
   // Active Mobile Phones:
   // A device is active if an employee is currently holding and using it.
-  // When a user takes multiple devices (e.g. PN 56, NEW 25), each physical device is counted.
   const activeRecords = records.filter(r => {
     if (!r.taking_device || r.taking_device.trim() === '') return false;
     const hasHandover = r.handover_to && r.handover_to.trim() !== '';
@@ -681,28 +690,32 @@ async function getDashboardKPIs() {
 
   // Available in Stock:
   // Invariant: Available in Stock + Active Mobile Phones = Total Inventory Stock
-  // When activeCount = 4, availableStock = 159 - 4 = 155 (155 + 4 = 159 tally)
   const availableStock = Math.max(0, totalStock - activeCount);
 
   // Need an Update:
-  // Count of records where sign == 'Pending' or not returned/handed over after shift!
+  // Count of records where sign == 'Pending' or not returned/handed over
   const needAnUpdateCount = records.filter(r => r.sign && r.sign.toLowerCase() === 'pending').length;
 
   return {
     totalMobilePhones: totalStock,
     activeMobilePhones: activeCount,
     availableInStock: availableStock,
-    needAnUpdate: needAnUpdateCount
+    needAnUpdate: needAnUpdateCount,
+    activeTaskNumber: activeTask
   };
 }
 
 // Daily Task KPIs calculation matching Task view & calendar
 // 4 Cards: Today Active Mobiles, Active In Shift, Returned Mobiles, Missing Devices
-async function getDailyTaskKPIs(taskNumber = 17) {
-  const records = await dbAll(`
-    SELECT * FROM device_records 
-    WHERE (task_number = ? OR task_number IS NULL)
-  `, [taskNumber]);
+async function getDailyTaskKPIs(taskNumber = 17, taskDate = null) {
+  let query = `SELECT * FROM device_records WHERE task_number = ?`;
+  const params = [taskNumber];
+  if (taskDate) {
+    query += ` AND task_date = ?`;
+    params.push(taskDate);
+  }
+
+  const records = await dbAll(query, params);
 
   let totalTakingDevices = 0;
   let returnedCount = 0;
@@ -737,8 +750,8 @@ async function getDailyTaskKPIs(taskNumber = 17) {
     }
   }
 
-  // Today Active Mobiles: total active devices recorded for today (e.g. 71, or morning check)
-  const todayActiveCount = totalTakingDevices > 0 ? totalTakingDevices : 70;
+  // Today Active Mobiles: exact count of taking devices for this day's task (0 if empty day)
+  const todayActiveCount = totalTakingDevices;
 
   return {
     todayActiveMobiles: todayActiveCount,
@@ -749,7 +762,7 @@ async function getDailyTaskKPIs(taskNumber = 17) {
     activeMobilePhones: activeInShiftCount,
     needAnUpdate: missingCount,
     taskNumber: taskNumber,
-    taskDate: `${taskNumber}th August 2026`
+    taskDate: taskDate || `${taskNumber}th August 2026`
   };
 }
 

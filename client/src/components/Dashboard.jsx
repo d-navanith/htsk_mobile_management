@@ -26,9 +26,9 @@ export default function Dashboard({
 
   const [kpis, setKpis] = useState({
     totalMobilePhones: 159,
-    activeMobilePhones: 3,
-    availableInStock: 156,
-    needAnUpdate: 1
+    activeMobilePhones: 0,
+    availableInStock: 159,
+    needAnUpdate: 0
   });
 
   const fetchKpis = async () => {
@@ -451,10 +451,10 @@ export default function Dashboard({
                       {/* Device Details (Stacked Return & Taking pills matching Image 4 & multi-device support) */}
                       <td style={{ padding: '14px 16px', borderRight: '1px solid #e5e7eb' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          {/* Return row */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
-                            <span style={{ color: '#6b7280', width: '52px' }}>Return:</span>
-                            {r.return_device ? (
+                          {/* Return row if device exists */}
+                          {r.return_device ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
+                              <span style={{ color: '#6b7280', width: '52px' }}>Return:</span>
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                                 {r.return_device.split(/[,+&/]/).map(d => d.trim()).filter(Boolean).map((dev, i) => (
                                   <span key={i} style={{
@@ -469,13 +469,13 @@ export default function Dashboard({
                                   </span>
                                 ))}
                               </div>
-                            ) : null}
-                          </div>
+                            </div>
+                          ) : null}
 
-                          {/* Taking row */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
-                            <span style={{ color: '#6b7280', width: '52px' }}>Taking:</span>
-                            {r.taking_device ? (
+                          {/* Taking row if device exists */}
+                          {r.taking_device ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
+                              <span style={{ color: '#6b7280', width: '52px' }}>Taking:</span>
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                                 {r.taking_device.split(/[,+&/]/).map(d => d.trim()).filter(Boolean).map((dev, i) => (
                                   <span key={i} style={{
@@ -490,8 +490,12 @@ export default function Dashboard({
                                   </span>
                                 ))}
                               </div>
-                            ) : null}
-                          </div>
+                            </div>
+                          ) : null}
+
+                          {!r.return_device && !r.taking_device && (
+                            <span style={{ color: '#9ca3af', fontSize: '12.5px' }}>—</span>
+                          )}
                         </div>
                       </td>
 

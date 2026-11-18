@@ -40,8 +40,8 @@ export default function DailyTaskSection({
   const [loading, setLoading] = useState(false);
 
   const [kpis, setKpis] = useState({
-    todayActiveMobiles: 71,
-    activeInShift: 71,
+    todayActiveMobiles: 0,
+    activeInShift: 0,
     returnedMobiles: 0,
     missingDevices: 0
   });
@@ -72,7 +72,7 @@ export default function DailyTaskSection({
 
   useEffect(() => {
     fetchTaskData();
-  }, [selectedDay]);
+  }, [selectedDay, currentMonthIndex, currentYear]);
 
   // Handle inline shift change
   const handleInlineShiftChange = async (recordId, newShift) => {
@@ -275,10 +275,10 @@ export default function DailyTaskSection({
               Today Active Mobiles
             </div>
             <div style={{ fontSize: '38px', fontWeight: 800, color: '#84cc16', lineHeight: 1.1, marginBottom: '8px' }}>
-              {kpis.todayActiveMobiles ?? 71}
+              {kpis.todayActiveMobiles ?? 0}
             </div>
             <div style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 400 }}>
-              {kpis.todayActiveMobiles ?? 71} Mobile phones issued today
+              {kpis.todayActiveMobiles ?? 0} Mobile phones issued today
             </div>
           </div>
 
@@ -294,10 +294,10 @@ export default function DailyTaskSection({
               Active In Shift
             </div>
             <div style={{ fontSize: '38px', fontWeight: 800, color: '#06b6d4', lineHeight: 1.1, marginBottom: '8px' }}>
-              {kpis.activeInShift ?? kpis.activeMobilePhones ?? 71}
+              {kpis.activeInShift ?? 0}
             </div>
             <div style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 400 }}>
-              {kpis.activeInShift ?? 71} currently active on shift
+              {kpis.activeInShift ?? 0} currently active on shift
             </div>
           </div>
 
@@ -723,13 +723,13 @@ export default function DailyTaskSection({
                         {r.return_time || ''}
                       </td>
 
-                      {/* Device Details with multi-device support matching user's scenario */}
+                      {/* Device Details with multi-device support */}
                       <td style={{ padding: '14px 16px', borderRight: '1px solid #e5e7eb' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          {/* Return row */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
-                            <span style={{ color: '#6b7280', width: '52px' }}>Return:</span>
-                            {r.return_device ? (
+                          {/* Return row if device exists */}
+                          {r.return_device ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
+                              <span style={{ color: '#6b7280', width: '52px' }}>Return:</span>
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                                 {parseDevices(r.return_device).map((dev, i) => (
                                   <span key={i} style={{
@@ -744,13 +744,13 @@ export default function DailyTaskSection({
                                   </span>
                                 ))}
                               </div>
-                            ) : null}
-                          </div>
+                            </div>
+                          ) : null}
 
-                          {/* Taking row */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
-                            <span style={{ color: '#6b7280', width: '52px' }}>Taking:</span>
-                            {r.taking_device ? (
+                          {/* Taking row if device exists */}
+                          {r.taking_device ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
+                              <span style={{ color: '#6b7280', width: '52px' }}>Taking:</span>
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                                 {parseDevices(r.taking_device).map((dev, i) => (
                                   <span key={i} style={{
@@ -765,8 +765,12 @@ export default function DailyTaskSection({
                                   </span>
                                 ))}
                               </div>
-                            ) : null}
-                          </div>
+                            </div>
+                          ) : null}
+
+                          {!r.return_device && !r.taking_device && (
+                            <span style={{ color: '#9ca3af', fontSize: '12.5px' }}>—</span>
+                          )}
                         </div>
                       </td>
 

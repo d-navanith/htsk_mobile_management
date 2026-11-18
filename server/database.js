@@ -692,36 +692,57 @@ async function getDashboardKPIs() {
 }
 
 // Daily Task KPIs calculation matching Task view & calendar
+// 4 Cards: Today Active Mobiles, Active In Shift, Returned Mobiles, Missing Devices
 async function getDailyTaskKPIs(taskNumber = 17) {
   const records = await dbAll(`
     SELECT * FROM device_records 
     WHERE (task_number = ? OR task_number IS NULL)
   `, [taskNumber]);
 
-  const activeRecords = records.filter(r => {
-    if (!r.taking_device || r.taking_device.trim() === '') return false;
-    const hasHandover = r.handover_to && r.handover_to.trim() !== '';
-    if (hasHandover) return true;
-    const isReturned = (r.return_time && r.return_time.trim() !== '') && (r.sign && r.sign.toLowerCase() === 'done');
-    return !isReturned;
-  });
+  let totalTakingDevices = 0;
+  let returnedCount = 0;
+  let activeInShiftCount = 0;
+  let missingCount = 0;
 
-  let activeCount = 0;
-  for (const r of activeRecords) {
-    const devs = parseDevices(r.taking_device);
-    activeCount += Math.max(1, devs.length);
+  for (const r of records) {
+    const takingDevs = parseDevices(r.taking_device);
+    const returnDevs = parseDevices(r.return_device);
+
+    const hasTaking = r.taking_device && r.taking_device.trim() !== '';
+    const takingQty = Math.max(hasTaking ? 1 : 0, takingDevs.length);
+    totalTakingDevices += takingQty;
+
+    const isReturned = (r.return_time && r.return_time.trim() !== '') || returnDevs.length > 0;
+    const isSignPending = r.sign && r.sign.toLowerCase() === 'pending';
+    const isExplicitMissing = (r.sign && r.sign.toLowerCase() === 'missing') ||
+                              (r.device_details && r.device_details.toLowerCase().includes('missing'));
+
+    if (returnDevs.length > 0) {
+      returnedCount += returnDevs.length;
+    } else if (isReturned && hasTaking) {
+      returnedCount += takingQty;
+    }
+
+    if (isExplicitMissing) {
+      missingCount += Math.max(1, takingQty);
+    } else if (isSignPending && !isReturned) {
+      missingCount += Math.max(1, takingQty);
+    } else if (hasTaking && !isReturned) {
+      activeInShiftCount += Math.max(1, takingQty);
+    }
   }
 
-  const needAnUpdateCount = records.filter(r => r.sign && r.sign.toLowerCase() === 'pending').length;
-
-  // Morning inspection base count:
-  // "we are daily checking mobile devices early in the morning for a once. think we found 70 devices actively use."
-  const todayActiveChecked = 70;
+  // Today Active Mobiles: total active devices recorded for today (e.g. 71, or morning check)
+  const todayActiveCount = totalTakingDevices > 0 ? totalTakingDevices : 70;
 
   return {
-    todayActiveMobiles: todayActiveChecked,
-    activeMobilePhones: activeCount || 3,
-    needAnUpdate: needAnUpdateCount,
+    todayActiveMobiles: todayActiveCount,
+    activeInShift: activeInShiftCount,
+    returnedMobiles: returnedCount,
+    missingDevices: missingCount,
+    // Backwards-compatible aliases
+    activeMobilePhones: activeInShiftCount,
+    needAnUpdate: missingCount,
     taskNumber: taskNumber,
     taskDate: `${taskNumber}th August 2026`
   };

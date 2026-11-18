@@ -40,9 +40,10 @@ export default function DailyTaskSection({
   const [loading, setLoading] = useState(false);
 
   const [kpis, setKpis] = useState({
-    todayActiveMobiles: 70,
-    activeMobilePhones: 3,
-    needAnUpdate: 1
+    todayActiveMobiles: 71,
+    activeInShift: 71,
+    returnedMobiles: 0,
+    missingDevices: 0
   });
 
   // Fetch records and KPIs for current selected daily task
@@ -263,62 +264,81 @@ export default function DailyTaskSection({
         marginBottom: '28px',
         alignItems: 'start'
       }}>
-        {/* Left: 3 KPI Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px' }}>
+        {/* Left: 4 Daily Task KPI Cards in 2x2 Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           {/* Card 1: Today Active Mobiles */}
           <div style={{
             backgroundColor: '#ffffff',
-            borderRadius: '18px',
+            borderRadius: '16px',
             border: '2px solid #84cc16',
-            padding: '22px 24px',
+            padding: '18px 20px',
             boxShadow: '0 2px 6px rgba(132, 204, 22, 0.06)'
           }}>
-            <div style={{ fontSize: '16px', fontWeight: 600, color: '#4b5563', marginBottom: '8px' }}>
+            <div style={{ fontSize: '15px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
               Today Active Mobiles
             </div>
-            <div style={{ fontSize: '42px', fontWeight: 800, color: '#84cc16', lineHeight: 1.1, marginBottom: '10px' }}>
-              {kpis.todayActiveMobiles ?? 70}
+            <div style={{ fontSize: '38px', fontWeight: 800, color: '#84cc16', lineHeight: 1.1, marginBottom: '8px' }}>
+              {kpis.todayActiveMobiles ?? 71}
             </div>
-            <div style={{ fontSize: '12.5px', color: '#9ca3af', fontWeight: 400 }}>
-              {kpis.todayActiveMobiles ?? 70} Mobile phones issued in today
+            <div style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 400 }}>
+              {kpis.todayActiveMobiles ?? 71} Mobile phones issued today
             </div>
           </div>
 
-          {/* Card 2: Active Mobile Phones */}
+          {/* Card 2: Active In Shift */}
           <div style={{
             backgroundColor: '#ffffff',
-            borderRadius: '18px',
+            borderRadius: '16px',
             border: '2px solid #06b6d4',
-            padding: '22px 24px',
+            padding: '18px 20px',
             boxShadow: '0 2px 6px rgba(6, 182, 212, 0.06)'
           }}>
-            <div style={{ fontSize: '16px', fontWeight: 600, color: '#4b5563', marginBottom: '8px' }}>
-              Active Mobile Phones
+            <div style={{ fontSize: '15px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
+              Active In Shift
             </div>
-            <div style={{ fontSize: '42px', fontWeight: 800, color: '#06b6d4', lineHeight: 1.1, marginBottom: '10px' }}>
-              {kpis.activeMobilePhones ?? 3}
+            <div style={{ fontSize: '38px', fontWeight: 800, color: '#06b6d4', lineHeight: 1.1, marginBottom: '8px' }}>
+              {kpis.activeInShift ?? kpis.activeMobilePhones ?? 71}
             </div>
-            <div style={{ fontSize: '12.5px', color: '#9ca3af', fontWeight: 400 }}>
-              {String(kpis.activeMobilePhones ?? 3).padStart(2, '0')} under active mobile phones
+            <div style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 400 }}>
+              {kpis.activeInShift ?? 71} currently active on shift
             </div>
           </div>
 
-          {/* Card 3: Need an Update */}
+          {/* Card 3: Returned Mobiles */}
           <div style={{
             backgroundColor: '#ffffff',
-            borderRadius: '18px',
+            borderRadius: '16px',
+            border: '2px solid #8b5cf6',
+            padding: '18px 20px',
+            boxShadow: '0 2px 6px rgba(139, 92, 246, 0.06)'
+          }}>
+            <div style={{ fontSize: '15px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
+              Returned Mobiles
+            </div>
+            <div style={{ fontSize: '38px', fontWeight: 800, color: '#8b5cf6', lineHeight: 1.1, marginBottom: '8px' }}>
+              {kpis.returnedMobiles ?? 0}
+            </div>
+            <div style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 400 }}>
+              {kpis.returnedMobiles ?? 0} mobiles returned today
+            </div>
+          </div>
+
+          {/* Card 4: Missing Devices */}
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '16px',
             border: '2px solid #ef4444',
-            padding: '22px 24px',
+            padding: '18px 20px',
             boxShadow: '0 2px 6px rgba(239, 68, 68, 0.06)'
           }}>
-            <div style={{ fontSize: '16px', fontWeight: 600, color: '#4b5563', marginBottom: '8px' }}>
-              Need an Update
+            <div style={{ fontSize: '15px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
+              Missing Devices
             </div>
-            <div style={{ fontSize: '42px', fontWeight: 800, color: '#ef4444', lineHeight: 1.1, marginBottom: '10px' }}>
-              {kpis.needAnUpdate ?? 1}
+            <div style={{ fontSize: '38px', fontWeight: 800, color: '#ef4444', lineHeight: 1.1, marginBottom: '8px' }}>
+              {kpis.missingDevices ?? 0}
             </div>
-            <div style={{ fontSize: '12.5px', color: '#9ca3af', fontWeight: 400 }}>
-              {kpis.needAnUpdate ?? 1} under need an update
+            <div style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 400 }}>
+              {kpis.missingDevices ?? 0} unreturned or missing devices
             </div>
           </div>
         </div>

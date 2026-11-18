@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Edit2, Clock, Smartphone, CheckCircle2, UserCheck, ArrowRightLeft } from 'lucide-react';
+import { X, Edit2, Clock, Smartphone, CheckCircle2, UserCheck, ArrowRightLeft, Trash2 } from 'lucide-react';
 
-export default function EditRecordModal({ isOpen, onClose, onUpdate, record }) {
+export default function EditRecordModal({ isOpen, onClose, onUpdate, onDelete, record }) {
   const formatCurrentTime = () => {
     const now = new Date();
     let hours = now.getHours();
@@ -468,45 +468,76 @@ export default function EditRecordModal({ isOpen, onClose, onUpdate, record }) {
           {/* Submit buttons */}
           <div style={{
             display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '12px',
+            justifyContent: 'space-between',
+            alignItems: 'center',
             marginTop: '10px',
             paddingTop: '16px',
             borderTop: '1px solid #e5e7eb'
           }}>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                padding: '10px 20px',
-                borderRadius: '10px',
-                border: '1px solid #d1d5db',
-                backgroundColor: '#ffffff',
-                color: '#374151',
-                fontSize: '14px',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
-            >
-              Cancel
-            </button>
+            <div>
+              {onDelete && record?.id && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onDelete(record.id);
+                    onClose();
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '10px 16px',
+                    borderRadius: '10px',
+                    border: '1px solid #fee2e2',
+                    backgroundColor: '#fef2f2',
+                    color: '#ef4444',
+                    fontSize: '13.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                  title="Delete Record"
+                >
+                  <Trash2 size={15} color="#ef4444" />
+                  Delete
+                </button>
+              )}
+            </div>
 
-            <button
-              type="submit"
-              disabled={saving}
-              style={{
-                padding: '10px 26px',
-                borderRadius: '10px',
-                border: 'none',
-                backgroundColor: '#84cc16',
-                color: '#000000',
-                fontSize: '14px',
-                fontWeight: 800,
-                cursor: 'pointer'
-              }}
-            >
-              {saving ? 'Updating...' : 'Save Changes'}
-            </button>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                type="button"
+                onClick={onClose}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '10px',
+                  border: '1px solid #d1d5db',
+                  backgroundColor: '#ffffff',
+                  color: '#374151',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="submit"
+                disabled={saving}
+                style={{
+                  padding: '10px 26px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  backgroundColor: '#84cc16',
+                  color: '#000000',
+                  fontSize: '14px',
+                  fontWeight: 800,
+                  cursor: 'pointer'
+                }}
+              >
+                {saving ? 'Updating...' : 'Save Changes'}
+              </button>
+            </div>
           </div>
         </form>
       </div>

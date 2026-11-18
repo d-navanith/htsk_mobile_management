@@ -399,7 +399,7 @@ export default function Dashboard({
                 <th style={{ padding: '16px 14px', fontSize: '13px', fontWeight: 700, color: '#111827', width: '90px', textAlign: 'center', borderRight: '1px solid #e5e7eb' }}>
                   Sign
                 </th>
-                <th style={{ padding: '16px 14px', fontSize: '13px', fontWeight: 700, color: '#111827', width: '70px', textAlign: 'center' }}>
+                <th style={{ padding: '16px 14px', fontSize: '13px', fontWeight: 700, color: '#111827', width: '90px', textAlign: 'center' }}>
                   Action
                 </th>
               </tr>
@@ -515,25 +515,44 @@ export default function Dashboard({
                         </span>
                       </td>
 
-                      {/* Action (Yellow pencil edit icon matching Image 4) */}
+                      {/* Action (Edit and Delete buttons) */}
                       <td style={{ padding: '16px 14px', textAlign: 'center' }}>
-                        <button
-                          onClick={() => onOpenEditModal(r)}
-                          style={{
-                            color: '#eab308',
-                            backgroundColor: 'transparent',
-                            border: 'none',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            padding: '4px',
-                            borderRadius: '6px'
-                          }}
-                          title="Edit Record"
-                        >
-                          <Edit2 size={16} color="#eab308" />
-                        </button>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                          <button
+                            onClick={() => onOpenEditModal(r)}
+                            style={{
+                              color: '#eab308',
+                              backgroundColor: 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '4px',
+                              borderRadius: '6px'
+                            }}
+                            title="Edit Record"
+                          >
+                            <Edit2 size={16} color="#eab308" />
+                          </button>
+                          <button
+                            onClick={() => onDeleteRecord(r.id)}
+                            style={{
+                              color: '#ef4444',
+                              backgroundColor: 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '4px',
+                              borderRadius: '6px'
+                            }}
+                            title="Delete Record"
+                          >
+                            <Trash2 size={16} color="#ef4444" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

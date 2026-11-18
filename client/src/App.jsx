@@ -243,6 +243,7 @@ export default function App() {
         isOpen={Boolean(editingRecord)}
         onClose={() => setEditingRecord(null)}
         onUpdate={handleUpdateRecord}
+        onDelete={handleDeleteRecord}
         record={editingRecord}
       />
     </div>

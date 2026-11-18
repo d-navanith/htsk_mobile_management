@@ -280,6 +280,8 @@ export default function App() {
             <UpdateSection
               onImportSuccess={handleImportSuccess}
               onDownloadTemplate={handleDownloadTemplate}
+              setActiveTab={setActiveTab}
+              groups={groups}
             />
           )}
 

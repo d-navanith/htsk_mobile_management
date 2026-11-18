@@ -247,6 +247,29 @@ function parseTextToRecords(fullText) {
     }
   }
 
+  // Fallback: If no multi-column records were parsed, handle single-column list of device tags
+  if (parsedRecords.length === 0 && lines.length > 0) {
+    let count = 1;
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) continue;
+      if (/^\s*(#|rec|record|emp|name|shift|group|issued|return|device|sign|action)/i.test(line)) continue;
+
+      parsedRecords.push({
+        name: String(count).padStart(2, '0'),
+        shift: 'Day',
+        group: '',
+        issued_at: '7.30 A.M.',
+        return_time: '',
+        return_device: '',
+        taking_device: line,
+        handover_to: '',
+        sign: 'Done'
+      });
+      count++;
+    }
+  }
+
   return parsedRecords;
 }
 
@@ -698,6 +721,13 @@ app.post('/api/upload/parse', upload.single('file'), async (req, res) => {
           }
         });
       }
+    } else if (['.txt', '.text', '.log'].includes(ext)) {
+      const text = fs.readFileSync(filePath, 'utf8');
+      rows = parseTextToRecords(text).map((r, idx) => ({
+        id: `preview-${idx + 1}`,
+        ...r,
+        isValid: Boolean(r.name)
+      }));
     } else if (['.pdf'].includes(ext)) {
       const dataBuffer = fs.readFileSync(filePath);
       const pdfData = await pdfParse(dataBuffer);
@@ -780,6 +810,137 @@ app.post('/api/upload/confirm', async (req, res) => {
     });
   } catch (err) {
     console.error('Error confirming upload:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 14b. Quick Device List Parser (Parse raw list of mobile devices)
+app.post('/api/upload/parse-quick-list', (req, res) => {
+  try {
+    const {
+      rawText = '',
+      startNumber = 1,
+      padZero = true,
+      shift = 'Day',
+      group = '',
+      issued_at = '7.30 A.M.'
+    } = req.body;
+
+    if (!rawText || !rawText.trim()) {
+      return res.status(400).json({ success: false, error: 'No device list text provided' });
+    }
+
+    const lines = rawText
+      .split(/\r?\n/)
+      .map(l => l.trim())
+      .filter(l => l.length > 0);
+
+    const rows = [];
+    let currentNum = parseInt(startNumber) || 1;
+
+    for (const line of lines) {
+      const items = line.includes(',') ? line.split(',').map(s => s.trim()).filter(Boolean) : [line];
+
+      for (const item of items) {
+        if (!item) continue;
+        if (/^(rec|emp|name|shift|group|device|phone|serial|model|list|taking)/i.test(item) && items.length === 1 && rows.length === 0) {
+          continue;
+        }
+
+        const formattedEmpName = padZero && currentNum < 100
+          ? String(currentNum).padStart(2, '0')
+          : String(currentNum);
+
+        rows.push({
+          id: `quick-${rows.length + 1}`,
+          emp_number: currentNum,
+          name: formattedEmpName,
+          shift: shift || 'Day',
+          group: group || '',
+          issued_at: issued_at || '7.30 A.M.',
+          return_time: '',
+          return_device: '',
+          taking_device: item,
+          handover_to: '',
+          sign: 'Done',
+          isValid: true
+        });
+
+        currentNum++;
+      }
+    }
+
+    res.json({
+      success: true,
+      totalRows: rows.length,
+      validRows: rows.length,
+      rows
+    });
+  } catch (err) {
+    console.error('Error parsing quick list:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 14c. Quick Device List Confirm & Import
+app.post('/api/upload/quick-list', async (req, res) => {
+  try {
+    const {
+      rows,
+      task_number = 17,
+      task_date = '2026-08-17',
+      replaceMode = false
+    } = req.body;
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ success: false, error: 'No rows provided to import' });
+    }
+
+    const tNum = parseInt(task_number) || 17;
+    const tDate = task_date || '2026-08-17';
+
+    if (replaceMode) {
+      await dbRun(`DELETE FROM device_records WHERE task_number = ?`, [tNum]);
+    }
+
+    let insertedCount = 0;
+    for (const r of rows) {
+      const empName = (r.name || r.emp_name || String(insertedCount + 1)).trim();
+      const takingDevice = (r.taking_device || '').trim();
+      if (!empName && !takingDevice) continue;
+
+      await insertDeviceRecord({
+        name: empName,
+        shift: r.shift || 'Day',
+        group: r.group || '',
+        issued_at: r.issued_at || '7.30 A.M.',
+        return_time: r.return_time || '',
+        return_device: r.return_device || '',
+        taking_device: takingDevice,
+        handover_to: r.handover_to || '',
+        sign: r.sign || 'Done',
+        admin_user: 'Shanaka',
+        task_number: tNum,
+        task_date: tDate
+      });
+      insertedCount++;
+    }
+
+    await createUploadBatch(
+      `quick_daily_task_${tNum}_list.txt`,
+      rows.length,
+      insertedCount
+    );
+
+    res.json({
+      success: true,
+      task_number: tNum,
+      task_date: tDate,
+      insertedCount,
+      message: `Successfully imported ${insertedCount} Today Active Mobiles for Task ${tNum}!`
+    });
+  } catch (err) {
+    console.error('Error importing quick list:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

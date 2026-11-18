@@ -102,79 +102,83 @@ function mapRowToRecord(rawRow) {
     normalized[normalizeKey(key)] = rawRow[key];
   }
 
-  const name =
-    normalized['name'] ||
-    normalized['empname'] ||
-    normalized['employeename'] ||
-    normalized['fullname'] ||
-    normalized['person'] ||
-    normalized['user'] ||
+  const rawName =
+    normalized['name'] !== undefined ? normalized['name'] :
+    normalized['empname'] !== undefined ? normalized['empname'] :
+    normalized['employeename'] !== undefined ? normalized['employeename'] :
+    normalized['fullname'] !== undefined ? normalized['fullname'] :
+    normalized['person'] !== undefined ? normalized['person'] :
+    normalized['user'] !== undefined ? normalized['user'] :
+    normalized['empno'] !== undefined ? normalized['empno'] :
+    normalized['recno'] !== undefined ? normalized['recno'] :
     '';
 
-  const shift =
-    normalized['shift'] ||
-    (String(rawRow['Issued At'] || rawRow['time'] || '').toUpperCase().includes('A.M.') ? 'Day' : 'Night');
+  const name = String(rawName !== null && rawName !== undefined ? rawName : '').trim();
 
-  const group =
-    normalized['group'] ||
-    normalized['groupname'] ||
-    normalized['department'] ||
-    normalized['team'] ||
-    'Group D';
+  const rawTaking =
+    normalized['taking'] !== undefined ? normalized['taking'] :
+    normalized['takingdevice'] !== undefined ? normalized['takingdevice'] :
+    normalized['takingphone'] !== undefined ? normalized['takingphone'] :
+    normalized['issueddevice'] !== undefined ? normalized['issueddevice'] :
+    normalized['deviceid'] !== undefined ? normalized['deviceid'] :
+    normalized['device'] !== undefined ? normalized['device'] :
+    normalized['phone'] !== undefined ? normalized['phone'] :
+    normalized['mobile'] !== undefined ? normalized['mobile'] :
+    '';
 
-  const issued_at =
-    normalized['issuedat'] ||
-    normalized['time'] ||
-    normalized['issuetime'] ||
-    normalized['checkouttime'] ||
-    normalized['start'] ||
+  const taking_device = String(rawTaking !== null && rawTaking !== undefined ? rawTaking : '').trim();
+
+  const rawShift = normalized['shift'] !== undefined ? normalized['shift'] : '';
+  const shift = String(rawShift || 'Day').trim();
+
+  const rawGroup =
+    normalized['group'] !== undefined ? normalized['group'] :
+    normalized['groupname'] !== undefined ? normalized['groupname'] :
+    normalized['department'] !== undefined ? normalized['department'] :
+    normalized['team'] !== undefined ? normalized['team'] :
+    '';
+  const group = String(rawGroup || '').trim();
+
+  const rawIssued =
+    normalized['issuedat'] !== undefined ? normalized['issuedat'] :
+    normalized['time'] !== undefined ? normalized['time'] :
+    normalized['issuetime'] !== undefined ? normalized['issuetime'] :
     '7.30 A.M.';
+  const issued_at = String(rawIssued || '7.30 A.M.').trim();
 
-  const return_time =
-    normalized['returntime'] ||
-    normalized['checkintime'] ||
-    normalized['expectedreturn'] ||
-    normalized['expectedreturnat'] ||
-    normalized['return'] ||
+  const rawReturnTime =
+    normalized['returntime'] !== undefined ? normalized['returntime'] :
+    normalized['checkintime'] !== undefined ? normalized['checkintime'] :
     '';
+  const return_time = String(rawReturnTime || '').trim();
 
-  const return_device =
-    normalized['returndevice'] ||
-    normalized['returnphone'] ||
-    normalized['returneddevice'] ||
+  const rawReturnDevice =
+    normalized['returndevice'] !== undefined ? normalized['returndevice'] :
+    normalized['returnphone'] !== undefined ? normalized['returnphone'] :
     '';
+  const return_device = String(rawReturnDevice || '').trim();
 
-  const taking_device =
-    normalized['takingdevice'] ||
-    normalized['takingphone'] ||
-    normalized['issueddevice'] ||
-    normalized['deviceid'] ||
-    normalized['device'] ||
+  const rawHandover =
+    normalized['handoverto'] !== undefined ? normalized['handoverto'] :
+    normalized['handover'] !== undefined ? normalized['handover'] :
     '';
-
-  const handover_to =
-    normalized['handoverto'] ||
-    normalized['handover'] ||
-    normalized['receiver'] ||
-    normalized['nextcustodian'] ||
-    '';
+  const handover_to = String(rawHandover || '').trim();
 
   const rawSign =
-    normalized['sign'] ||
-    normalized['signature'] ||
-    normalized['status'] ||
-    normalized['signed'] ||
-    '';
+    normalized['sign'] !== undefined ? normalized['sign'] :
+    normalized['signature'] !== undefined ? normalized['signature'] :
+    normalized['status'] !== undefined ? normalized['status'] :
+    'Done';
 
   return {
-    name: name.trim(),
-    shift: shift.trim(),
-    group: group.trim(),
-    issued_at: issued_at.trim(),
-    return_time: return_time.trim(),
-    return_device: return_device.trim(),
-    taking_device: taking_device.trim(),
-    handover_to: handover_to.trim(),
+    name,
+    shift: shift || 'Day',
+    group,
+    issued_at: issued_at || '7.30 A.M.',
+    return_time,
+    return_device,
+    taking_device,
+    handover_to,
     sign: evaluateSignStatus(rawSign)
   };
 }

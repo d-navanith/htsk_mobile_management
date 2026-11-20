@@ -1,16 +1,41 @@
-# React + Vite
+# HTSK Mobile Management - Frontend Client
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The frontend interface for the HTSK Mobile Management Platform, built with **React 18**, **Vite**, and **Lucide Icons**.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🎨 UI Architecture & Design Standards
 
-## React Compiler
+- **Unified System Theme:**
+  - Standardized typography (`system-h1`, `system-breadcrumb`, card headers).
+  - Consistent color palette: Primary Lime (`#84cc16`), Cyan (`#06b6d4`), Purple (`#8b5cf6`), Amber (`#eab308`), Red (`#ef4444`).
+  - Fixed, non-scrolling sidebar navigation.
+  - Independent scroll containers for heavy data tables.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 📁 Key Components (`src/components/`)
 
-## Expanding the Oxlint configuration
+| Component | Description |
+|-----------|-------------|
+| `Dashboard.jsx` | Executive KPI overview, interactive calendar drawer filter, and day-by-day records table. |
+| `DailyTaskSection.jsx` | Multi-round task auditing, check time management, and attention highlight workflows. |
+| `InventorySection.jsx` | 241 cataloged phones, live custodian synchronization, and rack storage locations. |
+| `UpdateSection.jsx` | Ingestion center for Excel, CSV, PDF, Word, and OCR image documents, plus quick text list entry. |
+| `UserManageSection.jsx` | User accounts, custom role creation, granular capability toggles, and dashboard animation management. |
+| `HistorySection.jsx` | Chronological audit trail of all device handovers, updates, returns, and administrative logins. |
+| `SettingsSection.jsx` | Operational shift configuration (Day/Night timings, duration, grace periods). |
+| `Sidebar.jsx` | Fixed navigation bar with responsive mobile drawer support. |
+| `SnowEffect.jsx` | 60fps CSS particle animation engine supporting Snow, Rain, and Sparkle ambient card effects. |
+| `AdminLogin.jsx` | Administrative authentication portal. |
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## 🛠 Available Scripts
+
+```bash
+# Start local Vite development server (Port 5173)
+npm run dev
+
+# Build production bundle to dist/
+npm run build
+
+# Preview production build locally
+npm run preview
+```

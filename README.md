@@ -1,59 +1,157 @@
 # HTSK Mobile Management System
 
-A full-stack, enterprise-grade **Company Mobile Management & Handover System** built faithfully to the HTSK specifications and UI mockups.
+A production-grade, enterprise **Company Mobile Device Inventory, Shift Handover & Daily Task Management Platform** built for high-throughput daily device operations, real-time custody tracking, and multi-round shift accountability.
 
 ---
 
-## 📱 Operational Logic & Workflow
-
-1. **Time (Item Given to User)**:
-   - The exact time the replacement or temporary mobile unit is handed over to the employee (e.g. `06.48 P.M.`).
-2. **Return Time (Returned to Us)**:
-   - The time the user brings the mobile back to the desk (e.g. `07.55 P.M.`). If the mobile is still with the user, this remains empty or shows a 1-click **Return Mobile** button.
-3. **Device Details (Issue & Reassigned Mobile)**:
-   - Explains what the issue was with the previous device and which device was newly assigned (e.g. `Bank blocked, Reassigned "pn 34 mobile"`).
-4. **Sign (Verification Status)**:
-   - **Done (Green)**: The user has completed the handover/return process and signed.
-   - **Pending (Amber)**: The process is in progress, the device is currently in use, or the signature section is empty.
+## 📑 Table of Contents
+- [Key Features](#-key-features)
+- [System Architecture & Modules](#-system-architecture--modules)
+- [Operational Logic & Workflows](#-operational-logic--workflows)
+- [Security, Roles & Permissions](#-security-roles--permissions)
+- [Technology Stack](#-technology-stack)
+- [Getting Started](#-getting-started)
+- [Git Repositories](#-git-repositories)
 
 ---
 
-## ⚡ Smart Sheet & Signed Document Ingestion
+## 🌟 Key Features
 
-When you upload a file in the **Update** section (`.xlsx`, `.xls`, `.csv`, `.pdf`, `.docx`, `.png`, `.jpg`):
-- **Signature Detection:**
-  - If a row has a signature, checkmark, or is marked Done: the system automatically recognizes it as **Done**.
-  - If the signature section is empty, blank, or unmarked: the system automatically recognizes it as **Pending**.
-- **Automated Record Updating:**
-  - If an employee already has an active record in the system with `Sign = 'Pending'` and a signed sheet or image is uploaded showing they signed / returned the mobile, the system **automatically updates their status to Done** and records the return time!
-  - If it is a new handover record, it inserts it as a new entry.
+### 1. Dashboard & Real-Time KPIs
+- **4 Interactive KPI Summary Cards:**
+  - **Total Mobile Phones (241):** Full fleet catalog overview across all series.
+  - **Active Mobile Phones:** Devices currently checked out and in use by shift workers.
+  - **Available in Stock:** Devices currently docked in charging racks and ready for deployment.
+  - **Need an Update:** Devices flagged with pending handovers or unreturned status.
+- **Interactive Calendar Drawer:** Filter records and metrics by specific dates (e.g., Nov 17, 18, 19, 20) with active day indicators.
+- **Ambient Visual Effects:** Configurable card animation engine (Snow, Rain, Sparkle) with admin toggle and per-user permission control.
+
+### 2. Daily Task & Multi-Round Tracking
+- **Intra-Day Round Auditing:** Track multiple device sweeps per day (e.g. `Task 19.1 : Time 8.30 A.M.`, `Task 19.2 : Time 02.00 P.M.`).
+- **Separate Scroll Containers:** Each round has an independent scrollable table container for streamlined review without endless page scrolling.
+- **Attention & Drop Highlights:** Missing or dropped devices between rounds are highlighted in red for immediate supervisor inspection.
+- **1-Click Resolutions:** Quickly mark unverified devices as **Returned in Office** or **Missing**, automatically synchronizing historical records and previous rounds.
+- **Accurate Return Accounting:** Accurately accounts for repeated device return events (e.g., PN 34 returned across multiple shifts/employees on the same day).
+
+### 3. Comprehensive Inventory Management
+- **241 Pre-Cataloged Devices:**
+  - **PN Series (122 Units):** `PN 1` to `PN 122` (Charging Station A)
+  - **NEW Series (90 Units):** `NEW 1` to `NEW 90` (Rack B-1)
+  - **CASS Series (29 Units):** `CASS 1` to `CASS 29` (Station B)
+- **Live Custodian Syncing:** Real-time linkage showing which employee currently holds each device.
+- **Card & Table Views:** Switch between visual device cards and dense tabular data with search and status filtering.
+
+### 4. Smart Ingestion & Data Update
+- **Flexible File Support:** Ingest device lists from Excel (`.xlsx`, `.xls`), CSV, Word (`.docx`), PDF, and Images (`.png`, `.jpg`).
+- **Automated Signature & OCR Recognition:** Automatically interprets marked/signed rows as `Done` and unsigned rows as `Pending`.
+- **Quick Daily Active List Entry:** Fast-entry textarea for pasting daily device numbers with auto-numbered employee assignment and live preview.
+
+### 5. User & Role Management
+- **Protected Administrator Accounts:** Core administrative accounts (e.g., `Shanaka`, `Admin`) cannot be set to Inactive or deleted.
+- **Dynamic Role Creation:** Admins can create custom roles (e.g., *Manager*, *Auditor*, *Technician*) directly from the user creation dropdown with auto-generated permission templates.
+- **Granular Capability Toggles:** Interactive toggle switches for operational permissions (`manage_devices`, `handover_devices`, `return_devices`, `manage_users`, `manage_groups_shifts`, `view_audit_logs`, `delete_records`).
+- **Role Filtering:** Filter the permission management view by specific roles.
+- **Per-User Animation Visibility:** Granular toggle controlling which users see ambient animations on their dashboard.
+
+### 6. Audit Trail & History
+- Complete chronological history log recording all device additions, edits, returns, shift handovers, and administrative logins.
 
 ---
 
-## 🎨 UI & Clean Sidebar
+## 🏛 System Architecture & Modules
 
-- **Clean Sidebar:** Exactly matches Mockups 1 & 2 without internal technical clutter:
-  - **HTSK** Brand Logo (lime green `#72bf12`)
-  - **Dashboard**
-  - **Update**
-  - **History**
-- **3NF Database Engine:** Operates quietly and strictly under the hood with 6 normalized tables (`persons`, `groups`, `devices`, `sign_statuses`, `upload_batches`, `device_records`) maintaining referential integrity.
-
----
-
-## 🚀 Running the System
-
-Server is running at: **[http://localhost:5100](http://localhost:5100)**
-
-```bash
-# Start server
-npm start
-
-# Build frontend
-npm run build
+```
+htsk-mobile-mgmt/
+├── client/                     # React 18 + Vite Frontend Application
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── Dashboard.jsx           # Main KPI & Calendar view
+│   │   │   ├── DailyTaskSection.jsx    # Multi-round task management
+│   │   │   ├── InventorySection.jsx    # 241 phone catalog & custody
+│   │   │   ├── UpdateSection.jsx       # Document & list ingestion
+│   │   │   ├── UserManageSection.jsx   # Users, roles, permissions & animations
+│   │   │   ├── HistorySection.jsx      # Audit logs & login history
+│   │   │   ├── SettingsSection.jsx     # Shift timings & group setups
+│   │   │   ├── Sidebar.jsx             # Fixed responsive navigation
+│   │   │   ├── AdminLogin.jsx          # Secure admin access
+│   │   │   └── SnowEffect.jsx          # Ambient card particle effects
+│   │   ├── App.jsx                     # Master state & route coordinator
+│   │   └── index.css                   # Unified system design & tokens
+├── server/                     # Node.js + Express Backend
+│   ├── database.js             # SQLite 3NF database engine & business logic
+│   ├── index.js                # REST API endpoints & file ingestion
+│   └── mobile_management.sqlite # Persistent SQLite database
+└── package.json                # Project dependencies & scripts
 ```
 
 ---
 
-## 📂 Pre-loaded Sample Files
-- `sample_mobile_upload.xlsx` — A pre-formatted spreadsheet with both signed (`Done`) and unsigned (`Pending`) rows ready to test in the Update section.
+## ⚡ Operational Logic & Workflows
+
+1. **Shift Handover / Issue Time (`Issued At`):**
+   - The timestamp when an employee is issued a mobile unit for their shift (e.g., `7.30 A.M.`).
+2. **Device Return (`Return Time`):**
+   - Recorded when the device is handed back to the charging station (e.g., `5.51 P.M.`).
+3. **Device Tagging:**
+   - Normalizes tags across different formats (`PN 34`, `Pn34`, `New 25`, `Cass 12`) to ensure uniform inventory tracking.
+4. **Sign Status:**
+   - **Done (Green):** Employee signed or verified return.
+   - **Pending (Amber):** Currently active or awaiting verification.
+   - **Missing (Red):** Unaccounted during intra-day round check.
+
+---
+
+## 🔒 Security, Roles & Permissions
+
+- **Default Roles:** `Admin`, `Supervisor`, `Staff`, `Developer`.
+- **Dynamic Roles:** Admins can define custom roles with instant permission template seeding.
+- **Admin Safeguard:** Root admin accounts cannot be deactivated via the UI or API.
+- **Role-Based Access Control (RBAC):** Real-time permission evaluation for device management, user administration, and audit logs.
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js (v18 or higher)
+- npm (v9 or higher)
+
+### Installation & Setup
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/xyruslabs/htsk-mobile-mgmt.git
+   cd htsk-mobile-mgmt
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   # Install root and backend dependencies
+   npm install
+
+   # Install frontend dependencies
+   cd client && npm install && cd ..
+   ```
+
+3. **Start the development servers:**
+   ```bash
+   # Start backend API (Port 5100)
+   npm start
+
+   # In a separate terminal, start frontend (Port 5173)
+   cd client && npm run dev
+   ```
+
+4. **Build for Production:**
+   ```bash
+   npm run build
+   ```
+   *Static assets will be compiled into `client/dist/` and served directly by the Express server on `http://localhost:5100`.*
+
+---
+
+## 🔗 Git Repositories
+
+This project is configured with dual-push remote synchronization:
+- **Primary Organization:** [https://github.com/xyruslabs/htsk-mobile-mgmt.git](https://github.com/xyruslabs/htsk-mobile-mgmt.git)
+- **Personal Repository:** [https://github.com/d-navanith/htsk_mobile_management.git](https://github.com/d-navanith/htsk_mobile_management.git)

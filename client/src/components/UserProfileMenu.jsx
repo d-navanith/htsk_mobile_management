@@ -11,7 +11,8 @@ export default function UserProfileMenu({
   onOpenSecurity = () => {},
   onLogout = () => {},
   setActiveTab = () => {},
-  onRefresh = () => {}
+  onRefresh = () => {},
+  canManageUsers = true
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef(null);
@@ -253,46 +254,48 @@ export default function UserProfileMenu({
               </div>
             </button>
 
-            {/* User Manage (Admins) */}
-            <button
-              type="button"
-              onClick={() => {
-                setIsOpen(false);
-                setActiveTab('usermanage');
-              }}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                padding: '10px 12px',
-                borderRadius: '12px',
-                border: 'none',
-                background: 'none',
-                cursor: 'pointer',
-                textAlign: 'left',
-                transition: 'background 0.15s ease'
-              }}
-              onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f9fafb'}
-              onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-            >
-              <div style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                backgroundColor: '#ede9fe',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#6d28d9'
-              }}>
-                <Users size={16} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: '#1f2937' }}>User Management</div>
-                <div style={{ fontSize: '11px', color: '#6b7280' }}>Roles & permissions</div>
-              </div>
-            </button>
+            {/* User Manage (Admins / Permitted Users) */}
+            {canManageUsers && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsOpen(false);
+                  setActiveTab('usermanage');
+                }}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '10px 12px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: 'none',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'background 0.15s ease'
+                }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '8px',
+                  backgroundColor: '#ede9fe',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#6d28d9'
+                }}>
+                  <Users size={16} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#1f2937' }}>User Management</div>
+                  <div style={{ fontSize: '11px', color: '#6b7280' }}>Roles & permissions</div>
+                </div>
+              </button>
+            )}
 
             {/* Quick Refresh */}
             <button

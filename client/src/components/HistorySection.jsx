@@ -30,7 +30,8 @@ export default function HistorySection({
   currentUserAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
   onOpenProfile = () => {},
   setAppTab = () => {},
-  onLogout = () => {}
+  onLogout = () => {},
+  canManageUsers = true
 }) {
   const [activeTab, setActiveTab] = useState('activeDevices'); // 'activeDevices', 'activityHistory', 'auditLogins'
   const [activeDevices, setActiveDevices] = useState([]);
@@ -383,6 +384,7 @@ export default function HistorySection({
             onLogout={onLogout}
             setActiveTab={setAppTab}
             onRefresh={() => window.location.reload()}
+            canManageUsers={canManageUsers}
           />
         </div>
       </div>

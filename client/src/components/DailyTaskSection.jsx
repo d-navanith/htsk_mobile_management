@@ -32,7 +32,10 @@ export default function DailyTaskSection({
   currentUserEmail = 'shanaka@htsk.com',
   currentUserAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
   onOpenProfile = () => {},
-  onLogout = () => {}
+  onLogout = () => {},
+  canEdit = true,
+  canDelete = true,
+  canManageUsers = true
 }) {
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -81,23 +84,34 @@ export default function DailyTaskSection({
     newInRoundCount: 0
   });
 
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('htsk_session_token');
+    const role = currentUserRole || localStorage.getItem('htsk_user_role') || 'Admin';
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      'X-User-Role': role
+    };
+  };
+
   // Handle resolving dropped devices (Mark Returned or Mark Missing)
   const [resolvingDev, setResolvingDev] = useState(null);
 
   const handleResolveDevice = async (taskNumber, roundNumber, deviceTag, action) => {
+    if (!canEdit) return;
     const key = `${roundNumber}-${deviceTag}`;
     if (resolvingDev === key) return; // Prevent double/spam clicking
     setResolvingDev(key);
     try {
       const res = await fetch('/api/daily-task/resolve-device', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           task_number: taskNumber,
           round_number: roundNumber,
           device_tag: deviceTag,
           action: action,
-          admin_user: 'Shanaka'
+          admin_user: currentUserName || currentUser || 'Shanaka'
         })
       });
       const data = await res.json();
@@ -114,6 +128,10 @@ export default function DailyTaskSection({
 
   // Handle adding next task check (Intra-day Round)
   const handleConfirmNextTask = async () => {
+    if (!canEdit) {
+      alert('You do not have permission to add task rounds (View only).');
+      return;
+    }
     if (!nextRawList.trim()) {
       alert('Please enter or paste at least one device tag for this check.');
       return;
@@ -150,7 +168,7 @@ export default function DailyTaskSection({
 
       const res = await fetch('/api/upload/quick-list', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           rows,
           task_number: selectedDay,
@@ -180,11 +198,12 @@ export default function DailyTaskSection({
   };
 
   const handleSaveCheckTime = async (roundId) => {
+    if (!canEdit) return;
     if (!editingCheckTime.trim()) return;
     try {
       await fetch(`/api/daily-task/rounds/${roundId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ check_time: editingCheckTime.trim() })
       });
       setEditingRoundId(null);
@@ -228,10 +247,11 @@ export default function DailyTaskSection({
 
   // Handle inline shift change
   const handleInlineShiftChange = async (recordId, newShift) => {
+    if (!canEdit) return;
     try {
       await fetch(`/api/records/${recordId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ shift: newShift })
       });
       fetchTaskData();
@@ -243,10 +263,11 @@ export default function DailyTaskSection({
 
   // Handle inline group change
   const handleInlineGroupChange = async (recordId, newGroup) => {
+    if (!canEdit) return;
     try {
       await fetch(`/api/records/${recordId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ group: newGroup })
       });
       fetchTaskData();
@@ -448,6 +469,7 @@ export default function DailyTaskSection({
             onLogout={onLogout}
             setActiveTab={setActiveTab}
             onRefresh={refreshRecords}
+            canManageUsers={canManageUsers}
           />
         </div>
       </div>
@@ -779,7 +801,7 @@ export default function DailyTaskSection({
                   <span style={{ fontSize: '15px', fontWeight: 800, color: '#111827', letterSpacing: '-0.01em' }}>
                     Task {selectedDay}.{rnd.round_number} : Time {rnd.check_time || '8.30 A.M.'}
                   </span>
-                  {rnd.id && typeof rnd.id === 'number' && (
+                  {canEdit && rnd.id && typeof rnd.id === 'number' && (
                     <button
                       onClick={() => {
                         setEditingRoundId(rnd.id);
@@ -927,15 +949,17 @@ export default function DailyTaskSection({
                     />
                   </div>
 
-                  <button
-                    onClick={() => onOpenAddModal({
-                      task_number: selectedDay,
-                      task_date: `${currentYear}-${String(currentMonthIndex + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`
-                    })}
-                    className="btn-primary-lime"
-                  >
-                    <span>Add</span>
-                  </button>
+                  {canEdit && (
+                    <button
+                      onClick={() => onOpenAddModal({
+                        task_number: selectedDay,
+                        task_date: `${currentYear}-${String(currentMonthIndex + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`
+                      })}
+                      className="btn-primary-lime"
+                    >
+                      <span>Add</span>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -1154,46 +1178,62 @@ export default function DailyTaskSection({
                           </td>
                           <td style={{ padding: '16px 14px', textAlign: 'center' }}>
                             <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                              <button
-                                onClick={() => onOpenEditModal(targetRecord)}
-                                style={{
-                                  color: '#eab308',
-                                  backgroundColor: 'transparent',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  padding: '4px',
+                              {canEdit && (
+                                <button
+                                  onClick={() => onOpenEditModal(targetRecord)}
+                                  style={{
+                                    color: '#eab308',
+                                    backgroundColor: 'transparent',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    padding: '4px',
+                                    borderRadius: '6px'
+                                  }}
+                                  title="Edit Record"
+                                >
+                                  <Edit2 size={16} color="#eab308" />
+                                </button>
+                              )}
+                              {canDelete && (
+                                <button
+                                  onClick={() => {
+                                    if (targetRecord.id && typeof targetRecord.id === 'number') {
+                                      onDeleteRecord(targetRecord.id);
+                                    } else {
+                                      onDeleteRecord(r.id);
+                                    }
+                                  }}
+                                  style={{
+                                    color: '#ef4444',
+                                    backgroundColor: 'transparent',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    padding: '4px',
+                                    borderRadius: '6px'
+                                  }}
+                                  title="Delete Record"
+                                >
+                                  <Trash2 size={16} color="#ef4444" />
+                                </button>
+                              )}
+                              {!canEdit && !canDelete && (
+                                <span style={{
+                                  fontSize: '11.5px',
+                                  color: '#9ca3af',
+                                  fontWeight: 600,
+                                  backgroundColor: '#f3f4f6',
+                                  padding: '3px 8px',
                                   borderRadius: '6px'
-                                }}
-                                title="Edit Record"
-                              >
-                                <Edit2 size={16} color="#eab308" />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  if (targetRecord.id && typeof targetRecord.id === 'number') {
-                                    onDeleteRecord(targetRecord.id);
-                                  } else {
-                                    onDeleteRecord(r.id);
-                                  }
-                                }}
-                                style={{
-                                  color: '#ef4444',
-                                  backgroundColor: 'transparent',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  padding: '4px',
-                                  borderRadius: '6px'
-                                }}
-                                title="Delete Record"
-                              >
-                                <Trash2 size={16} color="#ef4444" />
-                              </button>
+                                }}>
+                                  View only
+                                </span>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1281,42 +1321,48 @@ export default function DailyTaskSection({
                           </div>
                         </div>
 
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleResolveDevice(selectedDay, rnd.round_number, devTag, 'returned')}
-                            style={{
-                              backgroundColor: resolution?.status === 'returned' ? '#15803d' : '#f0fdf4',
-                              color: resolution?.status === 'returned' ? '#ffffff' : '#15803d',
-                              border: '1px solid #86efac',
-                              fontSize: '11px',
-                              fontWeight: 700,
-                              padding: '4px 8px',
-                              borderRadius: '6px',
-                              cursor: 'pointer'
-                            }}
-                            title="Mark this device as found / returned to office"
-                          >
-                            ✓ Returned
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleResolveDevice(selectedDay, rnd.round_number, devTag, 'missing')}
-                            style={{
-                              backgroundColor: resolution?.status === 'missing' ? '#dc2626' : '#fef2f2',
-                              color: resolution?.status === 'missing' ? '#ffffff' : '#dc2626',
-                              border: '1px solid #fca5a5',
-                              fontSize: '11px',
-                              fontWeight: 700,
-                              padding: '4px 8px',
-                              borderRadius: '6px',
-                              cursor: 'pointer'
-                            }}
-                            title="Mark this device as missing"
-                          >
-                            ✕ Missing
-                          </button>
-                        </div>
+                        {canEdit ? (
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleResolveDevice(selectedDay, rnd.round_number, devTag, 'returned')}
+                              style={{
+                                backgroundColor: resolution?.status === 'returned' ? '#15803d' : '#f0fdf4',
+                                color: resolution?.status === 'returned' ? '#ffffff' : '#15803d',
+                                border: '1px solid #86efac',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                cursor: 'pointer'
+                              }}
+                              title="Mark this device as found / returned to office"
+                            >
+                              ✓ Returned
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleResolveDevice(selectedDay, rnd.round_number, devTag, 'missing')}
+                              style={{
+                                backgroundColor: resolution?.status === 'missing' ? '#dc2626' : '#fef2f2',
+                                color: resolution?.status === 'missing' ? '#ffffff' : '#dc2626',
+                                border: '1px solid #fca5a5',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                cursor: 'pointer'
+                              }}
+                              title="Mark this device as missing"
+                            >
+                              ✕ Missing
+                            </button>
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: '11px', color: '#9ca3af', fontStyle: 'italic' }}>
+                            View only
+                          </span>
+                        )}
                       </div>
                     );
                   })}
@@ -1328,34 +1374,36 @@ export default function DailyTaskSection({
         );
       })}
 
-      {/* Centered '+ Add Next Task' button matching Image 2 mockup */}
-      <div style={{ display: 'flex', justifyContent: 'center', marginTop: '32px', marginBottom: '40px' }}>
-        <button
-          onClick={() => {
-            setNextCheckTime(formatCurrentCheckTime());
-            setNextRawList(''); // NO DEMO DATA
-            setIsAddNextTaskOpen(true);
-          }}
-          style={{
-            backgroundColor: '#84cc16',
-            color: '#000000',
-            fontWeight: 800,
-            fontSize: '14px',
-            padding: '12px 36px',
-            borderRadius: '10px',
-            border: 'none',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            boxShadow: '0 4px 14px rgba(132, 204, 22, 0.35)',
-            transition: 'all 0.15s ease'
-          }}
-        >
-          <Plus size={18} strokeWidth={2.8} />
-          <span>+ Add Next Task</span>
-        </button>
-      </div>
+      {/* Centered '+ Add Next Task' button matching Image 2 mockup (hidden for View only / non-editors) */}
+      {canEdit && (
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '32px', marginBottom: '40px' }}>
+          <button
+            onClick={() => {
+              setNextCheckTime(formatCurrentCheckTime());
+              setNextRawList(''); // NO DEMO DATA
+              setIsAddNextTaskOpen(true);
+            }}
+            style={{
+              backgroundColor: '#84cc16',
+              color: '#000000',
+              fontWeight: 800,
+              fontSize: '14px',
+              padding: '12px 36px',
+              borderRadius: '10px',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 14px rgba(132, 204, 22, 0.35)',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Plus size={18} strokeWidth={2.8} />
+            <span>+ Add Next Task</span>
+          </button>
+        </div>
+      )}
 
       {/* Add Next Task Modal (Clean - No Demo Data) */}
       {isAddNextTaskOpen && (

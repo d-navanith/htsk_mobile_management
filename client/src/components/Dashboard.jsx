@@ -38,7 +38,10 @@ export default function Dashboard({
   currentUserEmail = 'shanaka@htsk.com',
   currentUserAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
   onOpenProfile = () => {},
-  onLogout = () => {}
+  onLogout = () => {},
+  canEdit = true,
+  canDelete = true,
+  canManageUsers = true
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGroup, setSelectedGroup] = useState('All Groups');
@@ -412,6 +415,7 @@ export default function Dashboard({
             onLogout={onLogout}
             setActiveTab={setActiveTab}
             onRefresh={refreshRecords}
+            canManageUsers={canManageUsers}
           />
         </div>
       </div>
@@ -1011,13 +1015,15 @@ export default function Dashboard({
             <ChevronDown size={14} color="#6b7280" style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
           </div>
 
-          {/* Green Add button matching system theme */}
-          <button
-            onClick={() => onOpenAddModal({ task_number: selectedTaskNumber, task_date: selectedDateStr })}
-            className="btn-primary-lime"
-          >
-            Add
-          </button>
+          {/* Green Add button matching system theme (hidden for View only / non-editors) */}
+          {canEdit && (
+            <button
+              onClick={() => onOpenAddModal({ task_number: selectedTaskNumber, task_date: selectedDateStr })}
+              className="btn-primary-lime"
+            >
+              Add
+            </button>
+          )}
         </div>
       </div>
 
@@ -1197,43 +1203,59 @@ export default function Dashboard({
                         </span>
                       </td>
 
-                      {/* Action (Edit and Delete buttons) */}
+                      {/* Action (Edit and Delete buttons or View only indicator) */}
                       <td style={{ padding: '16px 14px', textAlign: 'center' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                          <button
-                            onClick={() => onOpenEditModal(r)}
-                            style={{
-                              color: '#eab308',
-                              backgroundColor: 'transparent',
-                              border: 'none',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              padding: '4px',
+                          {canEdit && (
+                            <button
+                              onClick={() => onOpenEditModal(r)}
+                              style={{
+                                color: '#eab308',
+                                backgroundColor: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '4px',
+                                borderRadius: '6px'
+                              }}
+                              title="Edit Record"
+                            >
+                              <Edit2 size={16} color="#eab308" />
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button
+                              onClick={() => onDeleteRecord(r.id)}
+                              style={{
+                                color: '#ef4444',
+                                backgroundColor: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '4px',
+                                borderRadius: '6px'
+                              }}
+                              title="Delete Record"
+                            >
+                              <Trash2 size={16} color="#ef4444" />
+                            </button>
+                          )}
+                          {!canEdit && !canDelete && (
+                            <span style={{
+                              fontSize: '11.5px',
+                              color: '#9ca3af',
+                              fontWeight: 600,
+                              backgroundColor: '#f3f4f6',
+                              padding: '3px 8px',
                               borderRadius: '6px'
-                            }}
-                            title="Edit Record"
-                          >
-                            <Edit2 size={16} color="#eab308" />
-                          </button>
-                          <button
-                            onClick={() => onDeleteRecord(r.id)}
-                            style={{
-                              color: '#ef4444',
-                              backgroundColor: 'transparent',
-                              border: 'none',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              padding: '4px',
-                              borderRadius: '6px'
-                            }}
-                            title="Delete Record"
-                          >
-                            <Trash2 size={16} color="#ef4444" />
-                          </button>
+                            }}>
+                              View only
+                            </span>
+                          )}
                         </div>
                       </td>
                     </tr>

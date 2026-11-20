@@ -36,7 +36,10 @@ export default function InventorySection({
   currentUserAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
   onOpenProfile = () => {},
   setActiveTab = () => {},
-  onLogout = () => {}
+  onLogout = () => {},
+  canEdit = true,
+  canDelete = true,
+  canManageUsers = true
 }) {
   const [inventory, setInventory] = useState([]);
   const [kpis, setKpis] = useState({
@@ -180,9 +183,23 @@ export default function InventorySection({
     }
   };
 
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('htsk_session_token');
+    const role = currentUserRole || localStorage.getItem('htsk_user_role') || 'Admin';
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      'X-User-Role': role
+    };
+  };
+
   // Handle Add Submit
   const handleAddSubmit = async (e) => {
     e.preventDefault();
+    if (!canEdit) {
+      setErrorMsg('You do not have permission to add devices (View only).');
+      return;
+    }
     if (!formTag.trim()) {
       setErrorMsg('Device Tag / Number is required (e.g. "New 91", "Pn 123", "Cass 30")');
       return;
@@ -192,7 +209,7 @@ export default function InventorySection({
     try {
       const res = await fetch('/api/inventory', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           device_tag: formTag.trim(),
           series: formSeries,
@@ -219,12 +236,16 @@ export default function InventorySection({
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     if (!editingItem) return;
+    if (!canEdit) {
+      setErrorMsg('You do not have permission to edit devices (View only).');
+      return;
+    }
     setSaving(true);
     setErrorMsg('');
     try {
       const res = await fetch(`/api/inventory/${editingItem.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           device_tag: formTag.trim(),
           series: formSeries,
@@ -251,10 +272,11 @@ export default function InventorySection({
   const handleSaveQuickNote = async (e) => {
     e.preventDefault();
     if (!quickNoteItem) return;
+    if (!canEdit) return;
     try {
       const res = await fetch(`/api/inventory/${quickNoteItem.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           notes: quickNoteText.trim()
         })
@@ -272,9 +294,13 @@ export default function InventorySection({
 
   // Handle Delete
   const handleDelete = async (id, tag) => {
+    if (!canDelete) return;
     if (!window.confirm(`Are you sure you want to remove device "${tag}" from inventory?`)) return;
     try {
-      await fetch(`/api/inventory/${id}`, { method: 'DELETE' });
+      await fetch(`/api/inventory/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
       fetchInventory();
     } catch (err) {
       console.error('Error deleting inventory item:', err);
@@ -475,6 +501,7 @@ export default function InventorySection({
             onLogout={onLogout}
             setActiveTab={setActiveTab}
             onRefresh={() => window.location.reload()}
+            canManageUsers={canManageUsers}
           />
         </div>
       </div>
@@ -862,31 +889,33 @@ export default function InventorySection({
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
 
-          {/* Lime Green Add Device Button matching system theme */}
-          <button
-            onClick={() => {
-              resetForm();
-              setIsAddOpen(true);
-            }}
-            style={{
-              backgroundColor: '#84cc16',
-              color: '#000000',
-              fontWeight: 800,
-              fontSize: '13px',
-              padding: '9px 20px',
-              borderRadius: '8px',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              boxShadow: '0 2px 4px rgba(132, 204, 22, 0.25)',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <Plus size={16} />
-            <span>Add Device</span>
-          </button>
+          {/* Lime Green Add Device Button matching system theme (hidden for View only / non-editors) */}
+          {canEdit && (
+            <button
+              onClick={() => {
+                resetForm();
+                setIsAddOpen(true);
+              }}
+              style={{
+                backgroundColor: '#84cc16',
+                color: '#000000',
+                fontWeight: 800,
+                fontSize: '13px',
+                padding: '9px 20px',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 2px 4px rgba(132, 204, 22, 0.25)',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Plus size={16} />
+              <span>Add Device</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1048,56 +1077,67 @@ export default function InventorySection({
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <button
-                          type="button"
-                          onClick={() => openQuickNote(item)}
-                          style={{
-                            background: '#f3f4f6',
-                            border: 'none',
-                            borderRadius: '6px',
-                            padding: '5px 8px',
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            color: '#4b5563',
-                            cursor: 'pointer'
-                          }}
-                          title="Add/Edit Note"
-                        >
-                          Note
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openEdit(item)}
-                          style={{
-                            background: '#f3f4f6',
-                            border: 'none',
-                            borderRadius: '6px',
-                            padding: '5px 8px',
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            color: '#4b5563',
-                            cursor: 'pointer'
-                          }}
-                          title="Edit Device Details"
-                        >
-                          <Edit2 size={12} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(item.id, item.device_tag)}
-                          style={{
-                            background: '#fee2e2',
-                            border: 'none',
-                            borderRadius: '6px',
-                            padding: '5px 8px',
-                            fontSize: '11px',
-                            color: '#b91c1c',
-                            cursor: 'pointer'
-                          }}
-                          title="Remove Device"
-                        >
-                          <Trash2 size={12} />
-                        </button>
+                        {canEdit && (
+                          <button
+                            type="button"
+                            onClick={() => openQuickNote(item)}
+                            style={{
+                              background: '#f3f4f6',
+                              border: 'none',
+                              borderRadius: '6px',
+                              padding: '5px 8px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              color: '#4b5563',
+                              cursor: 'pointer'
+                            }}
+                            title="Add/Edit Note"
+                          >
+                            Note
+                          </button>
+                        )}
+                        {canEdit && (
+                          <button
+                            type="button"
+                            onClick={() => openEdit(item)}
+                            style={{
+                              background: '#f3f4f6',
+                              border: 'none',
+                              borderRadius: '6px',
+                              padding: '5px 8px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              color: '#4b5563',
+                              cursor: 'pointer'
+                            }}
+                            title="Edit Device Details"
+                          >
+                            <Edit2 size={12} />
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(item.id, item.device_tag)}
+                            style={{
+                              background: '#fee2e2',
+                              border: 'none',
+                              borderRadius: '6px',
+                              padding: '5px 8px',
+                              fontSize: '11px',
+                              color: '#b91c1c',
+                              cursor: 'pointer'
+                            }}
+                            title="Remove Device"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                        {!canEdit && !canDelete && (
+                          <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 600, backgroundColor: '#f3f4f6', padding: '3px 8px', borderRadius: '4px' }}>
+                            View only
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1212,7 +1252,7 @@ export default function InventorySection({
                           <span style={{ color: '#854d0e', backgroundColor: '#fefce8', padding: '3px 8px', borderRadius: '4px', fontStyle: 'italic' }}>
                             "{item.notes}"
                           </span>
-                        ) : (
+                        ) : canEdit ? (
                           <button
                             type="button"
                             onClick={() => openQuickNote(item)}
@@ -1220,6 +1260,8 @@ export default function InventorySection({
                           >
                             + Add note
                           </button>
+                        ) : (
+                          <span style={{ color: '#9ca3af' }}>—</span>
                         )}
                       </td>
 
@@ -1234,20 +1276,29 @@ export default function InventorySection({
 
                       <td style={{ padding: '14px', textAlign: 'center' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                          <button
-                            onClick={() => openEdit(item)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4b5563', padding: '4px' }}
-                            title="Edit"
-                          >
-                            <Edit2 size={15} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(item.id, item.device_tag)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }}
-                            title="Delete"
-                          >
-                            <Trash2 size={15} />
-                          </button>
+                          {canEdit && (
+                            <button
+                              onClick={() => openEdit(item)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4b5563', padding: '4px' }}
+                              title="Edit"
+                            >
+                              <Edit2 size={15} />
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button
+                              onClick={() => handleDelete(item.id, item.device_tag)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }}
+                              title="Delete"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          )}
+                          {!canEdit && !canDelete && (
+                            <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 600, backgroundColor: '#f3f4f6', padding: '2px 8px', borderRadius: '4px' }}>
+                              View only
+                            </span>
+                          )}
                         </div>
                       </td>
                     </tr>

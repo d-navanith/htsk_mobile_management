@@ -24,7 +24,8 @@ export default function SettingsSection({
   currentUserAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
   onOpenProfile = () => {},
   setActiveTab = () => {},
-  onLogout = () => {}
+  onLogout = () => {},
+  canManageUsers = true
 }) {
   // Shift timing states (matching Image 2)
   const [morningStart, setMorningStart] = useState('06:00 AM');
@@ -255,6 +256,7 @@ export default function SettingsSection({
           onLogout={onLogout}
           setActiveTab={setActiveTab}
           onRefresh={() => window.location.reload()}
+          canManageUsers={canManageUsers}
         />
       </div>
 

@@ -256,36 +256,38 @@ async function initDatabase() {
 
   // Seed default Users (Shanaka as primary logged in Admin)
   const defaultUsers = [
-    { name: 'Shanaka', username: 'shanaka', role: 'Admin', email: 'shanaka@htsk.com' },
-    { name: 'IT Admin', username: 'admin', role: 'Admin', email: 'admin@htsk.com' },
-    { name: 'Lead Developer', username: 'developer', role: 'Developer', email: 'dev@htsk.com' }
+    { name: 'Shanaka', username: 'shanaka', role: 'Admin', email: 'shanaka@htsk.com', password: 'Admin@123' },
+    { name: 'IT Admin', username: 'admin', role: 'Admin', email: 'admin@htsk.com', password: 'Admin@123' },
+    { name: 'Lead Developer', username: 'developer', role: 'Developer', email: 'dev@htsk.com', password: 'Admin@123' },
+    { name: 'Device Viewer', username: 'viewer', role: 'Viewer', email: 'viewer@htsk.com', password: 'Viewer@123' }
   ];
   for (const u of defaultUsers) {
     await dbRun(
-      `INSERT OR IGNORE INTO system_users (full_name, username, role, email) VALUES (?, ?, ?, ?)`,
-      [u.name, u.username, u.role, u.email]
+      `INSERT OR IGNORE INTO system_users (full_name, username, role, email, password) VALUES (?, ?, ?, ?, ?)`,
+      [u.name, u.username, u.role, u.email, u.password || 'Admin@123']
     );
   }
 
   // Seed default User Permissions
   const defaultPermissions = [
-    { key: 'manage_devices', label: 'Add & Edit Mobile Devices', admin: 1, supervisor: 1, staff: 0 },
-    { key: 'handover_devices', label: 'Perform Shift Handover', admin: 1, supervisor: 1, staff: 1 },
-    { key: 'return_devices', label: 'Accept Inventory Returns', admin: 1, supervisor: 1, staff: 0 },
-    { key: 'manage_users', label: 'Create & Manage User Accounts', admin: 1, supervisor: 0, staff: 0 },
-    { key: 'manage_groups_shifts', label: 'Add / Edit Shifts & Groups', admin: 1, supervisor: 1, staff: 0 },
-    { key: 'view_audit_logs', label: 'View System Audit Logs', admin: 1, supervisor: 0, staff: 0 },
-    { key: 'delete_records', label: 'Delete Records', admin: 1, supervisor: 0, staff: 0 }
+    { key: 'manage_devices', label: 'Add & Edit Mobile Devices', admin: 1, supervisor: 1, staff: 0, viewer: 0 },
+    { key: 'handover_devices', label: 'Perform Shift Handover', admin: 1, supervisor: 1, staff: 1, viewer: 0 },
+    { key: 'return_devices', label: 'Accept Inventory Returns', admin: 1, supervisor: 1, staff: 0, viewer: 0 },
+    { key: 'manage_users', label: 'Create & Manage User Accounts', admin: 1, supervisor: 0, staff: 0, viewer: 0 },
+    { key: 'manage_groups_shifts', label: 'Add / Edit Shifts & Groups', admin: 1, supervisor: 1, staff: 0, viewer: 0 },
+    { key: 'view_audit_logs', label: 'View System Audit Logs', admin: 1, supervisor: 0, staff: 0, viewer: 0 },
+    { key: 'delete_records', label: 'Delete Records', admin: 1, supervisor: 0, staff: 0, viewer: 0 }
   ];
 
   for (const p of defaultPermissions) {
     await dbRun(`INSERT OR IGNORE INTO user_permissions (role, permission_key, permission_label, is_enabled) VALUES ('Admin', ?, ?, ?)`, [p.key, p.label, p.admin]);
     await dbRun(`INSERT OR IGNORE INTO user_permissions (role, permission_key, permission_label, is_enabled) VALUES ('Supervisor', ?, ?, ?)`, [p.key, p.label, p.supervisor]);
     await dbRun(`INSERT OR IGNORE INTO user_permissions (role, permission_key, permission_label, is_enabled) VALUES ('Staff', ?, ?, ?)`, [p.key, p.label, p.staff]);
+    await dbRun(`INSERT OR IGNORE INTO user_permissions (role, permission_key, permission_label, is_enabled) VALUES ('Viewer', ?, ?, ?)`, [p.key, p.label, p.viewer]);
   }
 
   // Seed default Roles
-  const defaultRoles = ['Admin', 'Supervisor', 'Staff', 'Developer'];
+  const defaultRoles = ['Admin', 'Supervisor', 'Staff', 'Developer', 'Viewer'];
   for (const r of defaultRoles) {
     await dbRun(`INSERT OR IGNORE INTO system_roles (role_name) VALUES (?)`, [r]);
   }
@@ -1295,11 +1297,13 @@ async function addRole(role_name, description = '') {
     [cleanRole, description || '']
   );
 
-  // Initialize permissions for the new role
+  const isViewer = cleanRole.toLowerCase() === 'viewer';
+
+  // Initialize permissions for the new role (Viewer defaults to 0 for all capabilities)
   const defaultPerms = [
-    { key: 'manage_devices', label: 'Add & Edit Mobile Devices', enabled: 1 },
-    { key: 'handover_devices', label: 'Perform Shift Handover', enabled: 1 },
-    { key: 'return_devices', label: 'Accept Inventory Returns', enabled: 1 },
+    { key: 'manage_devices', label: 'Add & Edit Mobile Devices', enabled: isViewer ? 0 : 1 },
+    { key: 'handover_devices', label: 'Perform Shift Handover', enabled: isViewer ? 0 : 1 },
+    { key: 'return_devices', label: 'Accept Inventory Returns', enabled: isViewer ? 0 : 1 },
     { key: 'manage_users', label: 'Create & Manage User Accounts', enabled: 0 },
     { key: 'manage_groups_shifts', label: 'Add / Edit Shifts & Groups', enabled: 0 },
     { key: 'view_audit_logs', label: 'View System Audit Logs', enabled: 0 },
@@ -1356,6 +1360,41 @@ async function checkUserAnimationStatus(username) {
     allowed: Boolean(isAllowed),
     activeAnimation: activeAnim.animation_key
   };
+}
+
+async function getUserPermissionsByRole(roleName = 'Admin') {
+  const cleanRole = String(roleName || 'Admin').trim();
+  const perms = await dbAll(
+    `SELECT permission_key, is_enabled FROM user_permissions WHERE LOWER(role) = LOWER(?)`,
+    [cleanRole]
+  );
+
+  const permMap = {
+    manage_devices: false,
+    handover_devices: false,
+    return_devices: false,
+    manage_users: false,
+    manage_groups_shifts: false,
+    view_audit_logs: false,
+    delete_records: false
+  };
+
+  if (cleanRole.toLowerCase() === 'admin') {
+    return {
+      manage_devices: true,
+      handover_devices: true,
+      return_devices: true,
+      manage_users: true,
+      manage_groups_shifts: true,
+      view_audit_logs: true,
+      delete_records: true
+    };
+  }
+
+  for (const p of perms) {
+    permMap[p.permission_key] = p.is_enabled === 1;
+  }
+  return permMap;
 }
 
 async function getAllPermissions() {
@@ -2408,6 +2447,7 @@ module.exports = {
   getActiveDashboardAnimation,
   checkUserAnimationStatus,
   getAllPermissions,
+  getUserPermissionsByRole,
   togglePermission,
   getHistoryLogs,
   getAuditLogins,

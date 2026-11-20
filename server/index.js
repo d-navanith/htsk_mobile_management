@@ -39,6 +39,7 @@ const {
   getActiveDashboardAnimation,
   checkUserAnimationStatus,
   getAllPermissions,
+  getUserPermissionsByRole,
   togglePermission,
   getHistoryLogs,
   getAuditLogins,
@@ -74,6 +75,53 @@ app.use(express.json());
 
 // In-memory active authenticated sessions map
 const activeSessions = new Map();
+
+// Helper to resolve requester capabilities from session token, header, or context
+async function getRequestPermissions(req) {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = (authHeader && authHeader.startsWith('Bearer '))
+      ? authHeader.slice(7)
+      : (req.query.token || req.headers['x-session-token']);
+
+    if (token && activeSessions.has(token)) {
+      const session = activeSessions.get(token);
+      return await getUserPermissionsByRole(session.role);
+    }
+
+    const explicitRole = req.headers['x-user-role'] || req.query.user_role;
+    if (explicitRole) {
+      return await getUserPermissionsByRole(explicitRole);
+    }
+
+    const user = req.body?.admin_user || req.query?.admin_user;
+    if (user && String(user).toLowerCase() === 'viewer') {
+      return await getUserPermissionsByRole('Viewer');
+    }
+
+    return await getUserPermissionsByRole('Admin');
+  } catch (e) {
+    return await getUserPermissionsByRole('Admin');
+  }
+}
+
+// Middleware to enforce role capability
+function requireCapability(capabilityKey) {
+  return async (req, res, next) => {
+    try {
+      const perms = await getRequestPermissions(req);
+      if (!perms[capabilityKey]) {
+        return res.status(403).json({
+          success: false,
+          error: `Access Denied: Your account role does not have permission to perform this action (${capabilityKey}).`
+        });
+      }
+      next();
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  };
+}
 
 // Setup file uploads folder
 const uploadDir = path.join(__dirname, 'uploads');
@@ -362,7 +410,7 @@ app.get('/api/records', async (req, res) => {
 });
 
 // 2. Add record manually (Dashboard Add Record popup)
-app.post('/api/records', async (req, res) => {
+app.post('/api/records', requireCapability('manage_devices'), async (req, res) => {
   try {
     const {
       name,
@@ -412,7 +460,7 @@ app.post('/api/records', async (req, res) => {
 });
 
 // 3. Update existing record (Edit Record / Handover update / Sign Done)
-app.put('/api/records/:id', async (req, res) => {
+app.put('/api/records/:id', requireCapability('manage_devices'), async (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -460,7 +508,7 @@ app.put('/api/records/:id', async (req, res) => {
 });
 
 // 4. Delete record
-app.delete('/api/records/:id', async (req, res) => {
+app.delete('/api/records/:id', requireCapability('delete_records'), async (req, res) => {
   try {
     const { id } = req.params;
     await deleteDeviceRecord(id, req.query.admin_user || 'Shanaka');
@@ -523,7 +571,7 @@ app.post('/api/daily-task/compare-rounds', async (req, res) => {
 });
 
 // 5e. Save Daily Task Round (Confirm new intra-day round)
-app.post('/api/daily-task/save-round', async (req, res) => {
+app.post('/api/daily-task/save-round', requireCapability('manage_devices'), async (req, res) => {
   try {
     const {
       task_number = 19,
@@ -557,7 +605,7 @@ app.post('/api/daily-task/save-round', async (req, res) => {
 });
 
 // 5f. Update Daily Task Round (e.g. edit check_time or round_name)
-app.put('/api/daily-task/rounds/:id', async (req, res) => {
+app.put('/api/daily-task/rounds/:id', requireCapability('manage_devices'), async (req, res) => {
   try {
     const roundId = parseInt(req.params.id);
     const { check_time, round_name } = req.body;
@@ -570,7 +618,7 @@ app.put('/api/daily-task/rounds/:id', async (req, res) => {
 });
 
 // 5g. Resolve Dropped / Missing Device in Round Check (Mark as Returned or Missing)
-app.post('/api/daily-task/resolve-device', async (req, res) => {
+app.post('/api/daily-task/resolve-device', requireCapability('manage_devices'), async (req, res) => {
   try {
     const { task_number, round_number, device_tag, action, admin_user } = req.body;
     if (!device_tag || !action) {
@@ -613,7 +661,7 @@ app.get('/api/inventory', async (req, res) => {
   }
 });
 
-app.post('/api/inventory', async (req, res) => {
+app.post('/api/inventory', requireCapability('manage_devices'), async (req, res) => {
   try {
     const { device_tag, series, model_name, storage_location, condition_status, notes } = req.body;
     if (!device_tag || !device_tag.trim()) {
@@ -626,7 +674,7 @@ app.post('/api/inventory', async (req, res) => {
   }
 });
 
-app.put('/api/inventory/:id', async (req, res) => {
+app.put('/api/inventory/:id', requireCapability('manage_devices'), async (req, res) => {
   try {
     const { id } = req.params;
     const updated = await updateInventoryItem(id, req.body);
@@ -636,7 +684,7 @@ app.put('/api/inventory/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/inventory/:id', async (req, res) => {
+app.delete('/api/inventory/:id', requireCapability('delete_records'), async (req, res) => {
   try {
     const { id } = req.params;
     await deleteInventoryItem(id);
@@ -702,7 +750,7 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
-app.post('/api/users', async (req, res) => {
+app.post('/api/users', requireCapability('manage_users'), async (req, res) => {
   try {
     const { full_name, username, email, role, password } = req.body;
     if (!full_name || !username) {
@@ -715,7 +763,7 @@ app.post('/api/users', async (req, res) => {
   }
 });
 
-app.put('/api/users/:id/toggle', async (req, res) => {
+app.put('/api/users/:id/toggle', requireCapability('manage_users'), async (req, res) => {
   try {
     const { id } = req.params;
     const { is_active } = req.body;
@@ -726,7 +774,7 @@ app.put('/api/users/:id/toggle', async (req, res) => {
   }
 });
 
-app.put('/api/users/:id/toggle-animation', async (req, res) => {
+app.put('/api/users/:id/toggle-animation', requireCapability('manage_users'), async (req, res) => {
   try {
     const { id } = req.params;
     const { animation_enabled } = req.body;
@@ -737,7 +785,7 @@ app.put('/api/users/:id/toggle-animation', async (req, res) => {
   }
 });
 
-app.delete('/api/users/:id', async (req, res) => {
+app.delete('/api/users/:id', requireCapability('manage_users'), async (req, res) => {
   try {
     const { id } = req.params;
     await deleteSystemUser(id);
@@ -757,7 +805,7 @@ app.get('/api/roles', async (req, res) => {
   }
 });
 
-app.post('/api/roles', async (req, res) => {
+app.post('/api/roles', requireCapability('manage_users'), async (req, res) => {
   try {
     const { role_name, description } = req.body;
     if (!role_name || !role_name.trim()) {
@@ -811,12 +859,23 @@ app.get('/api/permissions', async (req, res) => {
   }
 });
 
-app.put('/api/permissions/:id/toggle', async (req, res) => {
+app.put('/api/permissions/:id/toggle', requireCapability('manage_users'), async (req, res) => {
   try {
     const { id } = req.params;
     const { is_enabled } = req.body;
     await togglePermission(id, is_enabled);
     res.json({ success: true, message: 'Permission toggled successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get computed permissions for a specific role
+app.get('/api/user-permissions', async (req, res) => {
+  try {
+    const role = req.query.role || 'Admin';
+    const permissions = await getUserPermissionsByRole(role);
+    res.json({ success: true, role, permissions });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -900,10 +959,16 @@ app.post('/api/login', async (req, res) => {
       expiresAt: Date.now() + (24 * 60 * 60 * 1000) // 24-hour validity
     });
 
+    const permissions = await getUserPermissionsByRole(authResult.user.role);
+
     res.json({
       success: true,
       token,
-      user: authResult.user,
+      user: {
+        ...authResult.user,
+        permissions
+      },
+      permissions,
       message: 'Authentication successful.'
     });
   } catch (err) {
@@ -940,6 +1005,8 @@ app.get('/api/auth/verify', async (req, res) => {
       return res.status(403).json({ success: false, error: 'Account has been deactivated.' });
     }
 
+    const permissions = await getUserPermissionsByRole(user.role);
+
     res.json({
       success: true,
       user: {
@@ -948,8 +1015,11 @@ app.get('/api/auth/verify', async (req, res) => {
         full_name: user.full_name,
         role: user.role,
         email: user.email,
-        animation_enabled: user.animation_enabled
-      }
+        avatar_url: user.avatar_url,
+        animation_enabled: user.animation_enabled,
+        permissions
+      },
+      permissions
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

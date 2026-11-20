@@ -55,7 +55,7 @@ export default function UserManageSection({
   const [animSavedMessage, setAnimSavedMessage] = useState(false);
 
   // Roles Management (Admin can add more roles)
-  const [roles, setRoles] = useState(['Admin', 'Supervisor', 'Staff', 'Developer']);
+  const [roles, setRoles] = useState(['Admin', 'Supervisor', 'Staff', 'Developer', 'Viewer']);
   const [isAddingRole, setIsAddingRole] = useState(false);
   const [newRoleInput, setNewRoleInput] = useState('');
   const [newRoleDesc, setNewRoleDesc] = useState('');
@@ -130,6 +130,16 @@ export default function UserManageSection({
     loadData();
   }, []);
 
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('htsk_session_token');
+    const role = currentUserRole || localStorage.getItem('htsk_user_role') || 'Admin';
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      'X-User-Role': role
+    };
+  };
+
   // Add New Role
   const handleSaveNewRole = async e => {
     if (e) e.preventDefault();
@@ -138,7 +148,7 @@ export default function UserManageSection({
     try {
       const res = await fetch('/api/roles', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ role_name: cleanRole, description: newRoleDesc.trim() })
       });
       const data = await res.json();
@@ -233,7 +243,7 @@ export default function UserManageSection({
     try {
       await fetch('/api/users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           full_name: newFullName.trim(),
           username: newUsername.trim(),
@@ -258,7 +268,7 @@ export default function UserManageSection({
     try {
       await fetch(`/api/users/${userId}/toggle`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ is_active: currentStatus ? 0 : 1 })
       });
       loadData();
@@ -272,7 +282,7 @@ export default function UserManageSection({
     try {
       await fetch(`/api/users/${userId}/toggle-animation`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ animation_enabled: newStatus ? 1 : 0 })
       });
       loadData();
@@ -286,7 +296,7 @@ export default function UserManageSection({
     try {
       const res = await fetch(`/api/dashboard-animations/${animId}/toggle`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ is_enabled: newStatus })
       });
       const data = await res.json();
@@ -306,7 +316,10 @@ export default function UserManageSection({
   const handleDeleteUser = async userId => {
     if (!window.confirm('Are you sure you want to delete this user?')) return;
     try {
-      await fetch(`/api/users/${userId}`, { method: 'DELETE' });
+      await fetch(`/api/users/${userId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
       loadData();
     } catch (e) {
       console.error(e);
@@ -318,7 +331,7 @@ export default function UserManageSection({
     try {
       await fetch(`/api/permissions/${permId}/toggle`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ is_enabled: currentStatus ? 0 : 1 })
       });
       loadData();
@@ -806,11 +819,13 @@ export default function UserManageSection({
               <tr key={p.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                 <td style={{ padding: '12px 16px', fontSize: '13.5px', fontWeight: 700 }}>
                   <span style={{
-                    backgroundColor: p.role === 'Admin' ? '#f4fce8' : (p.role === 'Supervisor' ? '#eff6ff' : '#f3f4f6'),
-                    color: p.role === 'Admin' ? '#166534' : (p.role === 'Supervisor' ? '#1e40af' : '#374151'),
+                    backgroundColor: p.role === 'Admin' ? '#f4fce8' : (p.role === 'Supervisor' ? '#eff6ff' : (p.role === 'Viewer' ? '#e0f2fe' : '#f3f4f6')),
+                    color: p.role === 'Admin' ? '#166534' : (p.role === 'Supervisor' ? '#1e40af' : (p.role === 'Viewer' ? '#0369a1' : '#374151')),
                     padding: '3px 10px',
                     borderRadius: '6px',
-                    fontSize: '12px'
+                    fontSize: '12px',
+                    fontWeight: 800,
+                    border: p.role === 'Viewer' ? '1px solid #bae6fd' : (p.role === 'Admin' ? '1px solid #bbf7d0' : 'none')
                   }}>
                     {p.role}
                   </span>

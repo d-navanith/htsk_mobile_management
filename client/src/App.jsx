@@ -65,6 +65,22 @@ export default function App() {
   const [currentUserAvatar, setCurrentUserAvatar] = useState(() => {
     return localStorage.getItem('htsk_user_avatar') || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80';
   });
+  const [userPermissions, setUserPermissions] = useState(() => {
+    try {
+      const saved = localStorage.getItem('htsk_user_permissions');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  // Role Capability Checks
+  const isViewer = currentUserRole === 'Viewer';
+  const isAdmin = currentUserRole === 'Admin';
+  const canEdit = isAdmin || Boolean(userPermissions.manage_devices);
+  const canDelete = isAdmin || Boolean(userPermissions.delete_records);
+  const canManageUsers = isAdmin || Boolean(userPermissions.manage_users);
+
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [profileModalTab, setProfileModalTab] = useState('general');
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -115,6 +131,7 @@ export default function App() {
     const role = userObj.role || 'Admin';
     const avatar = userObj.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80';
     const email = userObj.email || `${username}@htsk.com`;
+    const permissions = loginData?.permissions || userObj?.permissions || {};
 
     localStorage.setItem('htsk_admin_authenticated', 'true');
     localStorage.setItem('htsk_session_token', token);
@@ -123,12 +140,14 @@ export default function App() {
     localStorage.setItem('htsk_user_role', role);
     localStorage.setItem('htsk_user_avatar', avatar);
     localStorage.setItem('htsk_user_email', email);
+    localStorage.setItem('htsk_user_permissions', JSON.stringify(permissions));
 
     setCurrentUser(username);
     setCurrentUserName(fullName);
     setCurrentUserRole(role);
     setCurrentUserAvatar(avatar);
     setCurrentUserEmail(email);
+    setUserPermissions(permissions);
     setIsAdminLoggedIn(true);
 
     showToast(`Welcome back, ${fullName}! Signed in as ${role}.`, 'success');
@@ -154,10 +173,12 @@ export default function App() {
     localStorage.removeItem('htsk_user_role');
     localStorage.removeItem('htsk_user_avatar');
     localStorage.removeItem('htsk_user_email');
+    localStorage.removeItem('htsk_user_permissions');
     setIsAdminLoggedIn(false);
     setCurrentUser('');
     setCurrentUserName('');
     setCurrentUserRole('');
+    setUserPermissions({});
     setCurrentUserAvatar('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80');
     setCurrentUserEmail('');
     setRecords([]);
@@ -226,6 +247,11 @@ export default function App() {
               setCurrentUserEmail(data.user.email);
               localStorage.setItem('htsk_user_email', data.user.email);
             }
+            if (data.permissions || data.user.permissions) {
+              const perms = data.permissions || data.user.permissions;
+              setUserPermissions(perms);
+              localStorage.setItem('htsk_user_permissions', JSON.stringify(perms));
+            }
           } else {
             // Session expired or revoked
             handleAdminLogout();
@@ -240,11 +266,42 @@ export default function App() {
     fetchGroups();
   }, [isAdminLoggedIn]);
 
+  // Sync role-based permissions dynamically
+  useEffect(() => {
+    if (currentUserRole) {
+      fetch(`/api/user-permissions?role=${encodeURIComponent(currentUserRole)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.permissions) {
+            setUserPermissions(data.permissions);
+            localStorage.setItem('htsk_user_permissions', JSON.stringify(data.permissions));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [currentUserRole]);
+
+  // Protect User Management view for unauthorized roles (View only roles)
+  useEffect(() => {
+    if (!canManageUsers && activeTab === 'usermanage') {
+      setActiveTab('dashboard');
+    }
+  }, [canManageUsers, activeTab]);
+
   // Save manual record
   const handleSaveManualRecord = async recordData => {
+    if (!canEdit) {
+      showToast('You do not have permission to add records (View only).', 'error');
+      return;
+    }
+    const token = localStorage.getItem('htsk_session_token');
     const res = await fetch('/api/records', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        'X-User-Role': currentUserRole
+      },
       body: JSON.stringify(recordData)
     });
     const result = await res.json();
@@ -258,9 +315,18 @@ export default function App() {
 
   // Update existing record
   const handleUpdateRecord = async (id, updatedFields) => {
+    if (!canEdit) {
+      showToast('You do not have permission to edit records (View only).', 'error');
+      return;
+    }
+    const token = localStorage.getItem('htsk_session_token');
     const res = await fetch(`/api/records/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        'X-User-Role': currentUserRole
+      },
       body: JSON.stringify(updatedFields)
     });
     const result = await res.json();
@@ -274,10 +340,21 @@ export default function App() {
 
   // Delete record
   const handleDeleteRecord = async id => {
+    if (!canDelete) {
+      showToast('You do not have permission to delete records.', 'error');
+      return;
+    }
     if (!window.confirm(`Are you sure you want to delete record #${id}?`)) return;
 
     try {
-      const res = await fetch(`/api/records/${id}`, { method: 'DELETE' });
+      const token = localStorage.getItem('htsk_session_token');
+      const res = await fetch(`/api/records/${id}`, {
+        method: 'DELETE',
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          'X-User-Role': currentUserRole
+        }
+      });
       const result = await res.json();
       if (result.success) {
         showToast('Record deleted successfully');
@@ -380,6 +457,7 @@ export default function App() {
             onLogout={handleAdminLogout}
             setActiveTab={setActiveTab}
             onRefresh={fetchRecords}
+            canManageUsers={canManageUsers}
           />
         </div>
       </header>
@@ -391,6 +469,7 @@ export default function App() {
         onLogout={handleAdminLogout}
         isMobileOpen={isMobileSidebarOpen}
         setIsMobileOpen={setIsMobileSidebarOpen}
+        canManageUsers={canManageUsers}
       />
 
       {/* Main Workspace View */}
@@ -419,6 +498,9 @@ export default function App() {
               currentUserAvatar={currentUserAvatar}
               onOpenProfile={handleOpenProfile}
               onLogout={handleAdminLogout}
+              canEdit={canEdit}
+              canDelete={canDelete}
+              canManageUsers={canManageUsers}
             />
           )}
 
@@ -448,6 +530,7 @@ export default function App() {
               onOpenProfile={handleOpenProfile}
               setAppTab={setActiveTab}
               onLogout={handleAdminLogout}
+              canManageUsers={canManageUsers}
             />
           )}
 
@@ -479,6 +562,9 @@ export default function App() {
               currentUserAvatar={currentUserAvatar}
               onOpenProfile={handleOpenProfile}
               onLogout={handleAdminLogout}
+              canEdit={canEdit}
+              canDelete={canDelete}
+              canManageUsers={canManageUsers}
             />
           )}
 
@@ -492,6 +578,9 @@ export default function App() {
               onOpenProfile={handleOpenProfile}
               setActiveTab={setActiveTab}
               onLogout={handleAdminLogout}
+              canEdit={canEdit}
+              canDelete={canDelete}
+              canManageUsers={canManageUsers}
             />
           )}
 
@@ -505,6 +594,7 @@ export default function App() {
               onOpenProfile={handleOpenProfile}
               setActiveTab={setActiveTab}
               onLogout={handleAdminLogout}
+              canManageUsers={canManageUsers}
             />
           )}
         </ErrorBoundary>

@@ -6,7 +6,8 @@ export default function Sidebar({
   setActiveTab,
   onLogout = () => {},
   isMobileOpen = false,
-  setIsMobileOpen = () => {}
+  setIsMobileOpen = () => {},
+  canManageUsers = true
 }) {
   const handleNavClick = (tab) => {
     setActiveTab(tab);
@@ -76,13 +77,15 @@ export default function Sidebar({
               <span>Update</span>
             </button>
 
-            <button
-              className={`nav-item ${activeTab === 'usermanage' ? 'active' : ''}`}
-              onClick={() => handleNavClick('usermanage')}
-            >
-              <User />
-              <span>User manage</span>
-            </button>
+            {canManageUsers && (
+              <button
+                className={`nav-item ${activeTab === 'usermanage' ? 'active' : ''}`}
+                onClick={() => handleNavClick('usermanage')}
+              >
+                <User />
+                <span>User manage</span>
+              </button>
+            )}
 
             <button
               className={`nav-item ${activeTab === 'history' ? 'active' : ''}`}

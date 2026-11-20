@@ -52,6 +52,14 @@ A production-grade, enterprise **Company Mobile Device Inventory, Shift Handover
 - **Audit Logging of All Login Events:** Successful and rejected login attempts are recorded into `audit_logins` with IP address and timestamp.
 - **Anti-Brute Force Protection:** Automatic temporary security lockout after 5 consecutive failed attempts.
 - **Protected Administrator Accounts:** Core administrative accounts (e.g., `Shanaka`, `Admin`) cannot be set to Inactive or deleted.
+- **Dedicated View-Only Role (`Viewer`):**
+  - Read-only visibility into current devices, stock catalog, KPI statistics, daily rounds, and activity history.
+  - Restricted from mutating data: all add, edit, delete, custody handover, quick notes, and device resolution controls are automatically hidden from the UI and strictly protected with `403 Forbidden` response guards on the backend.
+  - The `User manage` workspace navigation and administrative profile shortcuts are hidden from viewer accounts.
+- **Admin Permission Management (Shanaka Control):**
+  - Shanaka (Admin) can view and toggle permissions for the `Viewer` role (and any other role) directly in the **User Permission Management** section.
+  - Granular capability switches: `manage_devices`, `handover_devices`, `return_devices`, `manage_users`, `manage_groups_shifts`, `view_audit_logs`, `delete_records`.
+  - Filter permissions by role (`Viewer`, `Admin`, `Supervisor`, `Staff`, etc.) for fast review and immediate real-time toggle.
 - **Dynamic Role Creation:** Admins can create custom roles (e.g., *Manager*, *Auditor*, *Technician*) directly from the user creation dropdown with auto-generated permission templates.
 - **Granular Capability Toggles:** Interactive toggle switches for operational permissions (`manage_devices`, `handover_devices`, `return_devices`, `manage_users`, `manage_groups_shifts`, `view_audit_logs`, `delete_records`).
 - **Role Filtering:** Filter the permission management view by specific roles.

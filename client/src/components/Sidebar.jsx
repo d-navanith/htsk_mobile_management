@@ -7,7 +7,13 @@ export default function Sidebar({
   onLogout = () => {},
   isMobileOpen = false,
   setIsMobileOpen = () => {},
-  canManageUsers = true
+  canManageUsers = true,
+  canAccessUpdate = true,
+  canAccessHistory = true,
+  canAccessSettings = true,
+  canViewDevices = true,
+  canViewDailyTasks = true,
+  canViewInventory = true
 }) {
   const handleNavClick = (tab) => {
     setActiveTab(tab);
@@ -45,37 +51,45 @@ export default function Sidebar({
 
           {/* Navigation Menu matching user requested flow */}
           <nav className="nav-menu">
-            <button
-              className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-              onClick={() => handleNavClick('dashboard')}
-            >
-              <LayoutDashboard />
-              <span>Dashboard</span>
-            </button>
+            {canViewDevices && (
+              <button
+                className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+                onClick={() => handleNavClick('dashboard')}
+              >
+                <LayoutDashboard />
+                <span>Dashboard</span>
+              </button>
+            )}
 
-            <button
-              className={`nav-item ${activeTab === 'dailytask' ? 'active' : ''}`}
-              onClick={() => handleNavClick('dailytask')}
-            >
-              <ClipboardCheck />
-              <span>Daily Task</span>
-            </button>
+            {canViewDailyTasks && (
+              <button
+                className={`nav-item ${activeTab === 'dailytask' ? 'active' : ''}`}
+                onClick={() => handleNavClick('dailytask')}
+              >
+                <ClipboardCheck />
+                <span>Daily Task</span>
+              </button>
+            )}
 
-            <button
-              className={`nav-item ${activeTab === 'inventory' ? 'active' : ''}`}
-              onClick={() => handleNavClick('inventory')}
-            >
-              <Package />
-              <span>Inventory</span>
-            </button>
+            {canViewInventory && (
+              <button
+                className={`nav-item ${activeTab === 'inventory' ? 'active' : ''}`}
+                onClick={() => handleNavClick('inventory')}
+              >
+                <Package />
+                <span>Inventory</span>
+              </button>
+            )}
 
-            <button
-              className={`nav-item ${activeTab === 'update' ? 'active' : ''}`}
-              onClick={() => handleNavClick('update')}
-            >
-              <Sparkles />
-              <span>Update</span>
-            </button>
+            {canAccessUpdate && (
+              <button
+                className={`nav-item ${activeTab === 'update' ? 'active' : ''}`}
+                onClick={() => handleNavClick('update')}
+              >
+                <Sparkles />
+                <span>Update</span>
+              </button>
+            )}
 
             {canManageUsers && (
               <button
@@ -87,21 +101,25 @@ export default function Sidebar({
               </button>
             )}
 
-            <button
-              className={`nav-item ${activeTab === 'history' ? 'active' : ''}`}
-              onClick={() => handleNavClick('history')}
-            >
-              <History />
-              <span>History</span>
-            </button>
+            {canAccessHistory && (
+              <button
+                className={`nav-item ${activeTab === 'history' ? 'active' : ''}`}
+                onClick={() => handleNavClick('history')}
+              >
+                <History />
+                <span>History</span>
+              </button>
+            )}
 
-            <button
-              className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
-              onClick={() => handleNavClick('settings')}
-            >
-              <Settings />
-              <span>Settings</span>
-            </button>
+            {canAccessSettings && (
+              <button
+                className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
+                onClick={() => handleNavClick('settings')}
+              >
+                <Settings />
+                <span>Settings</span>
+              </button>
+            )}
           </nav>
         </div>
 

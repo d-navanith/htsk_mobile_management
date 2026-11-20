@@ -293,6 +293,11 @@ async function initDatabase() {
   // Ensure permission_label for manage_groups_shifts matches mockup "Add & Edit Shifts"
   await dbRun(`UPDATE user_permissions SET permission_label = 'Add & Edit Shifts' WHERE permission_key = 'manage_groups_shifts'`);
 
+  // Ensure Viewer role does not have settings, update, user management, or history permissions
+  await dbRun(
+    `UPDATE user_permissions SET is_enabled = 0 WHERE LOWER(role) = 'viewer' AND permission_key IN ('manage_devices', 'manage_groups_shifts', 'view_audit_logs', 'manage_users', 'handover_devices', 'return_devices', 'delete_records')`
+  );
+
   // Seed default Roles
   const defaultRoles = ['Admin', 'Supervisor', 'Staff', 'Developer', 'Viewer'];
   for (const r of defaultRoles) {

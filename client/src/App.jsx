@@ -78,11 +78,20 @@ export default function App() {
   });
 
   // Role Capability Checks
-  const isViewer = currentUserRole === 'Viewer';
-  const isAdmin = currentUserRole === 'Admin';
-  const canEdit = isAdmin || Boolean(userPermissions.manage_devices);
-  const canDelete = isAdmin || Boolean(userPermissions.delete_records);
-  const canManageUsers = isAdmin || Boolean(userPermissions.manage_users);
+  const isViewer = currentUserRole?.toLowerCase() === 'viewer';
+  const isAdmin = currentUserRole?.toLowerCase() === 'admin';
+  const isDeveloper = currentUserRole?.toLowerCase() === 'developer';
+  const hasFullAccess = isAdmin || isDeveloper;
+
+  const canEdit = !isViewer && (hasFullAccess || Boolean(userPermissions.manage_devices));
+  const canDelete = !isViewer && (hasFullAccess || Boolean(userPermissions.delete_records));
+  const canManageUsers = !isViewer && (hasFullAccess || Boolean(userPermissions.manage_users));
+  const canAccessUpdate = !isViewer && (hasFullAccess || Boolean(userPermissions.manage_devices));
+  const canAccessHistory = !isViewer && (hasFullAccess || Boolean(userPermissions.view_audit_logs));
+  const canAccessSettings = !isViewer && (hasFullAccess || Boolean(userPermissions.manage_groups_shifts));
+  const canViewDevices = hasFullAccess || userPermissions.view_devices !== false;
+  const canViewDailyTasks = hasFullAccess || userPermissions.view_daily_tasks !== false;
+  const canViewInventory = hasFullAccess || userPermissions.view_inventory !== false;
 
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [profileModalTab, setProfileModalTab] = useState('general');
@@ -284,12 +293,17 @@ export default function App() {
     }
   }, [currentUserRole]);
 
-  // Protect User Management view for unauthorized roles (View only roles)
+  // Protect restricted tabs for unauthorized roles (View only roles cannot access User manage, Update, History, Settings)
   useEffect(() => {
-    if (!canManageUsers && activeTab === 'usermanage') {
+    if (
+      (!canManageUsers && activeTab === 'usermanage') ||
+      (!canAccessUpdate && activeTab === 'update') ||
+      (!canAccessHistory && activeTab === 'history') ||
+      (!canAccessSettings && activeTab === 'settings')
+    ) {
       setActiveTab('dashboard');
     }
-  }, [canManageUsers, activeTab]);
+  }, [canManageUsers, canAccessUpdate, canAccessHistory, canAccessSettings, activeTab]);
 
   // Save manual record
   const handleSaveManualRecord = async recordData => {
@@ -473,6 +487,12 @@ export default function App() {
         isMobileOpen={isMobileSidebarOpen}
         setIsMobileOpen={setIsMobileSidebarOpen}
         canManageUsers={canManageUsers}
+        canAccessUpdate={canAccessUpdate}
+        canAccessHistory={canAccessHistory}
+        canAccessSettings={canAccessSettings}
+        canViewDevices={canViewDevices}
+        canViewDailyTasks={canViewDailyTasks}
+        canViewInventory={canViewInventory}
       />
 
       {/* Main Workspace View */}
@@ -507,7 +527,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'update' && (
+          {activeTab === 'update' && canAccessUpdate && (
             <UpdateSection
               onImportSuccess={handleImportSuccess}
               onDownloadTemplate={handleDownloadTemplate}
@@ -523,7 +543,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'history' && (
+          {activeTab === 'history' && canAccessHistory && (
             <HistorySection
               currentUser={currentUser}
               currentUserName={currentUserName}
@@ -537,7 +557,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'usermanage' && (
+          {activeTab === 'usermanage' && canManageUsers && (
             <UserManageSection
               currentUser={currentUser}
               currentUserName={currentUserName}
@@ -587,7 +607,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'settings' && (
+          {activeTab === 'settings' && canAccessSettings && (
             <SettingsSection
               currentUser={currentUser}
               currentUserName={currentUserName}
@@ -598,6 +618,7 @@ export default function App() {
               setActiveTab={setActiveTab}
               onLogout={handleAdminLogout}
               canManageUsers={canManageUsers}
+              canEditSettings={canAccessSettings}
             />
           )}
         </ErrorBoundary>

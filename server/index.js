@@ -705,7 +705,7 @@ app.get('/api/groups', async (req, res) => {
   }
 });
 
-app.post('/api/groups', async (req, res) => {
+app.post('/api/groups', requireCapability('manage_groups_shifts'), async (req, res) => {
   try {
     const { group_name, description } = req.body;
     if (!group_name || !group_name.trim()) {
@@ -728,7 +728,7 @@ app.get('/api/shifts', async (req, res) => {
   }
 });
 
-app.post('/api/shifts', async (req, res) => {
+app.post('/api/shifts', requireCapability('manage_groups_shifts'), async (req, res) => {
   try {
     const { shift_name, start_time, end_time } = req.body;
     if (!shift_name || !shift_name.trim()) {
@@ -1127,7 +1127,7 @@ app.get('/api/shift-settings', async (req, res) => {
   }
 });
 
-app.put('/api/shift-settings', async (req, res) => {
+app.put('/api/shift-settings', requireCapability('manage_groups_shifts'), async (req, res) => {
   try {
     const updated = await updateShiftSettings(req.body);
     res.json({ success: true, data: updated, message: 'Shift configuration saved successfully!' });
@@ -1137,7 +1137,7 @@ app.put('/api/shift-settings', async (req, res) => {
 });
 
 // 13. File Upload & Parser (Image 3: Sheet Update dropzone)
-app.post('/api/upload/parse', upload.single('file'), async (req, res) => {
+app.post('/api/upload/parse', requireCapability('manage_devices'), upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, error: 'No file uploaded' });
@@ -1240,7 +1240,7 @@ app.post('/api/upload/parse', upload.single('file'), async (req, res) => {
 });
 
 // 14. Confirm Upload (Import rows into database)
-app.post('/api/upload/confirm', async (req, res) => {
+app.post('/api/upload/confirm', requireCapability('manage_devices'), async (req, res) => {
   try {
     const { filename, rows, task_number, task_date, replaceMode } = req.body;
     if (!Array.isArray(rows) || rows.length === 0) {
@@ -1369,7 +1369,7 @@ app.post('/api/upload/parse-quick-list', (req, res) => {
 });
 
 // 14c. Quick Device List Confirm & Import (Supports Multi-Round Tracking & Comparison)
-app.post('/api/upload/quick-list', async (req, res) => {
+app.post('/api/upload/quick-list', requireCapability('manage_devices'), async (req, res) => {
   try {
     const {
       rows,

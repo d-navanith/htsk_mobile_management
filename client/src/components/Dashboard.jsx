@@ -866,8 +866,8 @@ export default function Dashboard({
 
         {/* Card 4: Need an Update */}
         <div
-          className="clickable-kpi-card"
-          onClick={() => setActiveTab && setActiveTab('update')}
+          className={canEdit ? 'clickable-kpi-card' : ''}
+          onClick={() => canEdit && setActiveTab && setActiveTab('update')}
           style={{
             position: 'relative',
             overflow: 'hidden',
@@ -875,9 +875,10 @@ export default function Dashboard({
             borderRadius: '18px',
             border: '2px solid #ef4444',
             padding: '22px 24px',
-            boxShadow: '0 2px 6px rgba(239, 68, 68, 0.06)'
+            boxShadow: '0 2px 6px rgba(239, 68, 68, 0.06)',
+            cursor: canEdit ? 'pointer' : 'default'
           }}
-          title="Click to open update section"
+          title={canEdit ? 'Click to open update section' : 'Need an Update count'}
         >
           {/* Ambient Animation strictly inside this card */}
           {animationStatus.allowed && animationStatus.activeAnimation && (

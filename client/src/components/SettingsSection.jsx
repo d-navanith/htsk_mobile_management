@@ -25,7 +25,8 @@ export default function SettingsSection({
   onOpenProfile = () => {},
   setActiveTab = () => {},
   onLogout = () => {},
-  canManageUsers = true
+  canManageUsers = true,
+  canEditSettings = true
 }) {
   // Shift timing states (matching Image 2)
   const [morningStart, setMorningStart] = useState('06:00 AM');
@@ -104,13 +105,27 @@ export default function SettingsSection({
     loadData();
   }, []);
 
+  const isViewer = currentUserRole?.toLowerCase() === 'viewer';
+  const canModifySettings = !isViewer && canEditSettings;
+
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('htsk_session_token');
+    const role = currentUserRole || localStorage.getItem('htsk_user_role') || 'Admin';
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      'X-User-Role': role
+    };
+  };
+
   // Save Shift Settings (Image 2)
   const handleSaveShiftSettings = async e => {
     e.preventDefault();
+    if (!canModifySettings) return;
     try {
       await fetch('/api/shift-settings', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           morning_start: morningStart,
           morning_end: morningEnd,
@@ -131,11 +146,11 @@ export default function SettingsSection({
   // Add Group
   const handleAddGroup = async e => {
     e.preventDefault();
-    if (!newGroupName.trim()) return;
+    if (!canModifySettings || !newGroupName.trim()) return;
     try {
       await fetch('/api/groups', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ group_name: newGroupName.trim(), description: newGroupDesc.trim() })
       });
       setNewGroupName('');
@@ -150,11 +165,11 @@ export default function SettingsSection({
 
   // Add Shift
   const handleAddShift = async () => {
-    if (!newShiftName.trim()) return;
+    if (!canModifySettings || !newShiftName.trim()) return;
     try {
       await fetch('/api/shifts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ shift_name: newShiftName.trim() })
       });
       setNewShiftName('');

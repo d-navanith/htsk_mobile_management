@@ -83,6 +83,16 @@ async function initDatabase() {
     );
   `);
 
+  // Table 4b: System Roles (Manageable by Admin)
+  await dbRun(`
+    CREATE TABLE IF NOT EXISTS system_roles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      role_name TEXT UNIQUE NOT NULL COLLATE NOCASE,
+      description TEXT DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
   // Table 5: Audit Logins
   await dbRun(`
     CREATE TABLE IF NOT EXISTS audit_logins (
@@ -148,7 +158,7 @@ async function initDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       shift TEXT NOT NULL DEFAULT 'Day',
-      group_name TEXT NOT NULL DEFAULT 'Group D',
+      group_name TEXT DEFAULT '',
       issued_at TEXT NOT NULL DEFAULT '7.30 A.M.',
       return_time TEXT DEFAULT '',
       return_device TEXT DEFAULT '',
@@ -174,7 +184,7 @@ async function initDatabase() {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         shift TEXT NOT NULL DEFAULT 'Day',
-        group_name TEXT NOT NULL DEFAULT 'Group D',
+        group_name TEXT DEFAULT '',
         issued_at TEXT NOT NULL DEFAULT '7.30 A.M.',
         return_time TEXT DEFAULT '',
         return_device TEXT DEFAULT '',
@@ -195,7 +205,7 @@ async function initDatabase() {
   const neededCols = [
     { name: 'name', type: 'TEXT' },
     { name: 'shift', type: "TEXT DEFAULT 'Day'" },
-    { name: 'group_name', type: "TEXT DEFAULT 'Group D'" },
+    { name: 'group_name', type: "TEXT DEFAULT ''" },
     { name: 'issued_at', type: "TEXT DEFAULT '7.30 A.M.'" },
     { name: 'return_time', type: "TEXT DEFAULT ''" },
     { name: 'return_device', type: "TEXT DEFAULT ''" },
@@ -205,7 +215,11 @@ async function initDatabase() {
     { name: 'sign', type: "TEXT DEFAULT 'Done'" },
     { name: 'active_user', type: 'TEXT' },
     { name: 'task_number', type: "INTEGER DEFAULT 17" },
-    { name: 'task_date', type: "TEXT DEFAULT '2026-08-17'" }
+    { name: 'task_date', type: "TEXT DEFAULT '2026-08-17'" },
+    { name: 'round_number', type: "INTEGER DEFAULT 1" },
+    { name: 'is_new_in_round', type: "INTEGER DEFAULT 0" },
+    { name: 'prev_round_status', type: "TEXT DEFAULT 'active'" },
+    { name: 'check_time', type: "TEXT DEFAULT '8.30 A.M.'" }
   ];
 
   for (const col of neededCols) {
@@ -270,6 +284,12 @@ async function initDatabase() {
     await dbRun(`INSERT OR IGNORE INTO user_permissions (role, permission_key, permission_label, is_enabled) VALUES ('Staff', ?, ?, ?)`, [p.key, p.label, p.staff]);
   }
 
+  // Seed default Roles
+  const defaultRoles = ['Admin', 'Supervisor', 'Staff', 'Developer'];
+  for (const r of defaultRoles) {
+    await dbRun(`INSERT OR IGNORE INTO system_roles (role_name) VALUES (?)`, [r]);
+  }
+
   // Seed default shift configuration if empty
   const shiftConfig = await dbGet(`SELECT COUNT(*) as count FROM shift_settings`);
   if (shiftConfig.count === 0) {
@@ -288,8 +308,130 @@ async function initDatabase() {
     `);
   }
 
+  // Table 10: Inventory Items (241 Mobile phones catalog: PN 1-122, NEW 1-90, CASS 1-29)
+  await dbRun(`
+    CREATE TABLE IF NOT EXISTS inventory_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      device_tag TEXT NOT NULL UNIQUE,
+      series TEXT NOT NULL,
+      model_name TEXT DEFAULT 'Samsung / Android Mobile Unit',
+      storage_location TEXT DEFAULT 'Charging Station A',
+      condition_status TEXT DEFAULT 'Good',
+      manual_status TEXT DEFAULT 'Auto',
+      notes TEXT DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // Table 11: Daily Task Rounds (Intra-day device count updates & comparison history)
+  await dbRun(`
+    CREATE TABLE IF NOT EXISTS daily_task_rounds (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      task_number INTEGER NOT NULL,
+      task_date TEXT NOT NULL,
+      round_number INTEGER NOT NULL,
+      round_name TEXT DEFAULT '',
+      check_time TEXT DEFAULT '8.30 A.M.',
+      total_devices INTEGER NOT NULL,
+      added_count INTEGER DEFAULT 0,
+      removed_count INTEGER DEFAULT 0,
+      retained_count INTEGER DEFAULT 0,
+      added_devices TEXT DEFAULT '[]',
+      removed_devices TEXT DEFAULT '[]',
+      raw_list TEXT DEFAULT '',
+      records_json TEXT DEFAULT '[]',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(task_number, round_number)
+    );
+  `);
+
+  // Ensure check_time, records_json, and resolutions_json exist in daily_task_rounds
+  try {
+    const roundCols = await dbAll(`PRAGMA table_info(daily_task_rounds);`);
+    const roundColNames = roundCols.map(c => c.name);
+    if (!roundColNames.includes('check_time')) {
+      await dbRun(`ALTER TABLE daily_task_rounds ADD COLUMN check_time TEXT DEFAULT '8.30 A.M.';`);
+    }
+    if (!roundColNames.includes('records_json')) {
+      await dbRun(`ALTER TABLE daily_task_rounds ADD COLUMN records_json TEXT DEFAULT '[]';`);
+    }
+    if (!roundColNames.includes('resolutions_json')) {
+      await dbRun(`ALTER TABLE daily_task_rounds ADD COLUMN resolutions_json TEXT DEFAULT '{}';`);
+    }
+  } catch (err) {
+    // Ignored
+  }
+
+  // Ensure animation_enabled column exists in system_users
+  try {
+    const userCols = await dbAll(`PRAGMA table_info(system_users);`);
+    const userColNames = userCols.map(c => c.name);
+    if (!userColNames.includes('animation_enabled')) {
+      await dbRun(`ALTER TABLE system_users ADD COLUMN animation_enabled INTEGER DEFAULT 1;`);
+      await dbRun(`UPDATE system_users SET animation_enabled = 1 WHERE animation_enabled IS NULL;`);
+    }
+  } catch (err) {
+    // Ignored
+  }
+
+  // Table 12: Dashboard Animation Management (Matching user screenshot)
+  await dbRun(`
+    CREATE TABLE IF NOT EXISTS dashboard_animations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      animation_key TEXT UNIQUE NOT NULL,
+      animation_name TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'Disable',
+      is_active INTEGER NOT NULL DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // Seed default animations matching user mockup
+  const animCount = await dbGet(`SELECT COUNT(*) as count FROM dashboard_animations`);
+  if (animCount.count === 0) {
+    await dbRun(`INSERT INTO dashboard_animations (animation_key, animation_name, status, is_active) VALUES ('snow', 'Snow Animation', 'Enable', 1)`);
+    await dbRun(`INSERT INTO dashboard_animations (animation_key, animation_name, status, is_active) VALUES ('rain', 'Rain Animation', 'Disable', 0)`);
+    await dbRun(`INSERT INTO dashboard_animations (animation_key, animation_name, status, is_active) VALUES ('sparkle', 'Sparkle Animation', 'Disable', 0)`);
+  }
+
+  // Seed default 241 inventory items if empty
+  await seedDefaultInventory241();
+
+  // Seed initial task rounds for existing daily tasks
+  await seedInitialTaskRounds();
+
   // Seed the exact 3 records from Image 4 if table is empty or needs alignment
   await seedMockupRecords();
+}
+
+// Seed the exact 241 inventory items (PN 1-122, NEW 1-90, CASS 1-29)
+async function seedDefaultInventory241() {
+  const countRow = await dbGet(`SELECT COUNT(*) as count FROM inventory_items`);
+  if (!countRow || countRow.count === 0) {
+    // Seed PN 1 - 122 (122 phones)
+    for (let i = 1; i <= 122; i++) {
+      await dbRun(
+        `INSERT INTO inventory_items (device_tag, series, model_name, storage_location, condition_status, manual_status, notes) VALUES (?, 'PN Series', 'Samsung / Android Mobile Unit', 'Charging Station A', 'Good', 'Auto', '')`,
+        [`Pn ${i}`]
+      );
+    }
+    // Seed NEW 1 - 90 (90 phones)
+    for (let i = 1; i <= 90; i++) {
+      await dbRun(
+        `INSERT INTO inventory_items (device_tag, series, model_name, storage_location, condition_status, manual_status, notes) VALUES (?, 'NEW Series', 'Samsung / Android Mobile Unit', 'Storage Rack B-1', 'Good', 'Auto', '')`,
+        [`New ${i}`]
+      );
+    }
+    // Seed CASS 1 - 29 (29 phones)
+    for (let i = 1; i <= 29; i++) {
+      await dbRun(
+        `INSERT INTO inventory_items (device_tag, series, model_name, storage_location, condition_status, manual_status, notes) VALUES (?, 'CASS Series', 'Samsung / Android Mobile Unit', 'Charging Station B', 'Good', 'Auto', '')`,
+        [`Cass ${i}`]
+      );
+    }
+    await dbRun(`UPDATE shift_settings SET total_inventory_stock = 241`);
+  }
 }
 
 // Seed the exact records matching user's Image 4
@@ -442,6 +584,15 @@ async function getAllRecords(filters = {}) {
     query += ` AND task_number = (SELECT COALESCE(MAX(task_number), 17) FROM device_records)`;
   }
 
+  if (filters.round_number !== undefined && filters.round_number !== 'all' && filters.round_number !== '') {
+    query += ` AND round_number = ?`;
+    params.push(parseInt(filters.round_number));
+  }
+
+  if (filters.only_new_in_round === 'true' || filters.only_new_in_round === true) {
+    query += ` AND is_new_in_round = 1`;
+  }
+
   query += ` ORDER BY id ASC`;
   return await dbAll(query, params);
 }
@@ -463,9 +614,15 @@ async function insertDeviceRecord({
   handover_to = '',
   sign = 'Done',
   admin_user = 'Shanaka',
-  task_number = 17,
-  task_date = '2026-08-17'
+  task_number,
+  task_date
 }) {
+  // If task_number or task_date are not provided, default dynamically to the latest active task and date
+  if (!task_number || !task_date) {
+    const latestRow = await dbGet(`SELECT MAX(task_number) as latestTask, MAX(task_date) as latestDate FROM device_records`);
+    if (!task_number) task_number = (latestRow && latestRow.latestTask) ? latestRow.latestTask : 19;
+    if (!task_date) task_date = (latestRow && latestRow.latestDate) ? latestRow.latestDate : '2026-11-19';
+  }
   const cleanName = (name || '').trim();
   const cleanShift = (shift || 'Day').trim();
   const cleanGroup = group !== undefined && group !== null ? String(group).trim() : '';
@@ -660,17 +817,46 @@ function parseDevices(str) {
   return str.split(/[,+&/]/).map(s => s.trim()).filter(Boolean);
 }
 
-// Dashboard KPIs calculation (Matches the current active mobile list)
-async function getDashboardKPIs() {
+// Normalizes device key for robust cross-matching: "Cass 02" -> "cass2", "Pn 07" -> "pn7", "New 68" -> "new68"
+function normalizeDeviceKey(str) {
+  if (!str) return '';
+  const clean = String(str).trim().toLowerCase().replace(/[\s_\-#.]+/g, '');
+  const m = clean.match(/^([a-z]+)0*(\d+)$/);
+  if (m) return `${m[1]}${parseInt(m[2], 10)}`;
+  return clean;
+}
+
+// Dashboard KPIs calculation (Supports specific date/task calendar filtering or defaults to current active)
+async function getDashboardKPIs(taskNumber, taskDate) {
   const settings = await dbGet(`SELECT * FROM shift_settings ORDER BY id ASC LIMIT 1`);
-  const totalStock = (settings && settings.total_inventory_stock) ? settings.total_inventory_stock : 159;
+  const totalStock = (settings && settings.total_inventory_stock) ? settings.total_inventory_stock : 241;
 
-  // Find latest active task number
-  const latestTaskRow = await dbGet(`SELECT MAX(task_number) as latestTask FROM device_records`);
-  const activeTask = (latestTaskRow && latestTaskRow.latestTask) ? latestTaskRow.latestTask : 17;
+  // Find latest active task number and date
+  const latestTaskRow = await dbGet(`SELECT MAX(task_number) as latestTask, MAX(task_date) as latestDate FROM device_records`);
+  const latestTask = (latestTaskRow && latestTaskRow.latestTask) ? latestTaskRow.latestTask : 17;
+  const latestDate = (latestTaskRow && latestTaskRow.latestDate) ? latestTaskRow.latestDate : '2026-11-19';
 
-  // Active records from the current active day/task
-  const records = await dbAll(`SELECT * FROM device_records WHERE task_number = ?`, [activeTask]);
+  let activeTask = (taskNumber !== undefined && taskNumber !== null && taskNumber !== 'all') ? parseInt(taskNumber) : (taskDate ? undefined : latestTask);
+  let records;
+  let effectiveDate = taskDate;
+
+  if (taskNumber === 'all') {
+    records = await dbAll(`SELECT * FROM device_records`);
+    activeTask = 'all';
+    effectiveDate = 'All Dates';
+  } else if (taskDate) {
+    records = await dbAll(`SELECT * FROM device_records WHERE task_date = ?`, [taskDate]);
+    if (records.length > 0 && records[0].task_number) {
+      activeTask = records[0].task_number;
+    }
+  } else {
+    records = await dbAll(`SELECT * FROM device_records WHERE task_number = ?`, [activeTask]);
+    if (records.length > 0 && records[0].task_date) {
+      effectiveDate = records[0].task_date;
+    } else if (activeTask === latestTask) {
+      effectiveDate = latestDate;
+    }
+  }
 
   // Active Mobile Phones:
   // A device is active if an employee is currently holding and using it.
@@ -689,19 +875,26 @@ async function getDashboardKPIs() {
   }
 
   // Available in Stock:
-  // Invariant: Available in Stock + Active Mobile Phones = Total Inventory Stock
   const availableStock = Math.max(0, totalStock - activeCount);
 
   // Need an Update:
   // Count of records where sign == 'Pending' or not returned/handed over
   const needAnUpdateCount = records.filter(r => r.sign && r.sign.toLowerCase() === 'pending').length;
 
+  const availableDays = await getHistoryAvailableDays();
+
   return {
     totalMobilePhones: totalStock,
-    activeMobilePhones: activeCount,
-    availableInStock: availableStock,
+    activeMobilePhones: activeCount, // 78 on Nov 19
+    availableInStock: availableStock, // 163 on Nov 19
     needAnUpdate: needAnUpdateCount,
-    activeTaskNumber: activeTask
+    activeTaskNumber: activeTask,
+    activeTaskDate: effectiveDate || (activeTask === 17 ? '2026-11-17' : (activeTask === 18 ? '2026-11-18' : '2026-11-19')),
+    isLatest: activeTask === latestTask,
+    latestTaskNumber: latestTask,
+    latestTaskDate: latestDate,
+    totalRecords: records.length,
+    availableDays
   };
 }
 
@@ -716,48 +909,84 @@ async function getDailyTaskKPIs(taskNumber = 17, taskDate = null) {
   }
 
   const records = await dbAll(query, params);
+  const taskRounds = await getTaskRounds(taskNumber, taskDate);
+  const latestRound = await getLatestTaskRound(taskNumber, taskDate);
 
-  let totalTakingDevices = 0;
+  // 1. Collect from device_records (each return record represents a returned device instance)
   let returnedCount = 0;
-  let activeInShiftCount = 0;
-  let missingCount = 0;
+  const returnedDevSet = new Set();
+  const missingDevSet = new Set();
 
   for (const r of records) {
-    const takingDevs = parseDevices(r.taking_device);
     const returnDevs = parseDevices(r.return_device);
+    const takingDevs = parseDevices(r.taking_device);
 
-    const hasTaking = r.taking_device && r.taking_device.trim() !== '';
-    const takingQty = Math.max(hasTaking ? 1 : 0, takingDevs.length);
-    totalTakingDevices += takingQty;
-
-    const isReturned = (r.return_time && r.return_time.trim() !== '') || returnDevs.length > 0;
-    const isSignPending = r.sign && r.sign.toLowerCase() === 'pending';
-    const isExplicitMissing = (r.sign && r.sign.toLowerCase() === 'missing') ||
-                              (r.device_details && r.device_details.toLowerCase().includes('missing'));
-
-    if (returnDevs.length > 0) {
-      returnedCount += returnDevs.length;
-    } else if (isReturned && hasTaking) {
-      returnedCount += takingQty;
+    for (const dev of returnDevs) {
+      const norm = normalizeDeviceTag(dev);
+      if (norm) {
+        returnedCount++;
+        returnedDevSet.add(norm);
+        missingDevSet.delete(norm);
+      }
     }
 
-    if (isExplicitMissing) {
-      missingCount += Math.max(1, takingQty);
-    } else if (isSignPending && !isReturned) {
-      missingCount += Math.max(1, takingQty);
-    } else if (hasTaking && !isReturned) {
-      activeInShiftCount += Math.max(1, takingQty);
+    if (r.sign && r.sign.toLowerCase() === 'missing') {
+      for (const dev of takingDevs) {
+        const norm = normalizeDeviceTag(dev);
+        if (norm && !returnedDevSet.has(norm)) {
+          missingDevSet.add(norm);
+        }
+      }
     }
   }
 
-  // Today Active Mobiles: exact count of taking devices for this day's task (0 if empty day)
-  const todayActiveCount = totalTakingDevices;
+  // 2. Also collect from all rounds' resolutions for this task (if a dropped device was marked returned or missing
+  // that was not already recorded in device_records)
+  for (const rnd of taskRounds) {
+    if (rnd.resolutions) {
+      for (const [normTag, res] of Object.entries(rnd.resolutions)) {
+        if (res && res.status === 'returned') {
+          if (!returnedDevSet.has(normTag)) {
+            returnedCount++;
+            returnedDevSet.add(normTag);
+          }
+          missingDevSet.delete(normTag);
+        } else if (res && res.status === 'missing') {
+          if (!returnedDevSet.has(normTag)) {
+            missingDevSet.add(normTag);
+          }
+        }
+      }
+    }
+  }
+
+  const missingCount = missingDevSet.size;
+
+  // Total Taking count for this day (from latest round if present, or distinct taking devices)
+  let todayActiveCount = 0;
+  if (latestRound && latestRound.total_devices) {
+    todayActiveCount = latestRound.total_devices;
+  } else {
+    const takingDevSet = new Set();
+    for (const r of records) {
+      for (const dev of parseDevices(r.taking_device)) {
+        takingDevSet.add(normalizeDeviceTag(dev));
+      }
+    }
+    todayActiveCount = takingDevSet.size;
+  }
+
+  const activeInShiftCount = Math.max(0, todayActiveCount - returnedCount);
+  const newInRoundCount = records.filter(r => r.is_new_in_round === 1).length;
 
   return {
     todayActiveMobiles: todayActiveCount,
     activeInShift: activeInShiftCount,
     returnedMobiles: returnedCount,
     missingDevices: missingCount,
+    newInRoundCount,
+    rounds: taskRounds,
+    latestRound: latestRound ? latestRound.round_number : 1,
     // Backwards-compatible aliases
     activeMobilePhones: activeInShiftCount,
     needAnUpdate: missingCount,
@@ -767,14 +996,32 @@ async function getDailyTaskKPIs(taskNumber = 17, taskDate = null) {
 }
 
 // Active Devices List (for History section "active devices and who is the actively use that device in table vise section")
-async function getActiveDevicesList() {
-  const rows = await dbAll(`
+async function getActiveDevicesList(filter = {}) {
+  let whereClauses = ["taking_device IS NOT NULL AND taking_device != ''"];
+  let params = [];
+
+  if (filter.task_number) {
+    whereClauses.push("task_number = ?");
+    params.push(Number(filter.task_number));
+  }
+  if (filter.task_date) {
+    whereClauses.push("task_date = ?");
+    params.push(filter.task_date);
+  }
+
+  // If no specific task/date requested and not asking for all records, show latest task
+  if (!filter.task_number && !filter.task_date && !filter.all) {
+    whereClauses.push("task_number = (SELECT COALESCE(MAX(task_number), 17) FROM device_records)");
+  }
+
+  const sql = `
     SELECT 
       id as record_id,
       name,
       active_user,
       taking_device,
       return_device,
+      device_details,
       shift,
       group_name,
       issued_at,
@@ -782,17 +1029,13 @@ async function getActiveDevicesList() {
       handover_to,
       sign,
       task_number,
+      task_date,
       updated_at
     FROM device_records
-    WHERE taking_device IS NOT NULL AND taking_device != ''
-      AND (
-        (handover_to IS NOT NULL AND handover_to != '')
-        OR return_time IS NULL
-        OR return_time = ''
-        OR LOWER(sign) = 'pending'
-      )
+    WHERE ${whereClauses.join(' AND ')}
     ORDER BY id ASC
-  `);
+  `;
+  const rows = await dbAll(sql, params);
 
   // Split multiple taking devices so each physical device is distinctly tracked!
   const list = [];
@@ -807,6 +1050,7 @@ async function getActiveDevicesList() {
         device_id: dev,
         all_taking: r.taking_device,
         return_device: r.return_device,
+        device_details: r.device_details,
         shift: r.shift,
         group_name: r.group_name,
         issued_at: r.issued_at,
@@ -814,11 +1058,28 @@ async function getActiveDevicesList() {
         handover_to: r.handover_to,
         sign: r.sign,
         task_number: r.task_number || 17,
+        task_date: r.task_date || '2026-11-17',
         updated_at: r.updated_at
       });
     }
   }
   return list;
+}
+
+async function getHistoryAvailableDays() {
+  return await dbAll(`
+    SELECT 
+      task_number,
+      task_date,
+      COUNT(*) as total_records,
+      COUNT(*) as device_count,
+      SUM(CASE WHEN LOWER(sign) = 'done' THEN 1 ELSE 0 END) as done_count,
+      SUM(CASE WHEN LOWER(sign) = 'pending' THEN 1 ELSE 0 END) as pending_count
+    FROM device_records
+    WHERE taking_device IS NOT NULL AND taking_device != ''
+    GROUP BY task_number, task_date
+    ORDER BY task_number DESC
+  `);
 }
 
 // Groups & Shifts Management
@@ -846,27 +1107,127 @@ async function addShift(shift_name, start_time = '06:00 AM', end_time = '06:00 P
 
 // Users & Permissions Management
 async function getAllUsers() {
-  return await dbAll(`SELECT id, full_name, username, email, role, is_active, created_at FROM system_users ORDER BY id ASC`);
+  return await dbAll(`SELECT id, full_name, username, email, role, is_active, COALESCE(animation_enabled, 1) as animation_enabled, created_at FROM system_users ORDER BY id ASC`);
 }
 
-async function createSystemUser({ full_name, username, email, role = 'Admin', password = 'Admin@123' }) {
+async function createSystemUser({ full_name, username, email, role = 'Admin', password = 'Admin@123', animation_enabled = 1 }) {
   const cleanUser = username.trim().toLowerCase();
   const cleanName = full_name.trim();
   if (!cleanUser || !cleanName) throw new Error('Full Name and Username are required');
 
   const res = await dbRun(
-    `INSERT INTO system_users (full_name, username, email, role, password) VALUES (?, ?, ?, ?, ?)`,
-    [cleanName, cleanUser, email || '', role, password]
+    `INSERT INTO system_users (full_name, username, email, role, password, animation_enabled) VALUES (?, ?, ?, ?, ?, ?)`,
+    [cleanName, cleanUser, email || '', role, password, animation_enabled ? 1 : 0]
   );
   return res.lastID;
 }
 
 async function toggleUserActive(userId, is_active) {
+  const user = await dbGet(`SELECT * FROM system_users WHERE id = ?`, [userId]);
+  if (user && (user.role.toLowerCase() === 'admin' || user.username.toLowerCase() === 'shanaka')) {
+    if (!is_active) {
+      throw new Error('Admin status cannot be set to Inactive.');
+    }
+  }
   return await dbRun(`UPDATE system_users SET is_active = ? WHERE id = ?`, [is_active ? 1 : 0, userId]);
 }
 
+async function toggleUserAnimation(userId, animation_enabled) {
+  return await dbRun(`UPDATE system_users SET animation_enabled = ? WHERE id = ?`, [animation_enabled ? 1 : 0, userId]);
+}
+
 async function deleteSystemUser(userId) {
+  const user = await dbGet(`SELECT * FROM system_users WHERE id = ?`, [userId]);
+  if (user && (user.role.toLowerCase() === 'admin' || user.username.toLowerCase() === 'shanaka')) {
+    throw new Error('Admin user cannot be deleted.');
+  }
   return await dbRun(`DELETE FROM system_users WHERE id = ?`, [userId]);
+}
+
+// System Roles Management (Admin can add more roles)
+async function getAllRoles() {
+  const roles = await dbAll(`SELECT * FROM system_roles ORDER BY id ASC`);
+  if (roles.length === 0) {
+    const defaultRoles = ['Admin', 'Supervisor', 'Staff', 'Developer'];
+    for (const r of defaultRoles) {
+      await dbRun(`INSERT OR IGNORE INTO system_roles (role_name) VALUES (?)`, [r]);
+    }
+    return await dbAll(`SELECT * FROM system_roles ORDER BY id ASC`);
+  }
+  return roles;
+}
+
+async function addRole(role_name, description = '') {
+  const cleanRole = role_name.trim();
+  if (!cleanRole) throw new Error('Role name cannot be empty');
+
+  // Insert role
+  await dbRun(
+    `INSERT OR IGNORE INTO system_roles (role_name, description) VALUES (?, ?)`,
+    [cleanRole, description || '']
+  );
+
+  // Initialize permissions for the new role
+  const defaultPerms = [
+    { key: 'manage_devices', label: 'Add & Edit Mobile Devices', enabled: 1 },
+    { key: 'handover_devices', label: 'Perform Shift Handover', enabled: 1 },
+    { key: 'return_devices', label: 'Accept Inventory Returns', enabled: 1 },
+    { key: 'manage_users', label: 'Create & Manage User Accounts', enabled: 0 },
+    { key: 'manage_groups_shifts', label: 'Add / Edit Shifts & Groups', enabled: 0 },
+    { key: 'view_audit_logs', label: 'View System Audit Logs', enabled: 0 },
+    { key: 'delete_records', label: 'Delete Records', enabled: 0 }
+  ];
+
+  for (const p of defaultPerms) {
+    await dbRun(
+      `INSERT OR IGNORE INTO user_permissions (role, permission_key, permission_label, is_enabled) VALUES (?, ?, ?, ?)`,
+      [cleanRole, p.key, p.label, p.enabled]
+    );
+  }
+
+  return await getAllRoles();
+}
+
+// Dashboard Animation Management (Matching user screenshot: "One animation can use one time only")
+async function getAllDashboardAnimations() {
+  return await dbAll(`SELECT * FROM dashboard_animations ORDER BY id ASC`);
+}
+
+async function toggleDashboardAnimation(animId, is_enabled) {
+  if (is_enabled) {
+    // Rule: "One animation can use one time only"
+    // Disable all other animations first
+    await dbRun(`UPDATE dashboard_animations SET is_active = 0, status = 'Disable'`);
+    // Enable the selected animation
+    await dbRun(`UPDATE dashboard_animations SET is_active = 1, status = 'Enable' WHERE id = ?`, [animId]);
+  } else {
+    // Disable this animation
+    await dbRun(`UPDATE dashboard_animations SET is_active = 0, status = 'Disable' WHERE id = ?`, [animId]);
+  }
+  return await getAllDashboardAnimations();
+}
+
+async function getActiveDashboardAnimation() {
+  return await dbGet(`SELECT * FROM dashboard_animations WHERE is_active = 1 LIMIT 1`);
+}
+
+async function checkUserAnimationStatus(username) {
+  const activeAnim = await dbGet(`SELECT * FROM dashboard_animations WHERE is_active = 1 LIMIT 1`);
+  if (!activeAnim) {
+    return { allowed: false, activeAnimation: null };
+  }
+  
+  if (!username) {
+    return { allowed: true, activeAnimation: activeAnim.animation_key };
+  }
+
+  const user = await dbGet(`SELECT animation_enabled FROM system_users WHERE LOWER(username) = LOWER(?) LIMIT 1`, [username.trim()]);
+  const isAllowed = user ? (user.animation_enabled === 1 || user.animation_enabled === null || user.animation_enabled === undefined) : true;
+  
+  return {
+    allowed: Boolean(isAllowed),
+    activeAnimation: activeAnim.animation_key
+  };
 }
 
 async function getAllPermissions() {
@@ -943,61 +1304,106 @@ async function getAllBatches() {
   return await dbAll(`SELECT * FROM upload_batches ORDER BY id DESC LIMIT 50`);
 }
 
-// Inventory Management
-async function getAllInventoryItems() {
-  const items = await dbAll(`SELECT * FROM inventory_items ORDER BY series ASC, id ASC`);
-  const records = await dbAll(`
-    SELECT * FROM device_records 
+// Inventory Management: Dynamic tracking with latest day or selected day
+async function getAllInventoryItems(filter = {}) {
+  // 1. Determine latest day in device_records
+  const latestTaskRow = await dbGet(`
+    SELECT task_number, task_date 
+    FROM device_records 
     WHERE taking_device IS NOT NULL AND taking_device != ''
-      AND (
-        (handover_to IS NOT NULL AND handover_to != '')
-        OR return_time IS NULL
-        OR return_time = ''
-        OR LOWER(sign) = 'pending'
-      )
+    ORDER BY task_number DESC, task_date DESC, id DESC 
+    LIMIT 1
   `);
 
+  const activeTaskNumber = filter.task_number !== undefined && filter.task_number !== 'all' && filter.task_number !== ''
+    ? Number(filter.task_number)
+    : (latestTaskRow ? latestTaskRow.task_number : 18);
+
+  const activeTaskDate = filter.task_date
+    ? filter.task_date
+    : (latestTaskRow ? latestTaskRow.task_date : '2026-11-18');
+
+  // 2. Fetch the records for that active day
+  const dayRecords = await dbAll(`
+    SELECT * FROM device_records 
+    WHERE task_number = ? AND taking_device IS NOT NULL AND taking_device != ''
+  `, [activeTaskNumber]);
+
+  // 3. Map active devices on that active day using normalized key (e.g. "Cass 02" -> "cass2")
   const activeMap = new Map();
-  for (const r of records) {
+
+  for (const r of dayRecords) {
     const devs = parseDevices(r.taking_device);
     for (const d of devs) {
-      const key = d.toLowerCase().replace(/\s+/g, '');
+      const key = normalizeDeviceKey(d);
       activeMap.set(key, {
-        holder: r.active_user || r.name,
-        shift: r.shift,
-        issued_at: r.issued_at,
-        task_number: r.task_number || 17
+        device_tag: d,
+        holder: r.active_user || (r.handover_to ? r.handover_to : r.name),
+        shift: r.shift || 'Day',
+        group_name: r.group_name || '',
+        issued_at: r.issued_at || '7.30 A.M.',
+        return_time: r.return_time || '',
+        handover_to: r.handover_to || '',
+        sign: r.sign || 'Done',
+        task_number: r.task_number,
+        task_date: r.task_date
       });
     }
   }
 
-  let inUse = 0, available = 0, maintenance = 0, missing = 0;
+  // Load all items in catalog
+  let items = await dbAll(`SELECT * FROM inventory_items ORDER BY series ASC, id ASC`);
+
+  // 4. Compute status & KPIs with full series counts
+  let maintenance = 0, missing = 0;
+  let pnTotal = 0, pnInUse = 0;
+  let newTotal = 0, newInUse = 0;
+  let cassTotal = 0, cassInUse = 0;
 
   const catalog = items.map(item => {
-    const key = item.device_tag.toLowerCase().replace(/\s+/g, '');
+    const key = normalizeDeviceKey(item.device_tag);
     let status = 'Available';
     let holder = item.storage_location || 'Charging Station';
     let shift = '—';
+    let group_name = '';
     let issued_at = '—';
+    let return_time = '—';
     let task_number = '—';
+    let task_date = '—';
+    let sign = '—';
+
+    const s = (item.series || '').toUpperCase();
+    const isPn = s.includes('PN') || key.startsWith('pn');
+    const isNew = s.includes('NEW') || key.startsWith('new');
+    const isCass = s.includes('CASS') || key.startsWith('cass');
+
+    if (isPn) pnTotal++;
+    else if (isNew) newTotal++;
+    else if (isCass) cassTotal++;
 
     if (item.manual_status && item.manual_status !== 'Auto') {
       status = item.manual_status;
       if (status === 'Maintenance') maintenance++;
       else if (status === 'Missing') missing++;
-      else if (status === 'In Use') inUse++;
-      else if (status === 'Available') available++;
+      else if (status === 'In Use') {
+        if (isPn) pnInUse++;
+        else if (isNew) newInUse++;
+        else if (isCass) cassInUse++;
+      }
     } else if (activeMap.has(key)) {
       status = 'In Use';
       const act = activeMap.get(key);
       holder = act.holder;
       shift = act.shift;
+      group_name = act.group_name;
       issued_at = act.issued_at;
+      return_time = act.return_time;
       task_number = act.task_number;
-      inUse++;
-    } else {
-      status = 'Available';
-      available++;
+      task_date = act.task_date;
+      sign = act.sign;
+      if (isPn) pnInUse++;
+      else if (isNew) newInUse++;
+      else if (isCass) cassInUse++;
     }
 
     return {
@@ -1005,30 +1411,107 @@ async function getAllInventoryItems() {
       status,
       holder,
       shift,
+      group_name,
       issued_at,
-      task_number
+      return_time,
+      task_number,
+      task_date,
+      sign
     };
   });
 
+  // Matches exactly the active day count (78 on Nov 19)
+  const inUse = dayRecords.length;
+  const available = Math.max(0, catalog.length - inUse);
+
+  // 5. Available days list
+  const availableDays = await dbAll(`
+    SELECT 
+      task_number, 
+      task_date, 
+      COUNT(*) as total_records,
+      COUNT(*) as device_count 
+    FROM device_records 
+    WHERE taking_device IS NOT NULL AND taking_device != ''
+    GROUP BY task_number, task_date 
+    ORDER BY task_number DESC
+  `);
+
   return {
     items: catalog,
+    activeDay: {
+      task_number: activeTaskNumber,
+      task_date: activeTaskDate,
+      isLatest: latestTaskRow ? activeTaskNumber === latestTaskRow.task_number : true,
+      latestTaskNumber: latestTaskRow ? latestTaskRow.task_number : 19,
+      latestTaskDate: latestTaskRow ? latestTaskRow.task_date : '2026-11-19'
+    },
+    availableDays,
     kpis: {
       totalStock: catalog.length,
       availableStock: available,
-      inUseStock: inUse,
+      inUseStock: inUse, // 78 on Nov 19
       maintenanceStock: maintenance,
-      missingStock: missing
+      missingStock: missing,
+      seriesStats: {
+        pn: {
+          total: pnTotal,
+          inUse: pnInUse,
+          available: Math.max(0, pnTotal - pnInUse),
+          label: 'PN 1 - 122',
+          name: 'PN Series'
+        },
+        new: {
+          total: newTotal,
+          inUse: newInUse,
+          available: Math.max(0, newTotal - newInUse),
+          label: 'NEW 1 - 90',
+          name: 'NEW Series'
+        },
+        cass: {
+          total: cassTotal,
+          inUse: cassInUse,
+          available: Math.max(0, cassTotal - cassInUse),
+          label: 'CASS 1 - 29',
+          name: 'CASS Series'
+        }
+      }
     }
   };
 }
 
-async function addInventoryItem({ device_tag, series, model_name, storage_location, condition_status, notes }) {
-  const cleanTag = (device_tag || '').trim();
-  if (!cleanTag) throw new Error('Device Tag is required');
+async function addInventoryItem({ device_tag, series, phone_type, model_name, storage_location, condition_status, notes }) {
+  let cleanTag = (device_tag || '').trim();
+  if (!cleanTag) throw new Error('Device Tag / Number is required');
 
-  let detectedSeries = series || 'PN Series';
-  if (cleanTag.toLowerCase().startsWith('new')) detectedSeries = 'NEW Series';
-  else if (cleanTag.toLowerCase().startsWith('cass')) detectedSeries = 'CASS Series';
+  let chosenType = (phone_type || series || '').trim().toUpperCase();
+  let detectedSeries = 'PN Series';
+
+  if (chosenType.includes('NEW') || cleanTag.toLowerCase().startsWith('new')) {
+    detectedSeries = 'NEW Series';
+    if (!cleanTag.toLowerCase().startsWith('new')) {
+      cleanTag = `New ${cleanTag.replace(/^new\s*/i, '')}`;
+    }
+  } else if (chosenType.includes('CASS') || cleanTag.toLowerCase().startsWith('cass')) {
+    detectedSeries = 'CASS Series';
+    if (!cleanTag.toLowerCase().startsWith('cass')) {
+      cleanTag = `Cass ${cleanTag.replace(/^cass\s*/i, '')}`;
+    }
+  } else if (chosenType.includes('PN') || cleanTag.toLowerCase().startsWith('pn')) {
+    detectedSeries = 'PN Series';
+    if (!cleanTag.toLowerCase().startsWith('pn')) {
+      cleanTag = `Pn ${cleanTag.replace(/^pn\s*/i, '')}`;
+    }
+  } else if (series) {
+    detectedSeries = series;
+  }
+
+  // Format clean casing e.g. "new 91" -> "New 91", "pn 125" -> "Pn 125"
+  const m = cleanTag.match(/^([a-zA-Z]+)\s*(\d+)$/);
+  if (m) {
+    const prefix = m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase();
+    cleanTag = `${prefix} ${m[2]}`;
+  }
 
   const res = await dbRun(`
     INSERT INTO inventory_items (device_tag, series, model_name, storage_location, condition_status, manual_status, notes)
@@ -1041,6 +1524,13 @@ async function addInventoryItem({ device_tag, series, model_name, storage_locati
     condition_status || 'Good',
     notes || ''
   ]);
+
+  // Update total stock count in shift settings
+  const total = await dbGet(`SELECT count(*) as count FROM inventory_items`);
+  if (total && total.count) {
+    await dbRun(`UPDATE shift_settings SET total_inventory_stock = ?`, [total.count]);
+  }
+
   return res.lastID;
 }
 
@@ -1076,6 +1566,689 @@ async function deleteInventoryItem(id) {
   return await dbRun(`DELETE FROM inventory_items WHERE id = ?`, [id]);
 }
 
+// ==========================================
+// INTRA-DAY TASK ROUNDS & COMPARISON HELPERS
+// ==========================================
+
+function normalizeDeviceTag(tag) {
+  if (!tag) return '';
+  const s = String(tag).trim().toLowerCase();
+  const m = s.match(/^([a-z]+)\s*0*(\d+)$/i);
+  if (m) {
+    return `${m[1]}${parseInt(m[2], 10)}`;
+  }
+  return s.replace(/\s+/g, '');
+}
+
+function formatDeviceTag(tag) {
+  if (!tag) return '';
+  const s = String(tag).trim();
+  const m = s.match(/^([a-z]+)\s*(\d+)$/i);
+  if (m) {
+    const prefix = m[1].toUpperCase();
+    const num = parseInt(m[2], 10);
+    if (prefix === 'PN') return `PN ${num}`;
+    if (prefix === 'NEW') return `New ${num}`;
+    if (prefix === 'CASS') return `Cass ${num}`;
+    return `${prefix} ${num}`;
+  }
+  return s;
+}
+
+function compareDeviceLists(prevTags = [], newTags = []) {
+  const prevNormMap = new Map();
+  for (const t of prevTags) {
+    const k = normalizeDeviceTag(t);
+    if (k && !prevNormMap.has(k)) prevNormMap.set(k, t);
+  }
+
+  const newNormMap = new Map();
+  for (const t of newTags) {
+    const k = normalizeDeviceTag(t);
+    if (k && !newNormMap.has(k)) newNormMap.set(k, t);
+  }
+
+  const added = [];
+  for (const [k, origTag] of newNormMap.entries()) {
+    if (!prevNormMap.has(k)) {
+      added.push(origTag);
+    }
+  }
+
+  const removed = [];
+  for (const [k, origTag] of prevNormMap.entries()) {
+    if (!newNormMap.has(k)) {
+      removed.push(origTag);
+    }
+  }
+
+  const retained = [];
+  for (const [k, origTag] of newNormMap.entries()) {
+    if (prevNormMap.has(k)) {
+      retained.push(origTag);
+    }
+  }
+
+  return { added, removed, retained };
+}
+
+async function seedInitialTaskRounds() {
+  try {
+    const distinctTasks = await dbAll(`
+      SELECT task_number, task_date, COUNT(*) as count 
+      FROM device_records 
+      WHERE task_number IS NOT NULL AND taking_device != ''
+      GROUP BY task_number, task_date
+      ORDER BY task_number ASC
+    `);
+
+    for (const t of distinctTasks) {
+      const existingRound = await dbGet(`SELECT * FROM daily_task_rounds WHERE task_number = ? AND round_number = 1`, [t.task_number]);
+      if (!existingRound) {
+        const recs = await dbAll(`SELECT taking_device FROM device_records WHERE task_number = ? ORDER BY id ASC`, [t.task_number]);
+        const devList = recs.map(r => r.taking_device).filter(Boolean);
+        await dbRun(`
+          INSERT INTO daily_task_rounds (
+            task_number, task_date, round_number, round_name, total_devices,
+            added_count, removed_count, retained_count, added_devices, removed_devices, raw_list
+          ) VALUES (?, ?, 1, 'Round 1 (Initial Morning Taking)', ?, ?, 0, 0, ?, '[]', ?)
+        `, [
+          t.task_number,
+          t.task_date || '2026-11-19',
+          devList.length,
+          devList.length,
+          JSON.stringify(devList),
+          devList.join('\n')
+        ]);
+      }
+    }
+  } catch (e) {
+    console.error('Error seeding initial task rounds:', e);
+  }
+}
+
+async function getTaskRounds(taskNumber, taskDate) {
+  let query = `SELECT * FROM daily_task_rounds WHERE 1=1`;
+  const params = [];
+  if (taskNumber !== undefined && taskNumber !== null && taskNumber !== 'all') {
+    query += ` AND task_number = ?`;
+    params.push(parseInt(taskNumber));
+  }
+  if (taskDate) {
+    query += ` AND task_date = ?`;
+    params.push(taskDate);
+  }
+  query += ` ORDER BY round_number ASC`;
+  const rounds = await dbAll(query, params);
+
+  // Aggregate all resolutions across rounds for this task
+  const allResolutions = {};
+  for (const r of rounds) {
+    if (r.resolutions_json) {
+      try {
+        const parsed = JSON.parse(r.resolutions_json);
+        Object.assign(allResolutions, parsed);
+      } catch (e) {}
+    }
+  }
+
+  // Also check device_records for any returned / missing devices logged for this task
+  try {
+    const tNumInt = parseInt(taskNumber);
+    if (!isNaN(tNumInt)) {
+      const dbDevs = await dbAll(`
+        SELECT taking_device, return_device, return_time, sign FROM device_records
+        WHERE task_number = ? AND (
+          (return_device IS NOT NULL AND return_device != '') OR
+          sign = 'Missing'
+        )
+      `, [tNumInt]);
+      for (const d of dbDevs) {
+        if (d.return_device && d.return_device.trim() !== '') {
+          const norm = normalizeDeviceTag(d.return_device);
+          if (norm && !allResolutions[norm]) {
+            allResolutions[norm] = {
+              status: 'returned',
+              device_tag: d.return_device,
+              check_time: d.return_time || 'Office Returned'
+            };
+          }
+        }
+        if (d.sign && d.sign.toLowerCase() === 'missing') {
+          const norm = normalizeDeviceTag(d.taking_device);
+          if (norm && !allResolutions[norm]) {
+            allResolutions[norm] = {
+              status: 'missing',
+              device_tag: d.taking_device
+            };
+          }
+        }
+      }
+    }
+  } catch (err) {}
+
+  return rounds.map(r => {
+    let records = [];
+    if (r.records_json && r.records_json !== '[]') {
+      try {
+        const parsed = JSON.parse(r.records_json);
+        // Guarantee round 1 never has is_new_in_round set
+        records = parsed.map(rec => ({
+          ...rec,
+          is_new_in_round: r.round_number === 1 ? 0 : (rec.is_new_in_round || 0)
+        }));
+      } catch (e) {}
+    }
+    // Fallback: construct round records from raw_list if records_json is empty
+    if (records.length === 0 && r.raw_list) {
+      const devList = r.raw_list.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      const addedSet = new Set((r.added_devices ? JSON.parse(r.added_devices) : []).map(normalizeDeviceTag));
+      records = devList.map((tag, idx) => {
+        const num = idx + 1;
+        const name = num < 100 ? String(num).padStart(2, '0') : String(num);
+        const isNew = r.round_number > 1 && addedSet.has(normalizeDeviceTag(tag));
+        return {
+          id: `round-${r.round_number}-${num}`,
+          emp_number: num,
+          name,
+          shift: 'Day',
+          group_name: '',
+          issued_at: '7.30 A.M.',
+          return_time: '',
+          return_device: '',
+          taking_device: tag,
+          handover_to: '',
+          sign: 'Done',
+          is_new_in_round: isNew ? 1 : 0,
+          round_number: r.round_number,
+          check_time: r.check_time || (r.round_number === 1 ? '8.30 A.M.' : '02.00 P.M.')
+        };
+      });
+    }
+
+    const checkTime = r.check_time || (r.round_number === 1 ? '8.30 A.M.' : (r.round_number === 2 ? '02.00 P.M.' : '05.30 P.M.'));
+    const roundTitle = `Task ${r.task_number}.${r.round_number} : Time ${checkTime}`;
+
+    let parsedResolutions = {};
+    if (r.resolutions_json) {
+      try {
+        parsedResolutions = JSON.parse(r.resolutions_json);
+      } catch (e) {}
+    }
+
+    // Apply resolutions so that previous task / round records show returned or missing status in their row
+    records = records.map(rec => {
+      const normTaking = normalizeDeviceTag(rec.taking_device);
+      const res = allResolutions[normTaking];
+      if (res) {
+        if (res.status === 'returned') {
+          return {
+            ...rec,
+            return_device: res.device_tag || rec.taking_device,
+            return_time: res.check_time || checkTime || 'Office Returned',
+            sign: 'Done',
+            device_details: `Return: ${res.device_tag || rec.taking_device} | Taking: ${rec.taking_device}`,
+            is_resolved_returned: true
+          };
+        } else if (res.status === 'missing') {
+          return {
+            ...rec,
+            return_device: '',
+            return_time: '',
+            sign: 'Missing',
+            device_details: 'Missing Device (Attention Required)',
+            is_resolved_missing: true
+          };
+        }
+      }
+      return rec;
+    });
+
+    return {
+      ...r,
+      round_title: roundTitle,
+      check_time: checkTime,
+      records,
+      added_devices: r.round_number === 1 ? [] : (r.added_devices ? JSON.parse(r.added_devices) : []),
+      removed_devices: r.removed_devices ? JSON.parse(r.removed_devices) : [],
+      resolutions: parsedResolutions
+    };
+  });
+}
+
+async function getLatestTaskRound(taskNumber, taskDate) {
+  let query = `SELECT * FROM daily_task_rounds WHERE 1=1`;
+  const params = [];
+  if (taskNumber !== undefined && taskNumber !== null && taskNumber !== 'all') {
+    query += ` AND task_number = ?`;
+    params.push(parseInt(taskNumber));
+  }
+  if (taskDate) {
+    query += ` AND task_date = ?`;
+    params.push(taskDate);
+  }
+  query += ` ORDER BY round_number DESC LIMIT 1`;
+  const r = await dbGet(query, params);
+  if (!r) return null;
+  const checkTime = r.check_time || (r.round_number === 1 ? '8.30 A.M.' : (r.round_number === 2 ? '02.00 P.M.' : '05.30 P.M.'));
+  return {
+    ...r,
+    round_title: `Task ${r.task_number}.${r.round_number} : Time ${checkTime}`,
+    check_time: checkTime,
+    added_devices: r.added_devices ? JSON.parse(r.added_devices) : [],
+    removed_devices: r.removed_devices ? JSON.parse(r.removed_devices) : []
+  };
+}
+
+async function updateTaskRound(roundId, updates = {}) {
+  const existing = await dbGet(`SELECT * FROM daily_task_rounds WHERE id = ?`, [roundId]);
+  if (!existing) throw new Error(`Round #${roundId} not found`);
+
+  const check_time = updates.check_time !== undefined ? updates.check_time.trim() : existing.check_time;
+  const round_name = updates.round_name !== undefined ? updates.round_name.trim() : existing.round_name;
+
+  await dbRun(`
+    UPDATE daily_task_rounds SET
+      check_time = ?,
+      round_name = ?
+    WHERE id = ?
+  `, [check_time, round_name, roundId]);
+
+  return await dbGet(`SELECT * FROM daily_task_rounds WHERE id = ?`, [roundId]);
+}
+
+async function compareTaskRound(taskNumber, taskDate, newRawTextOrTags) {
+  const tNum = parseInt(taskNumber) || 19;
+  const latestRound = await getLatestTaskRound(tNum, taskDate);
+  
+  let previousTags = [];
+  let prevRoundNumber = 0;
+  let prevRoundName = 'No Previous Round';
+
+  if (latestRound) {
+    prevRoundNumber = latestRound.round_number;
+    prevRoundName = latestRound.round_name || `Round ${latestRound.round_number}`;
+    if (latestRound.raw_list) {
+      previousTags = latestRound.raw_list.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    } else {
+      const recs = await dbAll(`SELECT taking_device FROM device_records WHERE task_number = ? ORDER BY id ASC`, [tNum]);
+      previousTags = recs.map(r => r.taking_device).filter(Boolean);
+    }
+  } else {
+    const recs = await dbAll(`SELECT taking_device FROM device_records WHERE task_number = ? ORDER BY id ASC`, [tNum]);
+    if (recs.length > 0) {
+      previousTags = recs.map(r => r.taking_device).filter(Boolean);
+      prevRoundNumber = 1;
+      prevRoundName = 'Round 1 (Initial)';
+    }
+  }
+
+  let newTags = [];
+  if (Array.isArray(newRawTextOrTags)) {
+    newTags = newRawTextOrTags.map(s => String(s).trim()).filter(Boolean);
+  } else if (typeof newRawTextOrTags === 'string') {
+    newTags = newRawTextOrTags.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  }
+
+  const { added, removed, retained } = compareDeviceLists(previousTags, newTags);
+  const nextRoundNumber = prevRoundNumber + 1;
+
+  return {
+    taskNumber: tNum,
+    taskDate: taskDate || '2026-11-19',
+    previousRoundNumber: prevRoundNumber,
+    previousRoundName: prevRoundName,
+    nextRoundNumber,
+    previousCount: previousTags.length,
+    newCount: newTags.length,
+    addedCount: added.length,
+    removedCount: removed.length,
+    retainedCount: retained.length,
+    addedDevices: added,
+    removedDevices: removed,
+    retainedDevices: retained
+  };
+}
+
+async function saveTaskRound({
+  task_number = 19,
+  task_date = '2026-11-19',
+  round_number = null,
+  round_name = '',
+  check_time = null,
+  rows = [],
+  raw_list = ''
+}) {
+  const tNum = parseInt(task_number) || 19;
+  const tDate = task_date || '2026-11-19';
+
+  const comparison = await compareTaskRound(tNum, tDate, raw_list || rows.map(r => r.taking_device));
+  const assignedRoundNumber = round_number || comparison.nextRoundNumber;
+  const assignedCheckTime = (check_time && check_time.trim())
+    ? check_time.trim()
+    : (assignedRoundNumber === 1 ? '8.30 A.M.' : (assignedRoundNumber === 2 ? '02.00 P.M.' : '05.30 P.M.'));
+  const assignedRoundName = round_name || `Task ${tNum}.${assignedRoundNumber}`;
+  const assignedRoundTitle = `Task ${tNum}.${assignedRoundNumber} : Time ${assignedCheckTime}`;
+
+  const addedNormSet = new Set(comparison.addedDevices.map(normalizeDeviceTag));
+
+  // Prepare full snapshot rows for records_json
+  const processedRows = rows.map((r, idx) => {
+    const isNew = assignedRoundNumber > 1 && addedNormSet.has(normalizeDeviceTag(r.taking_device)) ? 1 : 0;
+    const rowRound = isNew ? assignedRoundNumber : (assignedRoundNumber > 1 ? 1 : assignedRoundNumber);
+    const rowStatus = isNew ? 'new_taking' : 'retained';
+    return {
+      id: r.id || `round-${assignedRoundNumber}-${idx + 1}`,
+      emp_number: r.emp_number || (idx + 1),
+      name: (r.name || r.emp_name || String(idx + 1)).trim(),
+      shift: r.shift || 'Day',
+      group_name: r.group || r.group_name || '',
+      issued_at: r.issued_at || '7.30 A.M.',
+      return_time: r.return_time || '',
+      return_device: r.return_device || '',
+      taking_device: (r.taking_device || '').trim(),
+      handover_to: r.handover_to || '',
+      sign: r.sign || 'Done',
+      is_new_in_round: isNew,
+      round_number: rowRound,
+      prev_round_status: rowStatus,
+      check_time: assignedCheckTime
+    };
+  });
+
+  await dbRun(`
+    INSERT OR REPLACE INTO daily_task_rounds (
+      task_number, task_date, round_number, round_name, check_time, total_devices,
+      added_count, removed_count, retained_count, added_devices, removed_devices, raw_list, records_json, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+  `, [
+    tNum,
+    tDate,
+    assignedRoundNumber,
+    assignedRoundName,
+    assignedCheckTime,
+    rows.length,
+    assignedRoundNumber === 1 ? 0 : comparison.addedCount,
+    assignedRoundNumber === 1 ? 0 : comparison.removedCount,
+    assignedRoundNumber === 1 ? rows.length : comparison.retainedCount,
+    assignedRoundNumber === 1 ? '[]' : JSON.stringify(comparison.addedDevices),
+    assignedRoundNumber === 1 ? '[]' : JSON.stringify(comparison.removedDevices),
+    raw_list || rows.map(r => r.taking_device).join('\n'),
+    JSON.stringify(processedRows)
+  ]);
+
+  await dbRun(`DELETE FROM device_records WHERE task_number = ?`, [tNum]);
+
+  let insertedCount = 0;
+  for (const r of processedRows) {
+    const empName = (r.name || String(insertedCount + 1)).trim();
+    const takingDevice = (r.taking_device || '').trim();
+    if (!empName && !takingDevice) continue;
+
+    let details = (r.device_details || '').trim();
+    if (r.is_new_in_round) {
+      details = details ? `${details} | Round ${assignedRoundNumber} New Taking` : `Taking: ${takingDevice} (Round ${assignedRoundNumber} New Taking)`;
+    } else if (!details) {
+      details = `Taking: ${takingDevice}`;
+    }
+
+    await dbRun(`
+      INSERT INTO device_records (
+        name, shift, group_name, issued_at, return_time,
+        return_device, taking_device, device_details, handover_to, sign, active_user,
+        task_number, task_date, round_number, is_new_in_round, prev_round_status, check_time,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `, [
+      empName,
+      r.shift || 'Day',
+      r.group_name || '',
+      r.issued_at || '7.30 A.M.',
+      r.return_time || '',
+      r.return_device || '',
+      takingDevice,
+      details,
+      r.handover_to || '',
+      r.sign || 'Done',
+      r.handover_to ? r.handover_to : empName,
+      tNum,
+      tDate,
+      r.round_number,
+      r.is_new_in_round,
+      r.prev_round_status,
+      assignedCheckTime
+    ]);
+    insertedCount++;
+  }
+
+  await logHistoryEvent({
+    emp_name: 'System Admin',
+    action: `${assignedRoundTitle} Confirmed`,
+    shift: 'Day',
+    group_name: '',
+    return_device: comparison.removedDevices.join(', '),
+    taking_device: comparison.addedDevices.join(', '),
+    handover_to: '',
+    sign: 'Done',
+    admin_user: 'Shanaka',
+    details: `Saved ${assignedRoundTitle} with ${rows.length} total active devices. +${comparison.addedCount} newly added/taken (${comparison.addedDevices.join(', ')}), ${comparison.removedCount} returned/removed.`
+  });
+
+  return {
+    success: true,
+    task_number: tNum,
+    task_date: tDate,
+    round_number: assignedRoundNumber,
+    round_name: assignedRoundName,
+    check_time: assignedCheckTime,
+    round_title: assignedRoundTitle,
+    total_devices: rows.length,
+    added_count: comparison.addedCount,
+    removed_count: comparison.removedCount,
+    retained_count: comparison.retainedCount,
+    added_devices: comparison.addedDevices,
+    removed_devices: comparison.removedDevices
+  };
+}
+
+async function resolveDroppedDevice({ task_number = 19, round_number, device_tag, action, admin_user = 'Shanaka' }) {
+  if (!device_tag || !action) {
+    throw new Error('Device tag and action are required');
+  }
+
+  const tNum = parseInt(task_number) || 19;
+  const rNum = parseInt(round_number) || 2;
+  const cleanTag = device_tag.trim();
+  const normTag = normalizeDeviceTag(cleanTag);
+
+  // 1. Fetch round record
+  const round = await dbGet(`SELECT * FROM daily_task_rounds WHERE task_number = ? AND round_number = ?`, [tNum, rNum]);
+  if (!round) {
+    throw new Error(`Round #${rNum} for Task ${tNum} not found`);
+  }
+
+  const resolutionCheckTime = round.check_time || 'Office Returned';
+
+  let resolutions = {};
+  if (round.resolutions_json && round.resolutions_json.trim() !== '') {
+    try {
+      resolutions = JSON.parse(round.resolutions_json);
+    } catch (e) {}
+  }
+
+  resolutions[normTag] = {
+    status: action, // 'returned' or 'missing'
+    device_tag: cleanTag,
+    resolved_at: new Date().toISOString(),
+    resolved_by: admin_user,
+    check_time: resolutionCheckTime
+  };
+
+  // 2. Update daily_task_rounds resolutions_json
+  await dbRun(`UPDATE daily_task_rounds SET resolutions_json = ? WHERE id = ?`, [JSON.stringify(resolutions), round.id]);
+
+  // 3. Find any existing device_record matching this device in this task (checking taking_device OR return_device)
+  const existingMatches = await dbAll(`
+    SELECT id, taking_device, return_device FROM device_records 
+    WHERE task_number = ? AND (
+      LOWER(REPLACE(taking_device, ' ', '')) = ? OR
+      LOWER(REPLACE(return_device, ' ', '')) = ?
+    )
+  `, [tNum, normTag, normTag]);
+
+  // Also check previous tasks (e.g. task_number = tNum - 1)
+  const prevMatches = await dbAll(`
+    SELECT id, taking_device, return_device FROM device_records 
+    WHERE task_number = ? AND (
+      LOWER(REPLACE(taking_device, ' ', '')) = ? OR
+      LOWER(REPLACE(return_device, ' ', '')) = ?
+    )
+  `, [tNum - 1, normTag, normTag]);
+
+  if (action === 'returned') {
+    if (existingMatches.length > 0) {
+      const primeId = existingMatches[0].id;
+      await dbRun(`
+        UPDATE device_records SET
+          return_device = ?,
+          return_time = ?,
+          sign = 'Done',
+          device_details = CASE 
+            WHEN taking_device IS NOT NULL AND taking_device != '' THEN 'Return: ' || ? || ' | Taking: ' || taking_device 
+            ELSE 'Return: ' || ? 
+          END
+        WHERE id = ?
+      `, [cleanTag, resolutionCheckTime, cleanTag, cleanTag, primeId]);
+
+      // If duplicate rows exist from repeated previous clicks, remove extras
+      if (existingMatches.length > 1) {
+        const extraIds = existingMatches.slice(1).map(m => m.id);
+        await dbRun(`DELETE FROM device_records WHERE id IN (${extraIds.join(',')})`);
+      }
+    } else {
+      // Insert exactly ONE record
+      await dbRun(`
+        INSERT INTO device_records (
+          name, shift, issued_at, return_time, return_device, taking_device, device_details, sign, active_user, task_number, task_date, round_number, is_new_in_round, check_time
+        ) VALUES ('Office Return', 'Day', '7.30 A.M.', ?, ?, '', 'Return: ' || ?, 'Done', 'Office', ?, ?, ?, 0, ?)
+      `, [resolutionCheckTime, cleanTag, cleanTag, tNum, round.task_date || '2026-11-19', rNum, resolutionCheckTime]);
+    }
+
+    // Also update in previous task if it was taken in previous task
+    if (prevMatches.length > 0) {
+      for (const pm of prevMatches) {
+        await dbRun(`
+          UPDATE device_records SET
+            return_device = ?,
+            return_time = ?,
+            sign = 'Done',
+            device_details = 'Return: ' || ?
+          WHERE id = ?
+        `, [cleanTag, resolutionCheckTime, cleanTag, pm.id]);
+      }
+    }
+
+    await logHistoryEvent({
+      emp_name: admin_user,
+      action: 'Device Returned in Office',
+      shift: 'Day',
+      group_name: '',
+      return_device: cleanTag,
+      taking_device: '',
+      sign: 'Done',
+      admin_user,
+      details: `${cleanTag} was verified and marked as returned in office by ${admin_user}.`
+    });
+  } else if (action === 'missing') {
+    if (existingMatches.length > 0) {
+      const primeId = existingMatches[0].id;
+      await dbRun(`
+        UPDATE device_records SET
+          return_device = '',
+          return_time = '',
+          sign = 'Missing',
+          device_details = 'Missing Device (Not in Round Check)'
+        WHERE id = ?
+      `, [primeId]);
+
+      if (existingMatches.length > 1) {
+        const extraIds = existingMatches.slice(1).map(m => m.id);
+        await dbRun(`DELETE FROM device_records WHERE id IN (${extraIds.join(',')})`);
+      }
+    } else {
+      await dbRun(`
+        INSERT INTO device_records (
+          name, shift, issued_at, return_time, return_device, taking_device, device_details, sign, active_user, task_number, task_date, round_number, is_new_in_round, check_time
+        ) VALUES ('Missing Check', 'Day', '7.30 A.M.', '', '', ?, 'Missing Device (Not in Round Check)', 'Missing', 'Missing', ?, ?, ?, 0, ?)
+      `, [cleanTag, tNum, round.task_date || '2026-11-19', rNum, resolutionCheckTime]);
+    }
+
+    if (prevMatches.length > 0) {
+      for (const pm of prevMatches) {
+        await dbRun(`
+          UPDATE device_records SET
+            return_device = '',
+            return_time = '',
+            sign = 'Missing',
+            device_details = 'Missing Device (Not in Round Check)'
+          WHERE id = ?
+        `, [pm.id]);
+      }
+    }
+
+    await logHistoryEvent({
+      emp_name: admin_user,
+      action: 'Device Marked Missing',
+      shift: 'Day',
+      group_name: '',
+      return_device: '',
+      taking_device: cleanTag,
+      sign: 'Missing',
+      admin_user,
+      details: `${cleanTag} was missing in check and marked as MISSING by ${admin_user}.`
+    });
+  }
+
+  // 4. Update records_json in daily_task_rounds for this task if stored
+  const allRounds = await dbAll(`SELECT id, records_json, round_number FROM daily_task_rounds WHERE task_number = ?`, [tNum]);
+  for (const rndItem of allRounds) {
+    if (rndItem.records_json && rndItem.records_json !== '[]') {
+      try {
+        let recList = JSON.parse(rndItem.records_json);
+        let changed = false;
+        recList = recList.map(rec => {
+          if (normalizeDeviceTag(rec.taking_device) === normTag) {
+            changed = true;
+            if (action === 'returned') {
+              return {
+                ...rec,
+                return_device: cleanTag,
+                return_time: resolutionCheckTime,
+                sign: 'Done',
+                device_details: `Return: ${cleanTag} | Taking: ${rec.taking_device}`
+              };
+            } else {
+              return {
+                ...rec,
+                return_device: '',
+                return_time: '',
+                sign: 'Missing',
+                device_details: 'Missing Device'
+              };
+            }
+          }
+          return rec;
+        });
+        if (changed) {
+          await dbRun(`UPDATE daily_task_rounds SET records_json = ? WHERE id = ?`, [JSON.stringify(recList), rndItem.id]);
+        }
+      } catch (e) {}
+    }
+  }
+
+  return { success: true, resolutions, status: action, device_tag: cleanTag };
+}
+
 module.exports = {
   db,
   initDatabase,
@@ -1087,6 +2260,7 @@ module.exports = {
   getDashboardKPIs,
   getDailyTaskKPIs,
   getActiveDevicesList,
+  getHistoryAvailableDays,
   getAllGroups,
   addGroup,
   getAllShifts,
@@ -1094,7 +2268,14 @@ module.exports = {
   getAllUsers,
   createSystemUser,
   toggleUserActive,
+  toggleUserAnimation,
   deleteSystemUser,
+  getAllRoles,
+  addRole,
+  getAllDashboardAnimations,
+  toggleDashboardAnimation,
+  getActiveDashboardAnimation,
+  checkUserAnimationStatus,
   getAllPermissions,
   togglePermission,
   getHistoryLogs,
@@ -1109,6 +2290,15 @@ module.exports = {
   addInventoryItem,
   updateInventoryItem,
   deleteInventoryItem,
+  normalizeDeviceTag,
+  formatDeviceTag,
+  compareDeviceLists,
+  getTaskRounds,
+  getLatestTaskRound,
+  compareTaskRound,
+  saveTaskRound,
+  updateTaskRound,
+  resolveDroppedDevice,
   dbRun,
   dbGet,
   dbAll

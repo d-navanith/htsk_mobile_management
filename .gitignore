@@ -1,7 +1,13 @@
 # Node / Frontend
 node_modules/
 client/dist/
+server/public/
 .vite/
+
+# Deployment packages & archives
+monsterasp_deploy.zip
+publish_monsterasp/
+eng.traineddata
 
 # Local database & uploads
 server/*.sqlite

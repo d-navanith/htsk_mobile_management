@@ -46,17 +46,25 @@ export default function App() {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
     return localStorage.getItem('htsk_admin_authenticated') !== 'false';
   });
+  const [currentUser, setCurrentUser] = useState(() => {
+    return localStorage.getItem('htsk_current_user') || 'shanaka';
+  });
   const [activeTab, setActiveTab] = useState('dashboard');
   const [records, setRecords] = useState([]);
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [addModalContext, setAddModalContext] = useState({});
   const [editingRecord, setEditingRecord] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
-  const handleAdminLogin = () => {
+  const handleAdminLogin = (user) => {
     localStorage.setItem('htsk_admin_authenticated', 'true');
+    if (user) {
+      setCurrentUser(user);
+      localStorage.setItem('htsk_current_user', user);
+    }
     setIsAdminLoggedIn(true);
   };
 
@@ -264,7 +272,10 @@ export default function App() {
             <Dashboard
               records={records}
               loading={loading}
-              onOpenAddModal={() => setIsAddModalOpen(true)}
+              onOpenAddModal={ctx => {
+                setAddModalContext(ctx || {});
+                setIsAddModalOpen(true);
+              }}
               onOpenEditModal={record => setEditingRecord(record)}
               onDeleteRecord={handleDeleteRecord}
               onQuickReturn={handleQuickReturn}
@@ -272,6 +283,8 @@ export default function App() {
               onExportExcel={handleExportExcel}
               groups={groups}
               refreshRecords={fetchRecords}
+              setActiveTab={setActiveTab}
+              currentUser={currentUser}
               onLogout={handleAdminLogout}
             />
           )}
@@ -282,12 +295,13 @@ export default function App() {
               onDownloadTemplate={handleDownloadTemplate}
               setActiveTab={setActiveTab}
               groups={groups}
+              onLogout={handleAdminLogout}
             />
           )}
 
-          {activeTab === 'history' && <HistorySection />}
+          {activeTab === 'history' && <HistorySection onLogout={handleAdminLogout} />}
 
-          {activeTab === 'usermanage' && <UserManageSection />}
+          {activeTab === 'usermanage' && <UserManageSection currentUser={currentUser} onLogout={handleAdminLogout} />}
 
           {activeTab === 'dailytask' && (
             <DailyTaskSection
@@ -296,13 +310,14 @@ export default function App() {
               onDeleteRecord={handleDeleteRecord}
               groups={groups}
               refreshRecords={fetchRecords}
+              setActiveTab={setActiveTab}
               onLogout={handleAdminLogout}
             />
           )}
 
           {activeTab === 'inventory' && <InventorySection onLogout={handleAdminLogout} />}
 
-          {activeTab === 'settings' && <SettingsSection />}
+          {activeTab === 'settings' && <SettingsSection onLogout={handleAdminLogout} />}
         </ErrorBoundary>
       </main>
 
@@ -312,6 +327,7 @@ export default function App() {
         onClose={() => setIsAddModalOpen(false)}
         onSave={handleSaveManualRecord}
         groups={groups}
+        initialContext={addModalContext}
       />
 
       {/* Edit Record Modal */}

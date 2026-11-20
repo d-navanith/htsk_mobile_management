@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Clock, Plus, Smartphone, CheckCircle2, AlertCircle } from 'lucide-react';
 
-export default function ManualEntryModal({ isOpen, onClose, onSave, groups = [] }) {
+export default function ManualEntryModal({ isOpen, onClose, onSave, groups = [], initialContext = {} }) {
   const formatCurrentTime = () => {
     const now = new Date();
     let hours = now.getHours();
@@ -116,7 +116,9 @@ export default function ManualEntryModal({ isOpen, onClose, onSave, groups = [] 
         return_device: returnDevice.trim(),
         taking_device: takingDevice.trim(),
         handover_to: handoverTo.trim(),
-        sign: sign || 'Done'
+        sign: sign || 'Done',
+        task_number: initialContext?.task_number || undefined,
+        task_date: initialContext?.task_date || undefined
       });
 
       // Reset

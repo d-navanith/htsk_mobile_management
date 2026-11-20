@@ -19,7 +19,8 @@ export default function AdminLogin({ onLogin }) {
       (cleanUser === 'shanaka' || cleanUser === 'itadmin' || cleanUser === 'admin' || cleanUser === 'developer') &&
       (password === 'Admin@123' || password === 'Developer@123')
     ) {
-      onLogin();
+      localStorage.setItem('htsk_current_user', cleanUser);
+      onLogin(cleanUser);
     } else {
       setError('Invalid admin credentials. Please enter valid administrator credentials.');
     }

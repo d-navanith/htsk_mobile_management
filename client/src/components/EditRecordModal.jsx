@@ -15,7 +15,7 @@ export default function EditRecordModal({ isOpen, onClose, onUpdate, onDelete, r
 
   const [empName, setEmpName] = useState('');
   const [shift, setShift] = useState('Day');
-  const [group, setGroup] = useState('Group D');
+  const [group, setGroup] = useState('');
   const [issuedAt, setIssuedAt] = useState('7.30 A.M.');
   const [returnTime, setReturnTime] = useState('');
   const [returnDevice, setReturnDevice] = useState('');

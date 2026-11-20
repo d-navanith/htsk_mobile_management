@@ -18,6 +18,7 @@ const {
   getDashboardKPIs,
   getDailyTaskKPIs,
   getActiveDevicesList,
+  getHistoryAvailableDays,
   getAllGroups,
   addGroup,
   getAllShifts,
@@ -25,7 +26,14 @@ const {
   getAllUsers,
   createSystemUser,
   toggleUserActive,
+  toggleUserAnimation,
   deleteSystemUser,
+  getAllRoles,
+  addRole,
+  getAllDashboardAnimations,
+  toggleDashboardAnimation,
+  getActiveDashboardAnimation,
+  checkUserAnimationStatus,
   getAllPermissions,
   togglePermission,
   getHistoryLogs,
@@ -40,6 +48,15 @@ const {
   addInventoryItem,
   updateInventoryItem,
   deleteInventoryItem,
+  normalizeDeviceTag,
+  formatDeviceTag,
+  compareDeviceLists,
+  getTaskRounds,
+  getLatestTaskRound,
+  compareTaskRound,
+  saveTaskRound,
+  updateTaskRound,
+  resolveDroppedDevice,
   dbRun,
   dbGet,
   dbAll
@@ -282,12 +299,12 @@ function parseTextToRecords(fullText) {
 // 1. Get all records with filter query params
 app.get('/api/records', async (req, res) => {
   try {
-    const { search, group, shift, sign, task_number, task_date, all, current_active } = req.query;
+    const { search, group, shift, sign, task_number, task_date, all, current_active, round_number, only_new_in_round } = req.query;
     
     // If all === 'true', fetch across all tasks.
-    // If task_number is specified, fetch for that specific task.
-    // Otherwise (e.g. Dashboard view or current_active), default to the latest/current active task!
-    const isCurrentActive = current_active === 'true' || (task_number === undefined && all !== 'true');
+    // If task_number or task_date is specified, fetch for that specific task/date.
+    // Otherwise (e.g. Dashboard default or current_active), default to the latest/current active task!
+    const isCurrentActive = current_active === 'true' || (task_number === undefined && task_date === undefined && all !== 'true');
 
     const records = await getAllRecords({
       search,
@@ -296,7 +313,9 @@ app.get('/api/records', async (req, res) => {
       sign,
       task_number: task_number !== undefined && task_number !== 'all' ? parseInt(task_number) : undefined,
       task_date,
-      current_active: isCurrentActive
+      current_active: isCurrentActive,
+      round_number,
+      only_new_in_round
     });
     res.json({ success: true, data: records });
   } catch (err) {
@@ -418,7 +437,8 @@ app.delete('/api/records/:id', async (req, res) => {
 // 5. Dashboard KPIs metrics (159 stock, active count, available count, need an update count)
 app.get('/api/kpis', async (req, res) => {
   try {
-    const kpis = await getDashboardKPIs();
+    const { task_number, task_date } = req.query;
+    const kpis = await getDashboardKPIs(task_number, task_date);
     res.json({ success: true, data: kpis });
   } catch (err) {
     console.error('Error fetching KPIs:', err);
@@ -439,6 +459,100 @@ app.get('/api/daily-task/kpis', async (req, res) => {
   }
 });
 
+// 5c. Daily Task Rounds (Get intra-day calculation rounds and history)
+app.get('/api/daily-task/rounds', async (req, res) => {
+  try {
+    const taskNumber = req.query.task_number ? parseInt(req.query.task_number) : 19;
+    const taskDate = req.query.task_date || null;
+    const rounds = await getTaskRounds(taskNumber, taskDate);
+    const latestRound = await getLatestTaskRound(taskNumber, taskDate);
+    res.json({ success: true, data: rounds, latestRound });
+  } catch (err) {
+    console.error('Error fetching Daily Task rounds:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5d. Compare Daily Task Round (Diff incoming list with previous round)
+app.post('/api/daily-task/compare-rounds', async (req, res) => {
+  try {
+    const { task_number = 19, task_date = '2026-11-19', raw_text = '', device_list = [] } = req.body;
+    const comparison = await compareTaskRound(task_number, task_date, device_list && device_list.length > 0 ? device_list : raw_text);
+    res.json({ success: true, data: comparison });
+  } catch (err) {
+    console.error('Error comparing Daily Task rounds:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5e. Save Daily Task Round (Confirm new intra-day round)
+app.post('/api/daily-task/save-round', async (req, res) => {
+  try {
+    const {
+      task_number = 19,
+      task_date = '2026-11-19',
+      round_number,
+      round_name,
+      check_time,
+      rows = [],
+      raw_list = ''
+    } = req.body;
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ success: false, error: 'No device rows provided to save round.' });
+    }
+
+    const result = await saveTaskRound({
+      task_number,
+      task_date,
+      round_number,
+      round_name,
+      check_time,
+      rows,
+      raw_list
+    });
+
+    res.json({ success: true, data: result });
+  } catch (err) {
+    console.error('Error saving Daily Task round:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5f. Update Daily Task Round (e.g. edit check_time or round_name)
+app.put('/api/daily-task/rounds/:id', async (req, res) => {
+  try {
+    const roundId = parseInt(req.params.id);
+    const { check_time, round_name } = req.body;
+    const updated = await updateTaskRound(roundId, { check_time, round_name });
+    res.json({ success: true, data: updated });
+  } catch (err) {
+    console.error('Error updating task round:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5g. Resolve Dropped / Missing Device in Round Check (Mark as Returned or Missing)
+app.post('/api/daily-task/resolve-device', async (req, res) => {
+  try {
+    const { task_number, round_number, device_tag, action, admin_user } = req.body;
+    if (!device_tag || !action) {
+      return res.status(400).json({ success: false, error: 'device_tag and action (returned/missing) are required' });
+    }
+    const result = await resolveDroppedDevice({
+      task_number: task_number ? parseInt(task_number) : 19,
+      round_number: round_number ? parseInt(round_number) : 2,
+      device_tag,
+      action,
+      admin_user: admin_user || 'Shanaka'
+    });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('Error resolving device:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // 6. Active Devices list (table-wise view of who is actively using each device)
 app.get('/api/active-devices', async (req, res) => {
   try {
@@ -453,7 +567,8 @@ app.get('/api/active-devices', async (req, res) => {
 // 6b. Inventory Management API
 app.get('/api/inventory', async (req, res) => {
   try {
-    const data = await getAllInventoryItems();
+    const { task_number, task_date } = req.query;
+    const data = await getAllInventoryItems({ task_number, task_date });
     res.json({ success: true, ...data });
   } catch (err) {
     console.error('Error fetching inventory:', err);
@@ -574,11 +689,76 @@ app.put('/api/users/:id/toggle', async (req, res) => {
   }
 });
 
+app.put('/api/users/:id/toggle-animation', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { animation_enabled } = req.body;
+    await toggleUserAnimation(id, animation_enabled);
+    res.json({ success: true, message: 'User animation permission updated successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.delete('/api/users/:id', async (req, res) => {
   try {
     const { id } = req.params;
     await deleteSystemUser(id);
     res.json({ success: true, message: 'User deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Roles Management (Admin can add custom roles)
+app.get('/api/roles', async (req, res) => {
+  try {
+    const roles = await getAllRoles();
+    res.json({ success: true, data: roles });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/roles', async (req, res) => {
+  try {
+    const { role_name, description } = req.body;
+    if (!role_name || !role_name.trim()) {
+      return res.status(400).json({ success: false, error: 'Role name is required' });
+    }
+    const updatedRoles = await addRole(role_name, description);
+    res.status(201).json({ success: true, message: `Role "${role_name.trim()}" created successfully`, data: updatedRoles });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Dashboard Animation Management (Matching user screenshot: "One animation can use one time only")
+app.get('/api/dashboard-animations', async (req, res) => {
+  try {
+    const animations = await getAllDashboardAnimations();
+    res.json({ success: true, data: animations });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.put('/api/dashboard-animations/:id/toggle', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { is_enabled } = req.body;
+    const updated = await toggleDashboardAnimation(id, is_enabled);
+    res.json({ success: true, message: 'Animation status updated successfully', data: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/user-animation-status', async (req, res) => {
+  try {
+    const { username } = req.query;
+    const status = await checkUserAnimationStatus(username);
+    res.json({ success: true, ...status });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -608,11 +788,13 @@ app.put('/api/permissions/:id/toggle', async (req, res) => {
 // 11. History & Audit Logs
 app.get('/api/history', async (req, res) => {
   try {
-    const [activeDevices, historyLogs, auditLogins, batches] = await Promise.all([
-      getActiveDevicesList(),
+    const { task_number, task_date, all } = req.query;
+    const [activeDevices, historyLogs, auditLogins, batches, availableDays] = await Promise.all([
+      getActiveDevicesList({ task_number, task_date, all }),
       getHistoryLogs(),
       getAuditLogins(),
-      getAllBatches()
+      getAllBatches(),
+      getHistoryAvailableDays()
     ]);
 
     res.json({
@@ -620,7 +802,8 @@ app.get('/api/history', async (req, res) => {
       activeDevices,
       historyLogs,
       auditLogins,
-      batches
+      batches,
+      availableDays
     });
   } catch (err) {
     console.error('Error fetching history data:', err);
@@ -907,13 +1090,17 @@ app.post('/api/upload/parse-quick-list', (req, res) => {
   }
 });
 
-// 14c. Quick Device List Confirm & Import
+// 14c. Quick Device List Confirm & Import (Supports Multi-Round Tracking & Comparison)
 app.post('/api/upload/quick-list', async (req, res) => {
   try {
     const {
       rows,
-      task_number = 17,
-      task_date = '2026-08-17',
+      task_number = 19,
+      task_date = '2026-11-19',
+      round_number,
+      round_name,
+      check_time,
+      raw_list = '',
       replaceMode = false
     } = req.body;
 
@@ -921,48 +1108,32 @@ app.post('/api/upload/quick-list', async (req, res) => {
       return res.status(400).json({ success: false, error: 'No rows provided to import' });
     }
 
-    const tNum = parseInt(task_number) || 17;
-    const tDate = task_date || '2026-08-17';
+    const tNum = parseInt(task_number) || 19;
+    const tDate = task_date || '2026-11-19';
 
-    if (replaceMode) {
-      await dbRun(`DELETE FROM device_records WHERE task_number = ?`, [tNum]);
-    }
-
-    let insertedCount = 0;
-    for (const r of rows) {
-      const empName = (r.name || r.emp_name || String(insertedCount + 1)).trim();
-      const takingDevice = (r.taking_device || '').trim();
-      if (!empName && !takingDevice) continue;
-
-      await insertDeviceRecord({
-        name: empName,
-        shift: r.shift || 'Day',
-        group: r.group || '',
-        issued_at: r.issued_at || '7.30 A.M.',
-        return_time: r.return_time || '',
-        return_device: r.return_device || '',
-        taking_device: takingDevice,
-        handover_to: r.handover_to || '',
-        sign: r.sign || 'Done',
-        admin_user: 'Shanaka',
-        task_number: tNum,
-        task_date: tDate
-      });
-      insertedCount++;
-    }
+    const roundResult = await saveTaskRound({
+      task_number: tNum,
+      task_date: tDate,
+      round_number,
+      round_name,
+      check_time,
+      rows,
+      raw_list: raw_list || rows.map(r => r.taking_device).join('\n')
+    });
 
     await createUploadBatch(
-      `quick_daily_task_${tNum}_list.txt`,
+      `quick_daily_task_${tNum}_round_${roundResult.round_number}.txt`,
       rows.length,
-      insertedCount
+      roundResult.total_devices
     );
 
     res.json({
       success: true,
       task_number: tNum,
       task_date: tDate,
-      insertedCount,
-      message: `Successfully imported ${insertedCount} Today Active Mobiles for Task ${tNum}!`
+      insertedCount: roundResult.total_devices,
+      roundResult,
+      message: `Successfully imported ${roundResult.total_devices} Today Active Mobiles for Task ${tNum} (${roundResult.round_name})! (+${roundResult.added_count} newly taken)`
     });
   } catch (err) {
     console.error('Error importing quick list:', err);
@@ -1057,8 +1228,22 @@ app.get('/api/export', async (req, res) => {
 });
 
 // Serve static client build if it exists
-const clientDist = path.join(__dirname, '..', 'client', 'dist');
-if (fs.existsSync(clientDist)) {
+const possibleDistPaths = [
+  path.join(__dirname, '..', 'client', 'dist'),
+  path.join(__dirname, 'dist'),
+  path.join(__dirname, 'client', 'dist'),
+  path.join(__dirname, 'public')
+];
+
+let clientDist = null;
+for (const p of possibleDistPaths) {
+  if (fs.existsSync(p)) {
+    clientDist = p;
+    break;
+  }
+}
+
+if (clientDist) {
   app.use(express.static(clientDist, {
     setHeaders: (res, filePath) => {
       if (filePath.endsWith('.html')) {

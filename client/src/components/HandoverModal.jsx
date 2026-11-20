@@ -11,7 +11,7 @@ export default function HandoverModal({ isOpen, onClose, record, onSuccess, allE
   const [outgoingId, setOutgoingId] = useState('EMP-' + String(record.id).padStart(4, '0'));
   const [incomingName, setIncomingName] = useState(targetShift === 'Night Shift' ? 'Shehan Perera' : '');
   const [incomingId, setIncomingId] = useState(targetShift === 'Night Shift' ? 'EMP-0842' : '');
-  const [incomingGroup, setIncomingGroup] = useState(record.group || 'Group D');
+  const [incomingGroup, setIncomingGroup] = useState(record.group || record.group_name || '');
   const [handoverTime, setHandoverTime] = useState(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
   const [deviceCondition, setDeviceCondition] = useState(record.device_condition || 'Working');
   const [deviceIssues, setDeviceIssues] = useState(record.device_issues === 'None' ? '' : (record.device_issues || ''));

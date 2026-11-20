@@ -15,7 +15,7 @@ import {
   EyeOff
 } from 'lucide-react';
 
-export default function SettingsSection() {
+export default function SettingsSection({ onLogout = () => {} }) {
   // Shift timing states (matching Image 2)
   const [morningStart, setMorningStart] = useState('06:00 AM');
   const [morningEnd, setMorningEnd] = useState('06:00 PM');
@@ -220,15 +220,44 @@ export default function SettingsSection() {
   };
 
   return (
-    <div style={{ maxWidth: '1360px', margin: '0 auto', paddingBottom: '60px' }}>
-      {/* 2-Column Layout matching Image 2 */}
+    <div className="responsive-section-container">
+      {/* Top Header matching system theme */}
+      <div className="responsive-header">
+        <div>
+          <h1 className="system-h1">
+            Mobile Management
+          </h1>
+          <p className="system-breadcrumb">
+            <span>Workspace / Settings</span>
+            <span>•</span>
+            <strong style={{ color: '#111827' }}>System &amp; Shift Configuration</strong>
+          </p>
+        </div>
+
+        <div
+          className="desktop-only-profile user-profile-capsule"
+          onClick={onLogout}
+          title="Click to Logout"
+        >
+          <img
+            src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
+            alt="Shanaka"
+            style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
+          />
+          <span style={{ fontSize: '13.5px', fontWeight: 600, color: '#1f2937' }}>
+            Shanaka
+          </span>
+        </div>
+      </div>
+
+      {/* 2-Column Layout */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr', gap: '40px', marginBottom: '40px' }}>
-        {/* LEFT COLUMN: System & Shift Settings (Image 2) */}
+        {/* LEFT COLUMN: System & Shift Settings */}
         <div>
           <div style={{ marginBottom: '22px' }}>
-            <h1 style={{ fontSize: '26px', fontWeight: 700, color: '#111827', margin: 0 }}>
+            <h2 className="system-h2">
               System &amp; Shift Settings
-            </h1>
+            </h2>
             <div style={{ fontSize: '13px', color: '#9ca3af', marginTop: '4px' }}>
               Workspace / Administration / Shift Configuration
             </div>
@@ -474,16 +503,7 @@ export default function SettingsSection() {
             <div>
               <button
                 type="submit"
-                style={{
-                  backgroundColor: '#84cc16',
-                  color: '#000000',
-                  fontWeight: 800,
-                  fontSize: '14px',
-                  padding: '11px 26px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  cursor: 'pointer'
-                }}
+                className="btn-primary-lime"
               >
                 Save Shift Configuration
               </button>
@@ -494,9 +514,9 @@ export default function SettingsSection() {
         {/* RIGHT COLUMN: Group Settings (Image 2) */}
         <div>
           <div style={{ marginBottom: '22px' }}>
-            <h1 style={{ fontSize: '26px', fontWeight: 700, color: '#111827', margin: 0 }}>
+            <h2 className="system-h2">
               Group Settings
-            </h1>
+            </h2>
             <div style={{ fontSize: '13px', color: '#9ca3af', marginTop: '4px' }}>
               Workspace / Administration / Group Settings
             </div>
@@ -577,16 +597,7 @@ export default function SettingsSection() {
               <div>
                 <button
                   type="submit"
-                  style={{
-                    backgroundColor: '#84cc16',
-                    color: '#000000',
-                    fontWeight: 800,
-                    fontSize: '14px',
-                    padding: '10px 24px',
-                    borderRadius: '10px',
-                    border: 'none',
-                    cursor: 'pointer'
-                  }}
+                  className="btn-primary-lime"
                 >
                   Save Group
                 </button>

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   UploadCloud,
   FileSpreadsheet,
@@ -12,7 +12,8 @@ import {
   Eye,
   RefreshCw,
   Copy,
-  Plus
+  Plus,
+  Sparkles
 } from 'lucide-react';
 
 const SAMPLE_DEVICE_LIST = `New 68
@@ -89,7 +90,8 @@ export default function UpdateSection({
   onImportSuccess = () => {},
   onDownloadTemplate = () => {},
   setActiveTab = () => {},
-  groups = []
+  groups = [],
+  onLogout = () => {}
 }) {
   // Tab mode: 'quick' (Daily Mobile List) vs 'sheet' (File Dropzone)
   const [activeMode, setActiveMode] = useState('quick');
@@ -102,6 +104,16 @@ export default function UpdateSection({
     return `${y}-${m}-${d}`;
   };
 
+  // Helper to format check time matching mockup: e.g. '8.30 A.M.', '02.00 P.M.'
+  const formatCheckTime = (d = new Date()) => {
+    let hours = d.getHours();
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'P.M.' : 'A.M.';
+    hours = hours % 12;
+    if (hours === 0) hours = 12;
+    return `${hours}.${minutes} ${ampm}`;
+  };
+
   // Quick List Form State
   const [rawText, setRawText] = useState('');
   const [startNumber, setStartNumber] = useState(1);
@@ -112,6 +124,7 @@ export default function UpdateSection({
   const [defaultGroup, setDefaultGroup] = useState('');
   const [defaultIssuedAt, setDefaultIssuedAt] = useState('7.30 A.M.');
   const [replaceMode, setReplaceMode] = useState(true);
+  const [checkTime, setCheckTime] = useState(() => formatCheckTime(new Date()));
 
   // Synchronize Task Date <-> Target Daily Task #
   const handleTaskDateChange = (newDateStr) => {
@@ -154,8 +167,33 @@ export default function UpdateSection({
   const [errorMessage, setErrorMessage] = useState('');
   const [successBanner, setSuccessBanner] = useState(null);
 
-  // Generate Preview from Quick Text List
-  const handleGenerateQuickPreview = () => {
+  // Intra-Day Rounds & Diff Comparison State
+  const [taskRounds, setTaskRounds] = useState([]);
+  const [latestRound, setLatestRound] = useState(null);
+  const [comparisonData, setComparisonData] = useState(null);
+  const [previewFilter, setPreviewFilter] = useState('all'); // 'all', 'new', 'retained'
+
+  // Fetch rounds whenever targetTaskNumber or targetTaskDate changes
+  const fetchTaskRounds = async (num, dateStr) => {
+    try {
+      const res = await fetch(`/api/daily-task/rounds?task_number=${num || 19}&task_date=${dateStr || ''}`);
+      const data = await res.json();
+      if (data.success) {
+        setTaskRounds(data.data || []);
+        const latest = data.latestRound || (data.data && data.data[data.data.length - 1]) || null;
+        setLatestRound(latest);
+      }
+    } catch (e) {
+      console.error('Failed to fetch task rounds:', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchTaskRounds(targetTaskNumber, targetTaskDate);
+  }, [targetTaskNumber, targetTaskDate]);
+
+  // Generate Preview from Quick Text List & Live Compare with Previous Round
+  const handleGenerateQuickPreview = async () => {
     setErrorMessage('');
     setSuccessBanner(null);
 
@@ -200,7 +238,9 @@ export default function UpdateSection({
           taking_device: item,
           handover_to: '',
           sign: 'Done',
-          isValid: true
+          isValid: true,
+          isNewInRound: false,
+          roundNumber: 1
         });
 
         currentNum++;
@@ -210,6 +250,41 @@ export default function UpdateSection({
     if (rows.length === 0) {
       setErrorMessage('No valid device tags found in the provided text.');
       return;
+    }
+
+    // Call compare-rounds API to get real diff against previous round
+    try {
+      const compRes = await fetch('/api/daily-task/compare-rounds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          task_number: targetTaskNumber,
+          task_date: targetTaskDate,
+          device_list: rows.map(r => r.taking_device)
+        })
+      });
+      const compJson = await compRes.json();
+      if (compJson.success && compJson.data) {
+        const comp = compJson.data;
+        setComparisonData(comp);
+
+        const norm = s => {
+          if (!s) return '';
+          let str = String(s).trim().toLowerCase();
+          const m = str.match(/^([a-z]+)\s*0*(\d+)$/i);
+          if (m) return `${m[1]}${parseInt(m[2], 10)}`;
+          return str.replace(/\s+/g, '');
+        };
+
+        const addedNormSet = new Set((comp.addedDevices || []).map(norm));
+        rows.forEach(r => {
+          const isNew = addedNormSet.has(norm(r.taking_device));
+          r.isNewInRound = isNew;
+          r.roundNumber = isNew ? comp.nextRoundNumber : (comp.previousRoundNumber || 1);
+        });
+      }
+    } catch (e) {
+      console.error('Error fetching comparison:', e);
     }
 
     setPreviewRows(rows);
@@ -329,6 +404,9 @@ export default function UpdateSection({
             rows: previewRows,
             task_number: targetTaskNumber,
             task_date: targetTaskDate,
+            round_number: comparisonData ? comparisonData.nextRoundNumber : undefined,
+            check_time: checkTime,
+            raw_list: rawText,
             replaceMode
           })
         });
@@ -338,14 +416,19 @@ export default function UpdateSection({
           throw new Error(result.error || 'Failed to import quick list');
         }
 
+        const roundInfo = result.roundResult;
         setSuccessBanner({
-          title: `Successfully imported ${result.insertedCount || previewRows.length} Today Active Mobiles!`,
-          message: `All ${result.insertedCount} devices have been recorded with numbered EMP. Names for Task ${targetTaskNumber} (${targetTaskDate}).`,
+          title: `Successfully Saved ${roundInfo ? roundInfo.round_name : 'Daily Task'} (${result.insertedCount || previewRows.length} Active Mobiles)!`,
+          message: roundInfo && roundInfo.added_count > 0
+            ? `Recorded ${roundInfo.total_devices} active devices for Task ${targetTaskNumber}. Highlighted ${roundInfo.added_count} newly taken devices (${roundInfo.added_devices.slice(0, 5).join(', ')}${roundInfo.added_devices.length > 5 ? '...' : ''}).`
+            : `All ${result.insertedCount} devices recorded for Task ${targetTaskNumber} (${targetTaskDate}).`,
           taskNumber: targetTaskNumber,
           count: result.insertedCount
         });
         setPreviewRows([]);
         setRawText('');
+        setComparisonData(null);
+        fetchTaskRounds(targetTaskNumber, targetTaskDate);
       } else {
         const response = await fetch('/api/upload/confirm', {
           method: 'POST',
@@ -387,65 +470,84 @@ export default function UpdateSection({
   };
 
   return (
-    <div className="responsive-section-container" style={{ maxWidth: '1360px', margin: '0 auto', paddingBottom: '40px' }}>
-      {/* Header */}
-      <div className="responsive-header" style={{ borderBottom: '1px solid #e5e7eb', paddingBottom: '16px' }}>
+    <div className="responsive-section-container">
+      {/* Header matching system theme */}
+      <div className="responsive-header">
         <div>
-          <h1 style={{ fontSize: '32px', fontWeight: 700, color: '#111827', margin: 0, letterSpacing: '-0.02em' }}>
+          <h1 className="system-h1">
             Mobile Management
           </h1>
-          <div style={{ fontSize: '13px', color: '#9ca3af', marginTop: '4px', fontWeight: 500 }}>
-            Workspace / Update &amp; Bulk Active Devices
-          </div>
+          <p className="system-breadcrumb">
+            <span>Workspace / Update</span>
+            <span>•</span>
+            <strong style={{ color: '#111827' }}>Bulk Active Devices &amp; Fast Sheet Upload</strong>
+          </p>
         </div>
 
-        {/* Mode Switcher Tabs */}
-        <div style={{ display: 'flex', gap: '8px', backgroundColor: '#f3f4f6', padding: '4px', borderRadius: '12px' }}>
-          <button
-            type="button"
-            onClick={() => { setActiveMode('quick'); setErrorMessage(''); }}
-            style={{
-              padding: '8px 18px',
-              borderRadius: '9px',
-              border: 'none',
-              fontSize: '13px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              backgroundColor: activeMode === 'quick' ? '#ffffff' : 'transparent',
-              color: activeMode === 'quick' ? '#111827' : '#6b7280',
-              boxShadow: activeMode === 'quick' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <Smartphone size={16} color={activeMode === 'quick' ? '#84cc16' : '#6b7280'} />
-            <span>Quick Daily Mobile List</span>
-          </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+          {/* Mode Switcher Tabs */}
+          <div style={{ display: 'flex', gap: '8px', backgroundColor: '#f3f4f6', padding: '4px', borderRadius: '12px' }}>
+            <button
+              type="button"
+              onClick={() => { setActiveMode('quick'); setErrorMessage(''); }}
+              style={{
+                padding: '8px 18px',
+                borderRadius: '9px',
+                border: 'none',
+                fontSize: '13px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                backgroundColor: activeMode === 'quick' ? '#ffffff' : 'transparent',
+                color: activeMode === 'quick' ? '#111827' : '#6b7280',
+                boxShadow: activeMode === 'quick' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Smartphone size={16} color={activeMode === 'quick' ? '#84cc16' : '#6b7280'} />
+              <span>Quick Daily Mobile List</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => { setActiveMode('sheet'); setErrorMessage(''); }}
-            style={{
-              padding: '8px 18px',
-              borderRadius: '9px',
-              border: 'none',
-              fontSize: '13px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              backgroundColor: activeMode === 'sheet' ? '#ffffff' : 'transparent',
-              color: activeMode === 'sheet' ? '#111827' : '#6b7280',
-              boxShadow: activeMode === 'sheet' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-              transition: 'all 0.15s ease'
-            }}
+            <button
+              type="button"
+              onClick={() => { setActiveMode('sheet'); setErrorMessage(''); }}
+              style={{
+                padding: '8px 18px',
+                borderRadius: '9px',
+                border: 'none',
+                fontSize: '13px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                backgroundColor: activeMode === 'sheet' ? '#ffffff' : 'transparent',
+                color: activeMode === 'sheet' ? '#111827' : '#6b7280',
+                boxShadow: activeMode === 'sheet' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <FileSpreadsheet size={16} color={activeMode === 'sheet' ? '#2563eb' : '#6b7280'} />
+              <span>Document / Sheet Upload</span>
+            </button>
+          </div>
+
+          <div
+            className="desktop-only-profile user-profile-capsule"
+            onClick={onLogout}
+            title="Click to Logout"
           >
-            <FileSpreadsheet size={16} color={activeMode === 'sheet' ? '#2563eb' : '#6b7280'} />
-            <span>Document / Sheet Upload</span>
-          </button>
+            <img
+              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
+              alt="Shanaka"
+              style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
+            />
+            <span style={{ fontSize: '13.5px', fontWeight: 600, color: '#1f2937' }}>
+              Shanaka
+            </span>
+          </div>
         </div>
       </div>
 
@@ -744,6 +846,68 @@ export default function UpdateSection({
                 {replaceMode ? 'Clears previous day records and sets new' : 'Adds to current list'}
               </span>
             </div>
+
+            {/* List Checked Time matching user mockup (e.g. 8.30 A.M., 02.00 P.M.) */}
+            <div>
+              <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
+                List Checked Time
+              </label>
+              <input
+                type="text"
+                value={checkTime}
+                onChange={e => setCheckTime(e.target.value)}
+                placeholder="e.g. 8.30 A.M."
+                style={{
+                  width: '100%',
+                  padding: '9px 12px',
+                  borderRadius: '8px',
+                  border: '1.5px solid #d1d5db',
+                  fontSize: '13.5px',
+                  fontWeight: 700,
+                  color: '#0f766e',
+                  boxSizing: 'border-box'
+                }}
+              />
+              <span style={{ fontSize: '11px', color: '#9ca3af' }}>Time checked (e.g. 8.30 A.M.)</span>
+            </div>
+
+            {/* Live Intra-day Round Tracking Status Indicator */}
+            <div style={{
+              gridColumn: '1 / -1',
+              backgroundColor: '#f0fdf4',
+              border: '1.5px solid #84cc16',
+              borderRadius: '12px',
+              padding: '12px 18px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '10px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#16a34a', display: 'inline-block' }} />
+                <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#166534' }}>
+                  Intra-day Task #{targetTaskNumber} ({targetTaskDate}) Round Status
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
+                {taskRounds.length > 0 ? (
+                  <>
+                    <span style={{ color: '#4b5563' }}>
+                      Current: <strong>Task {targetTaskNumber}.{latestRound?.round_number || 1} : Time {latestRound?.check_time || '8.30 A.M.'} ({latestRound?.total_devices || 0} Mobiles)</strong>
+                    </span>
+                    <span style={{ color: '#84cc16', fontWeight: 800 }}>➔</span>
+                    <span style={{ backgroundColor: '#15803d', color: '#ffffff', padding: '3px 10px', borderRadius: '6px', fontWeight: 800, fontSize: '11.5px' }}>
+                      Next: Task {targetTaskNumber}.{(latestRound?.round_number || 1) + 1} : Time {checkTime}
+                    </span>
+                  </>
+                ) : (
+                  <span style={{ backgroundColor: '#dcfce7', color: '#15803d', padding: '3px 10px', borderRadius: '6px', fontWeight: 700 }}>
+                    Initial Round: Task {targetTaskNumber}.1 : Time {checkTime}
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Textarea Input Section */}
@@ -998,6 +1162,123 @@ export default function UpdateSection({
           )}
         </div>
 
+        {/* Live Intra-Day Comparison & Diff Box */}
+        {comparisonData && (
+          <div style={{
+            backgroundColor: '#ffffff',
+            border: '1.5px solid #84cc16',
+            borderRadius: '16px',
+            padding: '16px 20px',
+            marginBottom: '20px',
+            boxShadow: '0 4px 12px rgba(132, 204, 22, 0.08)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Sparkles size={18} color="#65a30d" />
+                <span style={{ fontSize: '15px', fontWeight: 800, color: '#14532d' }}>
+                  Intra-day Comparison: Round {comparisonData.previousRoundNumber} ({comparisonData.previousCount} Mobiles) ➔ Round {comparisonData.nextRoundNumber} ({comparisonData.newCount} Mobiles)
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => setPreviewFilter('all')}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    border: previewFilter === 'all' ? '1.5px solid #84cc16' : '1px solid #d1d5db',
+                    backgroundColor: previewFilter === 'all' ? '#ecfccb' : '#ffffff',
+                    color: previewFilter === 'all' ? '#3f6212' : '#374151'
+                  }}
+                >
+                  All ({previewRows.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewFilter('new')}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    border: previewFilter === 'new' ? '1.5px solid #16a34a' : '1px solid #d1d5db',
+                    backgroundColor: previewFilter === 'new' ? '#dcfce7' : '#ffffff',
+                    color: previewFilter === 'new' ? '#15803d' : '#374151'
+                  }}
+                >
+                  🟢 Newly Added (+{comparisonData.addedCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewFilter('retained')}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    border: previewFilter === 'retained' ? '1.5px solid #3b82f6' : '1px solid #d1d5db',
+                    backgroundColor: previewFilter === 'retained' ? '#eff6ff' : '#ffffff',
+                    color: previewFilter === 'retained' ? '#1d4ed8' : '#374151'
+                  }}
+                >
+                  ⚪ Retained ({comparisonData.retainedCount})
+                </button>
+              </div>
+            </div>
+
+            {/* Stat breakdown tiles */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
+              {/* Tile 1: Newly Added Taking */}
+              <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '12px 14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12.5px', fontWeight: 800, color: '#166534' }}>🟢 Newly Added Taking Mobiles</span>
+                  <span style={{ fontSize: '18px', fontWeight: 800, color: '#15803d' }}>+{comparisonData.addedCount}</span>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '8px', maxHeight: '100px', overflowY: 'auto' }}>
+                  {comparisonData.addedDevices.map((dev, i) => (
+                    <span key={i} style={{ backgroundColor: '#15803d', color: '#ffffff', fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '6px' }}>
+                      {dev}
+                    </span>
+                  ))}
+                  {comparisonData.addedDevices.length === 0 && <span style={{ fontSize: '12px', color: '#6b7280' }}>None</span>}
+                </div>
+              </div>
+
+              {/* Tile 2: Returned / Missing */}
+              <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', padding: '12px 14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12.5px', fontWeight: 800, color: '#991b1b' }}>🔴 Returned / Missing Mobiles</span>
+                  <span style={{ fontSize: '18px', fontWeight: 800, color: '#b91c1c' }}>{comparisonData.removedCount}</span>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '8px', maxHeight: '100px', overflowY: 'auto' }}>
+                  {comparisonData.removedDevices.map((dev, i) => (
+                    <span key={i} style={{ backgroundColor: '#ef4444', color: '#ffffff', fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '6px' }}>
+                      {dev}
+                    </span>
+                  ))}
+                  {comparisonData.removedDevices.length === 0 && <span style={{ fontSize: '12px', color: '#6b7280' }}>None (All previous active phones retained)</span>}
+                </div>
+              </div>
+
+              {/* Tile 3: Retained Continuing */}
+              <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px 14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12.5px', fontWeight: 800, color: '#334155' }}>⚪ Continuing From Round {comparisonData.previousRoundNumber}</span>
+                  <span style={{ fontSize: '18px', fontWeight: 800, color: '#334155' }}>{comparisonData.retainedCount}</span>
+                </div>
+                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '8px', lineHeight: 1.4 }}>
+                  {comparisonData.retainedCount} mobile devices were already in Round {comparisonData.previousRoundNumber} and continue actively assigned.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {previewRows.length === 0 ? (
           /* Empty Placeholder Box matching mockup */
           <div style={{
@@ -1055,89 +1336,122 @@ export default function UpdateSection({
                 </tr>
               </thead>
               <tbody>
-                {previewRows.map((row, idx) => (
-                  <tr key={row.id || idx} style={{ borderBottom: '1px solid #f3f4f6', backgroundColor: idx % 2 === 0 ? '#ffffff' : '#fcfdfc' }}>
-                    <td style={{ padding: '10px 14px', fontSize: '13px', fontWeight: 700, textAlign: 'center', borderRight: '1px solid #e5e7eb' }}>
-                      {idx + 1}.
-                    </td>
-
-                    {/* EMP. Name (Editable number or name) */}
-                    <td style={{ padding: '8px 14px', borderRight: '1px solid #e5e7eb' }}>
-                      <input
-                        type="text"
-                        value={row.name}
-                        onChange={e => handleUpdatePreviewRow(idx, 'name', e.target.value)}
+                {previewRows
+                  .filter(r => {
+                    if (previewFilter === 'new') return r.isNewInRound;
+                    if (previewFilter === 'retained') return !r.isNewInRound;
+                    return true;
+                  })
+                  .map((row, idx) => {
+                    const isNew = Boolean(row.isNewInRound);
+                    return (
+                      <tr
+                        key={row.id || idx}
                         style={{
-                          width: '100%',
-                          padding: '6px 10px',
-                          borderRadius: '6px',
-                          border: '1px solid #cbd5e1',
-                          fontSize: '13.5px',
-                          fontWeight: 700,
-                          color: '#111827',
-                          backgroundColor: '#ffffff'
+                          borderBottom: '1px solid #f3f4f6',
+                          backgroundColor: isNew ? '#f0fdf4' : (idx % 2 === 0 ? '#ffffff' : '#fcfdfc'),
+                          transition: 'background-color 0.15s ease'
                         }}
-                        title="Edit EMP. Name / Number"
-                      />
-                    </td>
-
-                    {/* Taking Device (Editable) */}
-                    <td style={{ padding: '8px 14px', borderRight: '1px solid #e5e7eb' }}>
-                      <input
-                        type="text"
-                        value={row.taking_device}
-                        onChange={e => handleUpdatePreviewRow(idx, 'taking_device', e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '6px 10px',
-                          borderRadius: '6px',
-                          border: '1px solid #cbd5e1',
-                          fontSize: '13.5px',
-                          fontWeight: 700,
-                          color: '#0284c7',
-                          backgroundColor: '#f0f9ff'
-                        }}
-                        title="Edit Taking Device"
-                      />
-                    </td>
-
-                    <td style={{ padding: '10px 14px', fontSize: '13px', fontWeight: 600, borderRight: '1px solid #e5e7eb' }}>
-                      {row.shift || 'Day'}
-                    </td>
-
-                    <td style={{ padding: '10px 14px', fontSize: '13px', color: row.group ? '#111827' : '#9ca3af', borderRight: '1px solid #e5e7eb' }}>
-                      {row.group || '—'}
-                    </td>
-
-                    <td style={{ padding: '10px 14px', fontSize: '12.5px', color: '#4b5563', borderRight: '1px solid #e5e7eb' }}>
-                      {row.issued_at || '7.30 A.M.'}
-                    </td>
-
-                    <td style={{ padding: '10px 14px', textAlign: 'center', borderRight: '1px solid #e5e7eb' }}>
-                      <span style={{
-                        backgroundColor: '#dcfce7',
-                        color: '#15803d',
-                        fontWeight: 700,
-                        fontSize: '12px',
-                        padding: '3px 10px',
-                        borderRadius: '9999px'
-                      }}>
-                        {row.sign || 'Done'}
-                      </span>
-                    </td>
-
-                    <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                      <button
-                        type="button"
-                        onClick={() => handleDeletePreviewRow(idx)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
-                        title="Remove row"
                       >
-                        <Trash2 size={16} color="#ef4444" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                        <td style={{ padding: '10px 14px', fontSize: '13px', fontWeight: 700, textAlign: 'center', borderRight: '1px solid #e5e7eb' }}>
+                          {idx + 1}.
+                        </td>
+
+                        {/* EMP. Name (Editable number or name) */}
+                        <td style={{ padding: '8px 14px', borderRight: '1px solid #e5e7eb' }}>
+                          <input
+                            type="text"
+                            value={row.name}
+                            onChange={e => handleUpdatePreviewRow(idx, 'name', e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '6px 10px',
+                              borderRadius: '6px',
+                              border: isNew ? '1.5px solid #86efac' : '1px solid #cbd5e1',
+                              fontSize: '13.5px',
+                              fontWeight: 700,
+                              color: '#111827',
+                              backgroundColor: '#ffffff'
+                            }}
+                            title="Edit EMP. Name / Number"
+                          />
+                        </td>
+
+                        {/* Taking Device (Editable with + NEW TAKING badge) */}
+                        <td style={{ padding: '8px 14px', borderRight: '1px solid #e5e7eb' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <input
+                              type="text"
+                              value={row.taking_device}
+                              onChange={e => handleUpdatePreviewRow(idx, 'taking_device', e.target.value)}
+                              style={{
+                                width: '100%',
+                                padding: '6px 10px',
+                                borderRadius: '6px',
+                                border: isNew ? '1.5px solid #22c55e' : '1px solid #cbd5e1',
+                                fontSize: '13.5px',
+                                fontWeight: 700,
+                                color: isNew ? '#15803d' : '#0284c7',
+                                backgroundColor: isNew ? '#ecfdf5' : '#f0f9ff'
+                              }}
+                              title="Edit Taking Device"
+                            />
+                            {isNew && (
+                              <span style={{
+                                backgroundColor: '#15803d',
+                                color: '#ffffff',
+                                fontSize: '10px',
+                                fontWeight: 800,
+                                padding: '3px 8px',
+                                borderRadius: '6px',
+                                whiteSpace: 'nowrap',
+                                letterSpacing: '0.02em',
+                                boxShadow: '0 1px 3px rgba(21, 128, 61, 0.25)'
+                              }}>
+                                + NEW TAKING (R{row.roundNumber || 2})
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        <td style={{ padding: '10px 14px', fontSize: '13px', fontWeight: 600, borderRight: '1px solid #e5e7eb' }}>
+                          {row.shift || 'Day'}
+                        </td>
+
+                        <td style={{ padding: '10px 14px', fontSize: '13px', color: row.group ? '#111827' : '#9ca3af', borderRight: '1px solid #e5e7eb' }}>
+                          {row.group || '—'}
+                        </td>
+
+                        <td style={{ padding: '10px 14px', fontSize: '12.5px', color: '#4b5563', borderRight: '1px solid #e5e7eb' }}>
+                          {row.issued_at || '7.30 A.M.'}
+                        </td>
+
+                        <td style={{ padding: '10px 14px', textAlign: 'center', borderRight: '1px solid #e5e7eb' }}>
+                          <span style={{
+                            backgroundColor: '#dcfce7',
+                            color: '#15803d',
+                            fontWeight: 700,
+                            fontSize: '12px',
+                            padding: '3px 10px',
+                            borderRadius: '9999px'
+                          }}>
+                            {row.sign || 'Done'}
+                          </span>
+                        </td>
+
+                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePreviewRow(idx)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+                            title="Remove row"
+                          >
+                            <Trash2 size={16} color="#ef4444" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
               </tbody>
             </table>
           </div>
@@ -1151,7 +1465,12 @@ export default function UpdateSection({
         <div style={{ fontSize: '13px', color: '#6b7280' }}>
           {previewRows.length > 0 ? (
             <span>
-              Target: <strong>Task {targetTaskNumber}</strong> ({targetTaskDate}) &bull; Ready to import <strong>{previewRows.length}</strong> active devices
+              Target: <strong>Task {targetTaskNumber}</strong> ({targetTaskDate}) &bull; Ready to save <strong>{previewRows.length}</strong> active devices
+              {comparisonData && comparisonData.addedCount > 0 && (
+                <span style={{ marginLeft: '6px', color: '#15803d', fontWeight: 700 }}>
+                  (+{comparisonData.addedCount} newly taken in Round {comparisonData.nextRoundNumber})
+                </span>
+              )}
             </span>
           ) : (
             'Generate preview above to enable confirmation.'
@@ -1178,11 +1497,13 @@ export default function UpdateSection({
           }}
         >
           {confirming ? (
-            <span>Confirming &amp; Importing...</span>
+            <span>Confirming &amp; Saving Round...</span>
           ) : (
             <>
               <CheckCircle size={18} />
-              <span>Confirm &amp; Set Today Active Mobiles ({previewRows.length})</span>
+              <span>
+                Confirm &amp; Save {comparisonData ? `Round ${comparisonData.nextRoundNumber}` : 'Daily Task'} ({previewRows.length} Mobiles)
+              </span>
             </>
           )}
         </button>

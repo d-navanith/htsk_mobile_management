@@ -5,7 +5,7 @@ export default function LateHandoverModal({ isOpen, onClose, record, onSuccess }
   if (!isOpen || !record) return null;
 
   const [actualReceiver, setActualReceiver] = useState('');
-  const [receiverGroup, setReceiverGroup] = useState(record.group || 'Group B');
+  const [receiverGroup, setReceiverGroup] = useState(record.group || record.group_name || '');
   const [actualHandoverTime, setActualHandoverTime] = useState('06:05 PM');
   const [reason, setReason] = useState('Physical device was handed over at shift change, but both employees forgot to log into system at 06:00 PM.');
   const [enteredBy, setEnteredBy] = useState('Admin (IT Support)');

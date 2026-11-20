@@ -22,8 +22,12 @@
 }
 
 html, body {
-  overflow-x: hidden;
+  height: 100%;
+  width: 100%;
   max-width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
 body {
@@ -31,7 +35,7 @@ body {
   background-color: #ffffff;
   color: var(--text-main);
   -webkit-font-smoothing: antialiased;
-  min-height: 100vh;
+  height: 100%;
 }
 
 button {
@@ -66,21 +70,32 @@ input, select, textarea {
 /* App Container */
 .app-layout {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  max-height: 100vh;
   width: 100%;
   max-width: 100vw;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
 /* Sidebar styling */
 .sidebar {
   width: 230px;
   min-width: 230px;
+  height: 100vh;
+  max-height: 100vh;
+  position: sticky;
+  top: 0;
+  left: 0;
+  flex-shrink: 0;
   background-color: var(--sidebar-bg);
   border-right: 1px solid var(--sidebar-border);
   padding: 32px 20px;
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
+  overflow-y: auto;
+  overflow-x: hidden;
+  z-index: 50;
 }
 
 .brand-logo {
@@ -153,10 +168,113 @@ input, select, textarea {
 .main-content {
   flex: 1 1 0%;
   min-width: 0;
+  height: 100vh;
+  max-height: 100vh;
   width: 100%;
   padding: 36px 48px;
   overflow-y: auto;
-  max-width: 1400px;
+  overflow-x: auto;
+  position: relative;
+}
+
+/* Unified Typography & Theme Components */
+.system-h1 {
+  font-size: 28px !important;
+  font-weight: 800 !important;
+  color: #111827 !important;
+  margin: 0 !important;
+  letter-spacing: -0.02em !important;
+}
+
+.system-h2 {
+  font-size: 20px !important;
+  font-weight: 800 !important;
+  color: #111827 !important;
+  margin: 0 !important;
+  letter-spacing: -0.01em !important;
+}
+
+.system-h3 {
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  color: #111827 !important;
+  margin: 0 !important;
+}
+
+.system-breadcrumb {
+  font-size: 13px !important;
+  color: #6b7280 !important;
+  margin: 4px 0 0 0 !important;
+  font-weight: 500 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  flex-wrap: wrap !important;
+}
+
+.btn-primary-lime {
+  background-color: #84cc16 !important;
+  color: #000000 !important;
+  font-weight: 800 !important;
+  font-size: 13.5px !important;
+  padding: 9px 20px !important;
+  border-radius: 9px !important;
+  border: none !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  box-shadow: 0 1px 3px rgba(132, 204, 22, 0.2) !important;
+  transition: all 0.15s ease-in-out !important;
+}
+
+.btn-primary-lime:hover {
+  background-color: #72bf12 !important;
+}
+
+.btn-secondary-white {
+  background-color: #ffffff !important;
+  border: 1px solid #d1d5db !important;
+  color: #374151 !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  padding: 8px 16px !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  transition: all 0.15s ease-in-out !important;
+}
+
+.btn-secondary-white:hover {
+  background-color: #f9fafb !important;
+}
+
+.stock-badge-pill {
+  background-color: #f0fdf4 !important;
+  border: 1.5px solid #84cc16 !important;
+  color: #3f6212 !important;
+  font-weight: 800 !important;
+  font-size: 13px !important;
+  padding: 7px 18px !important;
+  border-radius: 10px !important;
+  letter-spacing: 0.01em !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.user-profile-capsule {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  background-color: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 9999px !important;
+  padding: 4px 14px 4px 6px !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+  cursor: pointer !important;
 }
 
 /* Page Header */
@@ -754,6 +872,175 @@ input, select, textarea {
   display: block;
 }
 
+/* Daily Task Round Card (Modular task container with dedicated scroll option) */
+.daily-task-round-card {
+  background-color: #ffffff;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 18px;
+  padding: 20px 22px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  margin-bottom: 28px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.daily-task-card-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Dedicated Scroll Container for each Task / Round table */
+.daily-task-table-scroll {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  max-height: 420px;
+  overflow-y: auto;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+  background-color: #ffffff;
+}
+
+/* Sleek modern scrollbars for each task table */
+.daily-task-table-scroll::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+.daily-task-table-scroll::-webkit-scrollbar-track {
+  background: #f8fafc;
+  border-radius: 8px;
+}
+
+.daily-task-table-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 8px;
+}
+
+.daily-task-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.daily-task-table-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f8fafc;
+}
+
+/* Table structure with sticky headers */
+.daily-task-table {
+  width: 100%;
+  min-width: 960px;
+  border-collapse: separate;
+  border-spacing: 0;
+  text-align: left;
+}
+
+.daily-task-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.daily-task-table thead tr {
+  background-color: #ffffff;
+}
+
+.daily-task-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: #ffffff;
+  border-bottom: 1.5px solid #e5e7eb;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+/* Clickable KPI Cards & Circular Arrow Button matching user mockup */
+.clickable-kpi-card {
+  cursor: pointer;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  user-select: none;
+}
+
+.clickable-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.07);
+}
+
+.clickable-kpi-card:active {
+  transform: translateY(0);
+}
+
+.card-arrow-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #4b5563;
+  flex-shrink: 0;
+  transition: background-color 0.2s ease, transform 0.2s ease, color 0.2s ease;
+  border: none;
+  cursor: pointer;
+}
+
+.clickable-kpi-card:hover .card-arrow-btn {
+  background-color: #e5e7eb;
+  color: #111827;
+  transform: translate(1px, -1px);
+}
+
+/* Snowflake Animation strictly inside targeted cards/calendar */
+.card-snow-container {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 0;
+}
+
+.snowflake-item {
+  position: absolute;
+  top: -25px;
+  user-select: none;
+  pointer-events: none;
+  will-change: top, transform, opacity;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+@keyframes cardSnowFall {
+  0% {
+    top: -25px;
+    opacity: 0;
+  }
+  8% {
+    opacity: var(--snow-opacity, 0.65);
+  }
+  88% {
+    opacity: var(--snow-opacity, 0.65);
+  }
+  100% {
+    top: calc(100% + 18px);
+    opacity: 0;
+  }
+}
+
+@keyframes cardSnowSway {
+  0%, 100% {
+    transform: translateX(0) rotate(0deg);
+  }
+  50% {
+    transform: translateX(var(--snow-sway, 12px)) rotate(180deg);
+  }
+}
+
 .responsive-modal-card {
   width: 100%;
   max-width: 620px;
@@ -786,11 +1073,26 @@ input, select, textarea {
 
 /* Tablet & Mobile Screens (< 1024px) */
 @media screen and (max-width: 1023px) {
+  html, body {
+    height: auto !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+
   .app-layout {
     flex-direction: column !important;
+    height: auto !important;
+    max-height: none !important;
     min-height: 100vh;
     width: 100%;
     position: relative;
+    overflow: visible !important;
+  }
+
+  .main-content {
+    height: auto !important;
+    max-height: none !important;
+    overflow-y: visible !important;
   }
 
   .mobile-header {

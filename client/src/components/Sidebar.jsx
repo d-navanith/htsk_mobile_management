@@ -26,7 +26,6 @@ export default function Sidebar({
 
       <aside
         className={`sidebar ${isMobileOpen ? 'mobile-open' : ''}`}
-        style={{ display: 'flex', flexDirection: 'column', height: '100vh', justifyContent: 'space-between' }}
       >
         <div>
           {/* Brand Logo & Mobile Close button */}
@@ -43,7 +42,7 @@ export default function Sidebar({
             </button>
           </div>
 
-          {/* Navigation Menu matching user mockup order */}
+          {/* Navigation Menu matching user requested flow */}
           <nav className="nav-menu">
             <button
               className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
@@ -62,19 +61,11 @@ export default function Sidebar({
             </button>
 
             <button
-              className={`nav-item ${activeTab === 'history' ? 'active' : ''}`}
-              onClick={() => handleNavClick('history')}
+              className={`nav-item ${activeTab === 'inventory' ? 'active' : ''}`}
+              onClick={() => handleNavClick('inventory')}
             >
-              <History />
-              <span>History</span>
-            </button>
-
-            <button
-              className={`nav-item ${activeTab === 'usermanage' ? 'active' : ''}`}
-              onClick={() => handleNavClick('usermanage')}
-            >
-              <User />
-              <span>User manage</span>
+              <Package />
+              <span>Inventory</span>
             </button>
 
             <button
@@ -86,11 +77,19 @@ export default function Sidebar({
             </button>
 
             <button
-              className={`nav-item ${activeTab === 'inventory' ? 'active' : ''}`}
-              onClick={() => handleNavClick('inventory')}
+              className={`nav-item ${activeTab === 'usermanage' ? 'active' : ''}`}
+              onClick={() => handleNavClick('usermanage')}
             >
-              <Package />
-              <span>Inventory</span>
+              <User />
+              <span>User manage</span>
+            </button>
+
+            <button
+              className={`nav-item ${activeTab === 'history' ? 'active' : ''}`}
+              onClick={() => handleNavClick('history')}
+            >
+              <History />
+              <span>History</span>
             </button>
 
             <button

@@ -32,7 +32,10 @@ class ErrorBoundary extends React.Component {
           <h2 style={{ color: '#ef4444', fontSize: '20px', fontWeight: 800 }}>Section Error</h2>
           <p style={{ color: '#6b7280', margin: '8px 0' }}>{this.state.error?.message || 'Error loading content.'}</p>
           <button
-            onClick={() => this.setState({ hasError: false, error: null })}
+            onClick={() => {
+              this.setState({ hasError: false, error: null });
+              window.location.reload();
+            }}
             style={{ marginTop: '12px', padding: '8px 20px', borderRadius: '8px', backgroundColor: '#84cc16', color: '#000', fontWeight: 800, border: 'none', cursor: 'pointer' }}
           >
             Reload Section

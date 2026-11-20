@@ -1513,39 +1513,94 @@ const possibleDistPaths = [
   path.join(__dirname, 'public')
 ];
 
+// Clean up stale hashed bundles in all static folders so old cached chunks can never be served
+for (const distPath of possibleDistPaths) {
+  try {
+    const indexHtmlPath = path.join(distPath, 'index.html');
+    const assetsDir = path.join(distPath, 'assets');
+    if (fs.existsSync(indexHtmlPath) && fs.existsSync(assetsDir)) {
+      const htmlContent = fs.readFileSync(indexHtmlPath, 'utf8');
+      const allAssets = fs.readdirSync(assetsDir);
+      for (const file of allAssets) {
+        if ((file.startsWith('index-') && (file.endsWith('.js') || file.endsWith('.css'))) || file === 'index.js') {
+          if (!htmlContent.includes(file)) {
+            try {
+              fs.unlinkSync(path.join(assetsDir, file));
+            } catch (_) {}
+          }
+        }
+      }
+    }
+  } catch (_) {}
+}
+
 let clientDist = null;
 for (const p of possibleDistPaths) {
-  if (fs.existsSync(p)) {
+  if (fs.existsSync(path.join(p, 'index.html'))) {
     clientDist = p;
     break;
   }
 }
 
 if (clientDist) {
-  app.use(express.static(clientDist, {
-    setHeaders: (res, filePath) => {
-      if (filePath.endsWith('.html')) {
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
+  // Helper to resolve the active JS or CSS bundle referenced by index.html
+  const getActiveAssetFile = (ext) => {
+    try {
+      const assetsDir = path.join(clientDist, 'assets');
+      if (!fs.existsSync(assetsDir)) return null;
+      const indexHtmlPath = path.join(clientDist, 'index.html');
+      if (fs.existsSync(indexHtmlPath)) {
+        const html = fs.readFileSync(indexHtmlPath, 'utf8');
+        const files = fs.readdirSync(assetsDir).filter(f => f.endsWith(ext));
+        const match = files.find(f => html.includes(f));
+        if (match) return path.join(assetsDir, match);
       }
+      const files = fs.readdirSync(assetsDir)
+        .filter(f => f.endsWith(ext))
+        .map(f => ({ name: f, mtime: fs.statSync(path.join(assetsDir, f)).mtimeMs }))
+        .sort((a, b) => b.mtime - a.mtime);
+      return files.length > 0 ? path.join(assetsDir, files[0].name) : null;
+    } catch (_) {
+      return null;
+    }
+  };
+
+  // Intercept /assets/*.js and /assets/*.css before express.static so even stale cached HTML always loads the latest bundle
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && req.path.startsWith('/assets/')) {
+      if (req.path.endsWith('.js')) {
+        const activeJs = getActiveAssetFile('.js');
+        if (activeJs && fs.existsSync(activeJs)) {
+          res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+          return res.sendFile(activeJs);
+        }
+      } else if (req.path.endsWith('.css')) {
+        const activeCss = getActiveAssetFile('.css');
+        if (activeCss && fs.existsSync(activeCss)) {
+          res.setHeader('Content-Type', 'text/css; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+          return res.sendFile(activeCss);
+        }
+      }
+    }
+    next();
+  });
+
+  app.use(express.static(clientDist, {
+    setHeaders: (res) => {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
     }
   }));
 
   app.use((req, res, next) => {
     if (req.method === 'GET' && !req.path.startsWith('/api')) {
-      // If any stale JS chunk is requested by a cached browser tab, serve the active JS bundle
-      if (req.path.startsWith('/assets/') && req.path.endsWith('.js')) {
-        const assetsDir = path.join(clientDist, 'assets');
-        if (fs.existsSync(assetsDir)) {
-          const jsFiles = fs.readdirSync(assetsDir).filter(f => f.endsWith('.js'));
-          if (jsFiles.length > 0) {
-            res.setHeader('Content-Type', 'application/javascript');
-            return res.sendFile(path.join(assetsDir, jsFiles[0]));
-          }
-        }
-      }
-
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');

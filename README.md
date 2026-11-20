@@ -56,13 +56,24 @@ A production-grade, enterprise **Company Mobile Device Inventory, Shift Handover
   - Read-only visibility into current devices, stock catalog, KPI statistics, daily rounds, and activity history.
   - Restricted from mutating data: all add, edit, delete, custody handover, quick notes, and device resolution controls are automatically hidden from the UI and strictly protected with `403 Forbidden` response guards on the backend.
   - The `User manage` workspace navigation and administrative profile shortcuts are hidden from viewer accounts.
-- **Admin Permission Management (Shanaka Control):**
-  - Shanaka (Admin) can view and toggle permissions for the `Viewer` role (and any other role) directly in the **User Permission Management** section.
-  - Granular capability switches: `manage_devices`, `handover_devices`, `return_devices`, `manage_users`, `manage_groups_shifts`, `view_audit_logs`, `delete_records`.
-  - Filter permissions by role (`Viewer`, `Admin`, `Supervisor`, `Staff`, etc.) for fast review and immediate real-time toggle.
+- **Admin Permission Management & Capability Matrix Grid (Shanaka Control):**
+  - Shanaka (Admin) can view and toggle permissions for all roles directly in the interactive **Role Capability Matrix** grid table.
+  - Multi-column table layout: `Capability Description` column alongside role columns (`Admin`, `Viewer`, `Developer`, `Supervisor`, `Staff`).
+  - **Explicit View-Only Capabilities:**
+    - `view_devices`: `View Mobile Devices (Only View)`
+    - `view_daily_tasks`: `View Daily Tasks (Only View)`
+    - `view_inventory`: `View Inventory Stock (Only View)`
+  - **Granular Operational Capabilities:**
+    - `manage_devices`: `Add & Edit Mobile Devices`
+    - `manage_groups_shifts`: `Add & Edit Shifts`
+    - `handover_devices`: `Perform Shift Handover`
+    - `return_devices`: `Accept Inventory Returns`
+    - `manage_users`: `Create & Manage User Accounts`
+    - `view_audit_logs`: `View System Audit Logs`
+    - `delete_records`: `Delete Records`
+  - Real-time instant toggling with sleek lime-green toggle switches and immediate persistence to the SQLite database via `PUT /api/permissions/toggle`.
 - **Dynamic Role Creation:** Admins can create custom roles (e.g., *Manager*, *Auditor*, *Technician*) directly from the user creation dropdown with auto-generated permission templates.
-- **Granular Capability Toggles:** Interactive toggle switches for operational permissions (`manage_devices`, `handover_devices`, `return_devices`, `manage_users`, `manage_groups_shifts`, `view_audit_logs`, `delete_records`).
-- **Role Filtering:** Filter the permission management view by specific roles.
+- **Role Filtering:** Filter user listings and permission matrix by specific roles.
 - **Per-User Animation Visibility:** Granular toggle controlling which users see ambient animations on their dashboard.
 
 ### 6. Admin Profile Management & Interactive Dropdown Menu

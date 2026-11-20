@@ -41,6 +41,7 @@ const {
   getAllPermissions,
   getUserPermissionsByRole,
   togglePermission,
+  togglePermissionByRoleAndKey,
   getHistoryLogs,
   getAuditLogins,
   recordAuditLogin,
@@ -865,6 +866,20 @@ app.put('/api/permissions/:id/toggle', requireCapability('manage_users'), async 
     const { is_enabled } = req.body;
     await togglePermission(id, is_enabled);
     res.json({ success: true, message: 'Permission toggled successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Toggle permission by role and permission_key (supporting matrix grid toggles)
+app.put('/api/permissions/toggle', requireCapability('manage_users'), async (req, res) => {
+  try {
+    const { role, permission_key, is_enabled } = req.body;
+    if (!role || !permission_key) {
+      return res.status(400).json({ success: false, error: 'role and permission_key are required' });
+    }
+    const updated = await togglePermissionByRoleAndKey(role, permission_key, is_enabled);
+    res.json({ success: true, message: `Permission toggled for ${role}`, data: updated });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

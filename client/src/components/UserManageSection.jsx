@@ -326,6 +326,88 @@ export default function UserManageSection({
     }
   };
 
+  // Canonical Capabilities list matching user mockup & View Only capabilities
+  const SYSTEM_CAPABILITIES = [
+    { key: 'manage_devices', label: 'Add & Edit Mobile Devices' },
+    { key: 'manage_groups_shifts', label: 'Add & Edit Shifts' },
+    { key: 'view_devices', label: 'View Mobile Devices (Only View)' },
+    { key: 'view_daily_tasks', label: 'View Daily Tasks (Only View)' },
+    { key: 'view_inventory', label: 'View Inventory Stock (Only View)' },
+    { key: 'handover_devices', label: 'Perform Shift Handover' },
+    { key: 'return_devices', label: 'Accept Inventory Returns' },
+    { key: 'manage_users', label: 'Create & Manage User Accounts' },
+    { key: 'view_audit_logs', label: 'View System Audit Logs' },
+    { key: 'delete_records', label: 'Delete Records' }
+  ];
+
+  // Derive roles ensuring Admin, Viewer, Developer lead first matching user mockup
+  const displayRoles = useMemo(() => {
+    const priority = ['Admin', 'Viewer', 'Developer'];
+    const allRoles = Array.from(new Set([
+      ...roles,
+      ...permissions.map(p => p.role)
+    ])).filter(Boolean);
+
+    const leading = priority.filter(pr => allRoles.some(r => r.toLowerCase() === pr.toLowerCase()));
+    const rest = allRoles.filter(r => !priority.some(pr => pr.toLowerCase() === r.toLowerCase()));
+    return [...leading, ...rest];
+  }, [roles, permissions]);
+
+  // Lookup map: `${role.toLowerCase()}_${key}` => perm object
+  const permLookup = useMemo(() => {
+    const map = {};
+    permissions.forEach(p => {
+      const k = `${p.role?.toLowerCase()}_${p.permission_key}`;
+      map[k] = p;
+    });
+    return map;
+  }, [permissions]);
+
+  // Toggle permission cell in the matrix
+  const handleToggleCell = async (roleName, permKey) => {
+    const lookupKey = `${roleName.toLowerCase()}_${permKey}`;
+    const existing = permLookup[lookupKey];
+    const currentStatus = existing ? existing.is_enabled : (roleName.toLowerCase() === 'admin' || roleName.toLowerCase() === 'developer' ? 1 : 0);
+    const nextStatus = currentStatus ? 0 : 1;
+
+    // Optimistic UI update
+    setPermissions(prev => {
+      const idx = prev.findIndex(p => p.role?.toLowerCase() === roleName.toLowerCase() && p.permission_key === permKey);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = { ...copy[idx], is_enabled: nextStatus };
+        return copy;
+      } else {
+        return [...prev, {
+          id: 'temp_' + Date.now(),
+          role: roleName,
+          permission_key: permKey,
+          permission_label: permKey,
+          is_enabled: nextStatus
+        }];
+      }
+    });
+
+    try {
+      if (existing && existing.id && typeof existing.id === 'number') {
+        await fetch(`/api/permissions/${existing.id}/toggle`, {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ is_enabled: nextStatus })
+        });
+      } else {
+        await fetch('/api/permissions/toggle', {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ role: roleName, permission_key: permKey, is_enabled: nextStatus })
+        });
+      }
+    } catch (e) {
+      console.error('Failed to toggle permission:', e);
+      loadData();
+    }
+  };
+
   // Toggle Permission Switch
   const handleTogglePermission = async (permId, currentStatus) => {
     try {
@@ -751,7 +833,7 @@ export default function UserManageSection({
         </table>
       </div>
 
-      {/* SECTION 3: USER PERMISSION MANAGEMENT (WITH TOGGLE BUTTONS) */}
+      {/* SECTION 3: USER PERMISSION MANAGEMENT (CAPABILITY MATRIX MATCHING MOCKUP) */}
       <div style={{
         backgroundColor: '#ffffff',
         borderRadius: '16px',
@@ -759,112 +841,87 @@ export default function UserManageSection({
         padding: '24px',
         boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px', flexWrap: 'wrap', gap: '14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Key size={20} color="#84cc16" />
-            <div>
-              <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#111827', margin: 0 }}>
-                User Permission Management
-              </h2>
-              <p style={{ fontSize: '12.5px', color: '#6b7280', margin: '2px 0 0' }}>
-                Granular role-based capability toggles with live toggle switches
-              </p>
-            </div>
-          </div>
-
-          {/* Filter by Role */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Filter size={15} color="#4b5563" />
-            <label style={{ fontSize: '12.5px', fontWeight: 600, color: '#374151' }}>
-              Filter by Role:
-            </label>
-            <select
-              value={selectedPermRole}
-              onChange={e => setSelectedPermRole(e.target.value)}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '8px',
-                border: '1.5px solid #d1d5db',
-                fontSize: '13px',
-                fontWeight: 600,
-                color: '#1f2937',
-                backgroundColor: '#ffffff',
-                cursor: 'pointer',
-                outline: 'none'
-              }}
-            >
-              <option value="All">All Roles ({permissions.length})</option>
-              {Array.from(new Set(permissions.map(p => p.role))).map(r => (
-                <option key={r} value={r}>{r}</option>
-              ))}
-            </select>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+          <Key size={20} color="#84cc16" />
+          <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#111827', margin: 0 }}>
+            User Permission Management
+          </h2>
         </div>
 
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-          <thead>
-            <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-              <th style={{ padding: '12px 16px', fontSize: '12.5px', color: '#4b5563' }}>Role</th>
-              <th style={{ padding: '12px 16px', fontSize: '12.5px', color: '#4b5563' }}>Permission Key</th>
-              <th style={{ padding: '12px 16px', fontSize: '12.5px', color: '#4b5563' }}>Capability Description</th>
-              <th style={{ padding: '12px 16px', fontSize: '12.5px', color: '#4b5563', textAlign: 'center' }}>Access Status</th>
-              <th style={{ padding: '12px 16px', fontSize: '12.5px', color: '#4b5563', textAlign: 'center' }}>Toggle Switch</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(selectedPermRole === 'All'
-              ? permissions
-              : permissions.filter(p => p.role?.toLowerCase() === selectedPermRole.toLowerCase())
-            ).map(p => (
-              <tr key={p.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                <td style={{ padding: '12px 16px', fontSize: '13.5px', fontWeight: 700 }}>
-                  <span style={{
-                    backgroundColor: p.role === 'Admin' ? '#f4fce8' : (p.role === 'Supervisor' ? '#eff6ff' : (p.role === 'Viewer' ? '#e0f2fe' : '#f3f4f6')),
-                    color: p.role === 'Admin' ? '#166534' : (p.role === 'Supervisor' ? '#1e40af' : (p.role === 'Viewer' ? '#0369a1' : '#374151')),
-                    padding: '3px 10px',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    fontWeight: 800,
-                    border: p.role === 'Viewer' ? '1px solid #bae6fd' : (p.role === 'Admin' ? '1px solid #bbf7d0' : 'none')
-                  }}>
-                    {p.role}
-                  </span>
-                </td>
-                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#6b7280', fontFamily: 'monospace' }}>
-                  {p.permission_key}
-                </td>
-                <td style={{ padding: '12px 16px', fontSize: '13.5px', color: '#111827', fontWeight: 500 }}>
-                  {p.permission_label}
-                </td>
-                <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                  <span style={{
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    color: p.is_enabled ? '#15803d' : '#9ca3af'
-                  }}>
-                    {p.is_enabled ? 'Enabled' : 'Disabled'}
-                  </span>
-                </td>
-                <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                  <button
-                    onClick={() => handleTogglePermission(p.id, p.is_enabled)}
-                    style={{
-                      cursor: 'pointer',
-                      border: 'none',
-                      background: 'none',
-                      color: p.is_enabled ? '#84cc16' : '#9ca3af',
-                      display: 'inline-flex',
-                      alignItems: 'center'
-                    }}
-                    title="Click to toggle permission"
-                  >
-                    {p.is_enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
-                  </button>
-                </td>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', minWidth: '600px', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                <th style={{ padding: '14px 18px', fontSize: '13px', fontWeight: 600, color: '#6b7280', width: '38%' }}>
+                  Capability Description
+                </th>
+                {displayRoles.map(roleName => (
+                  <th key={roleName} style={{ padding: '14px 16px', fontSize: '13px', fontWeight: 700, color: '#374151', textAlign: 'center', minWidth: '100px' }}>
+                    {roleName}
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {SYSTEM_CAPABILITIES.map(cap => (
+                <tr
+                  key={cap.key}
+                  style={{
+                    borderBottom: '1px solid #f3f4f6',
+                    transition: 'background-color 0.12s ease'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = '#fafafa'}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  <td style={{ padding: '14px 18px', fontSize: '13.5px', color: '#111827', fontWeight: 600 }}>
+                    {cap.label}
+                  </td>
+                  {displayRoles.map(roleName => {
+                    const lookupKey = `${roleName.toLowerCase()}_${cap.key}`;
+                    const existing = permLookup[lookupKey];
+                    const isEnabled = existing ? Boolean(existing.is_enabled) : (roleName.toLowerCase() === 'admin' || roleName.toLowerCase() === 'developer');
+
+                    return (
+                      <td key={roleName} style={{ padding: '14px 16px', textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleCell(roleName, cap.key)}
+                          style={{
+                            width: '38px',
+                            height: '20px',
+                            borderRadius: '9999px',
+                            backgroundColor: isEnabled ? '#84cc16' : '#d1d5db',
+                            border: 'none',
+                            padding: '2px',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            position: 'relative',
+                            transition: 'background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                            outline: 'none'
+                          }}
+                          title={`Click to ${isEnabled ? 'disable' : 'enable'} for ${roleName}`}
+                        >
+                          <span
+                            style={{
+                              width: '16px',
+                              height: '16px',
+                              borderRadius: '50%',
+                              backgroundColor: '#ffffff',
+                              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.25)',
+                              transform: isEnabled ? 'translateX(18px)' : 'translateX(0px)',
+                              transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                            }}
+                          />
+                        </button>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Modal: Add Custom Role */}

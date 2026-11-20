@@ -268,23 +268,30 @@ async function initDatabase() {
     );
   }
 
-  // Seed default User Permissions
+  // Seed default User Permissions (Including View Only options & Developer role matching mockup)
   const defaultPermissions = [
-    { key: 'manage_devices', label: 'Add & Edit Mobile Devices', admin: 1, supervisor: 1, staff: 0, viewer: 0 },
-    { key: 'handover_devices', label: 'Perform Shift Handover', admin: 1, supervisor: 1, staff: 1, viewer: 0 },
-    { key: 'return_devices', label: 'Accept Inventory Returns', admin: 1, supervisor: 1, staff: 0, viewer: 0 },
-    { key: 'manage_users', label: 'Create & Manage User Accounts', admin: 1, supervisor: 0, staff: 0, viewer: 0 },
-    { key: 'manage_groups_shifts', label: 'Add / Edit Shifts & Groups', admin: 1, supervisor: 1, staff: 0, viewer: 0 },
-    { key: 'view_audit_logs', label: 'View System Audit Logs', admin: 1, supervisor: 0, staff: 0, viewer: 0 },
-    { key: 'delete_records', label: 'Delete Records', admin: 1, supervisor: 0, staff: 0, viewer: 0 }
+    { key: 'manage_devices', label: 'Add & Edit Mobile Devices', admin: 1, viewer: 0, developer: 1, supervisor: 1, staff: 0 },
+    { key: 'manage_groups_shifts', label: 'Add & Edit Shifts', admin: 1, viewer: 0, developer: 1, supervisor: 1, staff: 0 },
+    { key: 'view_devices', label: 'View Mobile Devices (Only View)', admin: 1, viewer: 1, developer: 1, supervisor: 1, staff: 1 },
+    { key: 'view_daily_tasks', label: 'View Daily Tasks (Only View)', admin: 1, viewer: 1, developer: 1, supervisor: 1, staff: 1 },
+    { key: 'view_inventory', label: 'View Inventory Stock (Only View)', admin: 1, viewer: 1, developer: 1, supervisor: 1, staff: 1 },
+    { key: 'handover_devices', label: 'Perform Shift Handover', admin: 1, viewer: 0, developer: 1, supervisor: 1, staff: 1 },
+    { key: 'return_devices', label: 'Accept Inventory Returns', admin: 1, viewer: 0, developer: 1, supervisor: 1, staff: 0 },
+    { key: 'manage_users', label: 'Create & Manage User Accounts', admin: 1, viewer: 0, developer: 1, supervisor: 0, staff: 0 },
+    { key: 'view_audit_logs', label: 'View System Audit Logs', admin: 1, viewer: 0, developer: 1, supervisor: 0, staff: 0 },
+    { key: 'delete_records', label: 'Delete Records', admin: 1, viewer: 0, developer: 1, supervisor: 0, staff: 0 }
   ];
 
   for (const p of defaultPermissions) {
     await dbRun(`INSERT OR IGNORE INTO user_permissions (role, permission_key, permission_label, is_enabled) VALUES ('Admin', ?, ?, ?)`, [p.key, p.label, p.admin]);
+    await dbRun(`INSERT OR IGNORE INTO user_permissions (role, permission_key, permission_label, is_enabled) VALUES ('Viewer', ?, ?, ?)`, [p.key, p.label, p.viewer]);
+    await dbRun(`INSERT OR IGNORE INTO user_permissions (role, permission_key, permission_label, is_enabled) VALUES ('Developer', ?, ?, ?)`, [p.key, p.label, p.developer]);
     await dbRun(`INSERT OR IGNORE INTO user_permissions (role, permission_key, permission_label, is_enabled) VALUES ('Supervisor', ?, ?, ?)`, [p.key, p.label, p.supervisor]);
     await dbRun(`INSERT OR IGNORE INTO user_permissions (role, permission_key, permission_label, is_enabled) VALUES ('Staff', ?, ?, ?)`, [p.key, p.label, p.staff]);
-    await dbRun(`INSERT OR IGNORE INTO user_permissions (role, permission_key, permission_label, is_enabled) VALUES ('Viewer', ?, ?, ?)`, [p.key, p.label, p.viewer]);
   }
+
+  // Ensure permission_label for manage_groups_shifts matches mockup "Add & Edit Shifts"
+  await dbRun(`UPDATE user_permissions SET permission_label = 'Add & Edit Shifts' WHERE permission_key = 'manage_groups_shifts'`);
 
   // Seed default Roles
   const defaultRoles = ['Admin', 'Supervisor', 'Staff', 'Developer', 'Viewer'];
@@ -1299,14 +1306,17 @@ async function addRole(role_name, description = '') {
 
   const isViewer = cleanRole.toLowerCase() === 'viewer';
 
-  // Initialize permissions for the new role (Viewer defaults to 0 for all capabilities)
+  // Initialize permissions for the new role
   const defaultPerms = [
     { key: 'manage_devices', label: 'Add & Edit Mobile Devices', enabled: isViewer ? 0 : 1 },
+    { key: 'manage_groups_shifts', label: 'Add & Edit Shifts', enabled: isViewer ? 0 : 1 },
+    { key: 'view_devices', label: 'View Mobile Devices (Only View)', enabled: 1 },
+    { key: 'view_daily_tasks', label: 'View Daily Tasks (Only View)', enabled: 1 },
+    { key: 'view_inventory', label: 'View Inventory Stock (Only View)', enabled: 1 },
     { key: 'handover_devices', label: 'Perform Shift Handover', enabled: isViewer ? 0 : 1 },
     { key: 'return_devices', label: 'Accept Inventory Returns', enabled: isViewer ? 0 : 1 },
     { key: 'manage_users', label: 'Create & Manage User Accounts', enabled: 0 },
-    { key: 'manage_groups_shifts', label: 'Add / Edit Shifts & Groups', enabled: 0 },
-    { key: 'view_audit_logs', label: 'View System Audit Logs', enabled: 0 },
+    { key: 'view_audit_logs', label: 'View System Audit Logs', enabled: isViewer ? 0 : 1 },
     { key: 'delete_records', label: 'Delete Records', enabled: 0 }
   ];
 
@@ -1371,21 +1381,27 @@ async function getUserPermissionsByRole(roleName = 'Admin') {
 
   const permMap = {
     manage_devices: false,
+    manage_groups_shifts: false,
+    view_devices: true,
+    view_daily_tasks: true,
+    view_inventory: true,
     handover_devices: false,
     return_devices: false,
     manage_users: false,
-    manage_groups_shifts: false,
     view_audit_logs: false,
     delete_records: false
   };
 
-  if (cleanRole.toLowerCase() === 'admin') {
+  if (cleanRole.toLowerCase() === 'admin' || cleanRole.toLowerCase() === 'developer') {
     return {
       manage_devices: true,
+      manage_groups_shifts: true,
+      view_devices: true,
+      view_daily_tasks: true,
+      view_inventory: true,
       handover_devices: true,
       return_devices: true,
       manage_users: true,
-      manage_groups_shifts: true,
       view_audit_logs: true,
       delete_records: true
     };
@@ -1398,11 +1414,45 @@ async function getUserPermissionsByRole(roleName = 'Admin') {
 }
 
 async function getAllPermissions() {
-  return await dbAll(`SELECT * FROM user_permissions ORDER BY role ASC, id ASC`);
+  return await dbAll(`SELECT * FROM user_permissions ORDER BY id ASC`);
 }
 
 async function togglePermission(permissionId, is_enabled) {
   return await dbRun(`UPDATE user_permissions SET is_enabled = ? WHERE id = ?`, [is_enabled ? 1 : 0, permissionId]);
+}
+
+async function togglePermissionByRoleAndKey(role, permission_key, is_enabled) {
+  const cleanRole = String(role).trim();
+  const existing = await dbGet(
+    `SELECT id FROM user_permissions WHERE LOWER(role) = LOWER(?) AND permission_key = ?`,
+    [cleanRole, permission_key]
+  );
+
+  const CAPABILITY_LABELS = {
+    manage_devices: 'Add & Edit Mobile Devices',
+    manage_groups_shifts: 'Add & Edit Shifts',
+    view_devices: 'View Mobile Devices (Only View)',
+    view_daily_tasks: 'View Daily Tasks (Only View)',
+    view_inventory: 'View Inventory Stock (Only View)',
+    handover_devices: 'Perform Shift Handover',
+    return_devices: 'Accept Inventory Returns',
+    manage_users: 'Create & Manage User Accounts',
+    view_audit_logs: 'View System Audit Logs',
+    delete_records: 'Delete Records'
+  };
+
+  const label = CAPABILITY_LABELS[permission_key] || permission_key;
+
+  if (existing) {
+    await dbRun(`UPDATE user_permissions SET is_enabled = ? WHERE id = ?`, [is_enabled ? 1 : 0, existing.id]);
+    return { id: existing.id, role: cleanRole, permission_key, permission_label: label, is_enabled: is_enabled ? 1 : 0 };
+  } else {
+    const res = await dbRun(
+      `INSERT INTO user_permissions (role, permission_key, permission_label, is_enabled) VALUES (?, ?, ?, ?)`,
+      [cleanRole, permission_key, label, is_enabled ? 1 : 0]
+    );
+    return { id: res.lastID, role: cleanRole, permission_key, permission_label: label, is_enabled: is_enabled ? 1 : 0 };
+  }
 }
 
 // History & Audit logs
@@ -2449,6 +2499,7 @@ module.exports = {
   getAllPermissions,
   getUserPermissionsByRole,
   togglePermission,
+  togglePermissionByRoleAndKey,
   getHistoryLogs,
   getAuditLogins,
   recordAuditLogin,

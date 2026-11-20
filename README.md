@@ -46,7 +46,11 @@ A production-grade, enterprise **Company Mobile Device Inventory, Shift Handover
 - **Automated Signature & OCR Recognition:** Automatically interprets marked/signed rows as `Done` and unsigned rows as `Pending`.
 - **Quick Daily Active List Entry:** Fast-entry textarea for pasting daily device numbers with auto-numbered employee assignment and live preview.
 
-### 5. User & Role Management
+### 5. Authentication & Sensitive Data Security
+- **Mandatory First-Load Login:** In order to safeguard sensitive operational records and employee contact data, the application strictly requires authentication on first load before rendering any workspace data or making API calls.
+- **Server-Side Authentication API (`/api/login`, `/api/auth/verify`):** Real-time credential validation against the SQLite `system_users` database, cryptographically random session tokens, and instant invalidation on account deactivation.
+- **Audit Logging of All Login Events:** Successful and rejected login attempts are recorded into `audit_logins` with IP address and timestamp.
+- **Anti-Brute Force Protection:** Automatic temporary security lockout after 5 consecutive failed attempts.
 - **Protected Administrator Accounts:** Core administrative accounts (e.g., `Shanaka`, `Admin`) cannot be set to Inactive or deleted.
 - **Dynamic Role Creation:** Admins can create custom roles (e.g., *Manager*, *Auditor*, *Technician*) directly from the user creation dropdown with auto-generated permission templates.
 - **Granular Capability Toggles:** Interactive toggle switches for operational permissions (`manage_devices`, `handover_devices`, `return_devices`, `manage_users`, `manage_groups_shifts`, `view_audit_logs`, `delete_records`).

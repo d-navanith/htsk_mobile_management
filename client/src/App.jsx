@@ -44,33 +44,74 @@ class ErrorBoundary extends React.Component {
 
 export default function App() {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
-    return localStorage.getItem('htsk_admin_authenticated') !== 'false';
+    const auth = localStorage.getItem('htsk_admin_authenticated');
+    const token = localStorage.getItem('htsk_session_token');
+    return auth === 'true' && Boolean(token);
   });
   const [currentUser, setCurrentUser] = useState(() => {
-    return localStorage.getItem('htsk_current_user') || 'shanaka';
+    return localStorage.getItem('htsk_current_user') || '';
+  });
+  const [currentUserName, setCurrentUserName] = useState(() => {
+    return localStorage.getItem('htsk_user_name') || '';
+  });
+  const [currentUserRole, setCurrentUserRole] = useState(() => {
+    return localStorage.getItem('htsk_user_role') || '';
   });
   const [activeTab, setActiveTab] = useState('dashboard');
   const [records, setRecords] = useState([]);
   const [groups, setGroups] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addModalContext, setAddModalContext] = useState({});
   const [editingRecord, setEditingRecord] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
-  const handleAdminLogin = (user) => {
+  const handleAdminLogin = (loginData) => {
+    const token = loginData?.token || ('session_' + Date.now());
+    const userObj = loginData?.user || (typeof loginData === 'object' ? loginData : {});
+    const username = userObj.username || (typeof loginData === 'string' ? loginData : 'shanaka');
+    const fullName = userObj.full_name || (username ? username.charAt(0).toUpperCase() + username.slice(1) : 'Shanaka');
+    const role = userObj.role || 'Admin';
+
     localStorage.setItem('htsk_admin_authenticated', 'true');
-    if (user) {
-      setCurrentUser(user);
-      localStorage.setItem('htsk_current_user', user);
-    }
+    localStorage.setItem('htsk_session_token', token);
+    localStorage.setItem('htsk_current_user', username);
+    localStorage.setItem('htsk_user_name', fullName);
+    localStorage.setItem('htsk_user_role', role);
+
+    setCurrentUser(username);
+    setCurrentUserName(fullName);
+    setCurrentUserRole(role);
     setIsAdminLoggedIn(true);
+
+    showToast(`Welcome back, ${fullName}! Signed in as ${role}.`, 'success');
   };
 
-  const handleAdminLogout = () => {
-    localStorage.setItem('htsk_admin_authenticated', 'false');
+  const handleAdminLogout = async () => {
+    const token = localStorage.getItem('htsk_session_token');
+    if (token) {
+      try {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        });
+      } catch (err) {
+        // silent
+      }
+    }
+    localStorage.removeItem('htsk_admin_authenticated');
+    localStorage.removeItem('htsk_session_token');
+    localStorage.removeItem('htsk_current_user');
+    localStorage.removeItem('htsk_user_name');
+    localStorage.removeItem('htsk_user_role');
     setIsAdminLoggedIn(false);
+    setCurrentUser('');
+    setCurrentUserName('');
+    setCurrentUserRole('');
+    setRecords([]);
+    showToast('You have been securely signed out.', 'info');
   };
 
   const showToast = (text, type = 'success') => {
@@ -110,10 +151,36 @@ export default function App() {
     }
   };
 
+  // On mount and auth state change: only load data if authenticated, and verify session
   useEffect(() => {
+    if (!isAdminLoggedIn) {
+      return;
+    }
+
+    const token = localStorage.getItem('htsk_session_token');
+    if (token) {
+      fetch('/api/auth/verify', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.user) {
+            setCurrentUser(data.user.username);
+            setCurrentUserName(data.user.full_name || data.user.username);
+            setCurrentUserRole(data.user.role || 'Admin');
+          } else {
+            // Session expired or revoked
+            handleAdminLogout();
+          }
+        })
+        .catch(() => {
+          // If offline or network issue, maintain current local session
+        });
+    }
+
     fetchRecords();
     fetchGroups();
-  }, []);
+  }, [isAdminLoggedIn]);
 
   // Save manual record
   const handleSaveManualRecord = async recordData => {
@@ -285,6 +352,7 @@ export default function App() {
               refreshRecords={fetchRecords}
               setActiveTab={setActiveTab}
               currentUser={currentUser}
+              currentUserName={currentUserName}
               onLogout={handleAdminLogout}
             />
           )}

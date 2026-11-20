@@ -7,6 +7,7 @@ const fs = require('fs');
 const mammoth = require('mammoth');
 const pdfParse = require('pdf-parse');
 const { createWorker } = require('tesseract.js');
+const crypto = require('crypto');
 
 const {
   initDatabase,
@@ -28,6 +29,7 @@ const {
   toggleUserActive,
   toggleUserAnimation,
   deleteSystemUser,
+  authenticateUser,
   getAllRoles,
   addRole,
   getAllDashboardAnimations,
@@ -67,6 +69,9 @@ const PORT = process.env.PORT || 5100;
 
 app.use(cors());
 app.use(express.json());
+
+// In-memory active authenticated sessions map
+const activeSessions = new Map();
 
 // Setup file uploads folder
 const uploadDir = path.join(__dirname, 'uploads');
@@ -834,6 +839,103 @@ app.post('/api/audit/login', async (req, res) => {
     const { username, role, status } = req.body;
     await recordAuditLogin(username || 'Admin', role || 'Admin', status || 'Success', req.ip);
     res.json({ success: true, message: 'Login recorded' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Secure System Authentication Endpoint
+app.post('/api/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ success: false, error: 'Username and password are required.' });
+    }
+    const clientIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || req.ip || '127.0.0.1';
+    const authResult = await authenticateUser(username, password, clientIp);
+    if (!authResult.success) {
+      return res.status(401).json(authResult);
+    }
+
+    // Generate secure session token
+    const token = crypto.randomBytes(32).toString('hex');
+    activeSessions.set(token, {
+      userId: authResult.user.id,
+      username: authResult.user.username,
+      full_name: authResult.user.full_name,
+      role: authResult.user.role,
+      loginAt: Date.now(),
+      expiresAt: Date.now() + (24 * 60 * 60 * 1000) // 24-hour validity
+    });
+
+    res.json({
+      success: true,
+      token,
+      user: authResult.user,
+      message: 'Authentication successful.'
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Session Verification Endpoint
+app.get('/api/auth/verify', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = (authHeader && authHeader.startsWith('Bearer '))
+      ? authHeader.slice(7)
+      : req.query.token;
+
+    if (!token || !activeSessions.has(token)) {
+      return res.status(401).json({ success: false, error: 'Session expired or invalid.' });
+    }
+
+    const session = activeSessions.get(token);
+    if (session.expiresAt && Date.now() > session.expiresAt) {
+      activeSessions.delete(token);
+      return res.status(401).json({ success: false, error: 'Session expired.' });
+    }
+
+    // Check user is still active in database
+    const user = await dbGet(
+      `SELECT id, full_name, username, email, role, is_active, animation_enabled FROM system_users WHERE id = ?`,
+      [session.userId]
+    );
+
+    if (!user || user.is_active !== 1) {
+      activeSessions.delete(token);
+      return res.status(403).json({ success: false, error: 'Account has been deactivated.' });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        username: user.username,
+        full_name: user.full_name,
+        role: user.role,
+        email: user.email,
+        animation_enabled: user.animation_enabled
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Logout Endpoint
+app.post('/api/auth/logout', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = (authHeader && authHeader.startsWith('Bearer '))
+      ? authHeader.slice(7)
+      : req.body.token;
+
+    if (token && activeSessions.has(token)) {
+      activeSessions.delete(token);
+    }
+    res.json({ success: true, message: 'Logged out successfully.' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

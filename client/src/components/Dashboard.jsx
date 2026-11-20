@@ -32,6 +32,7 @@ export default function Dashboard({
   refreshRecords = () => {},
   setActiveTab = () => {},
   currentUser = 'shanaka',
+  currentUserName = 'Shanaka',
   onLogout = () => {}
 }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -406,7 +407,7 @@ export default function Dashboard({
               style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
             />
             <span style={{ fontSize: '13.5px', fontWeight: 600, color: '#1f2937' }}>
-              Shanaka
+              {currentUserName || (currentUser ? currentUser.charAt(0).toUpperCase() + currentUser.slice(1) : 'Shanaka')}
             </span>
           </div>
         </div>

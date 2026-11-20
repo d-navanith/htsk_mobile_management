@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import UserProfileMenu from './UserProfileMenu';
 import {
   Search,
   ChevronDown,
@@ -33,6 +34,10 @@ export default function Dashboard({
   setActiveTab = () => {},
   currentUser = 'shanaka',
   currentUserName = 'Shanaka',
+  currentUserRole = 'Admin',
+  currentUserEmail = 'shanaka@htsk.com',
+  currentUserAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+  onOpenProfile = () => {},
   onLogout = () => {}
 }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -396,20 +401,18 @@ export default function Dashboard({
             <span>Total Stock: {kpis.totalMobilePhones || 241} Phones</span>
           </div>
 
-          <div
-            className="desktop-only-profile user-profile-capsule"
-            onClick={refreshRecords}
-            title="Refresh Data / User Profile"
-          >
-            <img
-              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
-              alt="Shanaka"
-              style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
-            />
-            <span style={{ fontSize: '13.5px', fontWeight: 600, color: '#1f2937' }}>
-              {currentUserName || (currentUser ? currentUser.charAt(0).toUpperCase() + currentUser.slice(1) : 'Shanaka')}
-            </span>
-          </div>
+          <UserProfileMenu
+            currentUser={currentUser}
+            currentUserName={currentUserName}
+            currentUserRole={currentUserRole}
+            currentUserEmail={currentUserEmail}
+            currentUserAvatar={currentUserAvatar}
+            onOpenProfile={() => onOpenProfile('general')}
+            onOpenSecurity={() => onOpenProfile('security')}
+            onLogout={onLogout}
+            setActiveTab={setActiveTab}
+            onRefresh={refreshRecords}
+          />
         </div>
       </div>
 

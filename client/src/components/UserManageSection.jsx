@@ -1,4 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react';
+import UserProfileMenu from './UserProfileMenu';
 import {
   Clock,
   Shield,
@@ -18,7 +19,16 @@ import {
   Lock
 } from 'lucide-react';
 
-export default function UserManageSection({ currentUser = 'shanaka', onLogout = () => {} }) {
+export default function UserManageSection({
+  currentUser = 'shanaka',
+  currentUserName = 'Shanaka',
+  currentUserRole = 'Admin',
+  currentUserEmail = 'shanaka@htsk.com',
+  currentUserAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+  onOpenProfile = () => {},
+  setActiveTab = () => {},
+  onLogout = () => {}
+}) {
   // Shift timing states (matching Image 2)
   const [morningStart, setMorningStart] = useState('06:00 AM');
   const [morningEnd, setMorningEnd] = useState('06:00 PM');
@@ -332,20 +342,18 @@ export default function UserManageSection({ currentUser = 'shanaka', onLogout = 
           </p>
         </div>
 
-        <div
-          className="desktop-only-profile user-profile-capsule"
-          onClick={onLogout}
-          title="Click to Logout"
-        >
-          <img
-            src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
-            alt="Shanaka"
-            style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
-          />
-          <span style={{ fontSize: '13.5px', fontWeight: 600, color: '#1f2937' }}>
-            Shanaka
-          </span>
-        </div>
+        <UserProfileMenu
+          currentUser={currentUser}
+          currentUserName={currentUserName}
+          currentUserRole={currentUserRole}
+          currentUserEmail={currentUserEmail}
+          currentUserAvatar={currentUserAvatar}
+          onOpenProfile={() => onOpenProfile('general')}
+          onOpenSecurity={() => onOpenProfile('security')}
+          onLogout={onLogout}
+          setActiveTab={setActiveTab}
+          onRefresh={() => window.location.reload()}
+        />
       </div>
 
       {/* SECTION 1: DASHBOARD ANIMATION MANAGEMENT (Matching user screenshot) */}

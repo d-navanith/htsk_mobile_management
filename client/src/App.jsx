@@ -10,6 +10,8 @@ import SettingsSection from './components/SettingsSection';
 import UserManageSection from './components/UserManageSection';
 import DailyTaskSection from './components/DailyTaskSection';
 import InventorySection from './components/InventorySection';
+import ProfileModal from './components/ProfileModal';
+import UserProfileMenu from './components/UserProfileMenu';
 import { Menu } from 'lucide-react';
 
 class ErrorBoundary extends React.Component {
@@ -57,6 +59,14 @@ export default function App() {
   const [currentUserRole, setCurrentUserRole] = useState(() => {
     return localStorage.getItem('htsk_user_role') || '';
   });
+  const [currentUserEmail, setCurrentUserEmail] = useState(() => {
+    return localStorage.getItem('htsk_user_email') || 'shanaka@htsk.com';
+  });
+  const [currentUserAvatar, setCurrentUserAvatar] = useState(() => {
+    return localStorage.getItem('htsk_user_avatar') || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80';
+  });
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [profileModalTab, setProfileModalTab] = useState('general');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [records, setRecords] = useState([]);
   const [groups, setGroups] = useState([]);
@@ -67,22 +77,58 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
+  const handleOpenProfile = (tab = 'general') => {
+    setProfileModalTab(tab);
+    setIsProfileModalOpen(true);
+  };
+
+  const handleUpdateProfile = (updatedUser) => {
+    if (!updatedUser) return;
+    if (updatedUser.username) {
+      setCurrentUser(updatedUser.username);
+      localStorage.setItem('htsk_current_user', updatedUser.username);
+    }
+    if (updatedUser.full_name) {
+      setCurrentUserName(updatedUser.full_name);
+      localStorage.setItem('htsk_user_name', updatedUser.full_name);
+    }
+    if (updatedUser.avatar_url) {
+      setCurrentUserAvatar(updatedUser.avatar_url);
+      localStorage.setItem('htsk_user_avatar', updatedUser.avatar_url);
+    }
+    if (updatedUser.email) {
+      setCurrentUserEmail(updatedUser.email);
+      localStorage.setItem('htsk_user_email', updatedUser.email);
+    }
+    if (updatedUser.role) {
+      setCurrentUserRole(updatedUser.role);
+      localStorage.setItem('htsk_user_role', updatedUser.role);
+    }
+    showToast('Profile updated successfully!', 'success');
+  };
+
   const handleAdminLogin = (loginData) => {
     const token = loginData?.token || ('session_' + Date.now());
     const userObj = loginData?.user || (typeof loginData === 'object' ? loginData : {});
     const username = userObj.username || (typeof loginData === 'string' ? loginData : 'shanaka');
     const fullName = userObj.full_name || (username ? username.charAt(0).toUpperCase() + username.slice(1) : 'Shanaka');
     const role = userObj.role || 'Admin';
+    const avatar = userObj.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80';
+    const email = userObj.email || `${username}@htsk.com`;
 
     localStorage.setItem('htsk_admin_authenticated', 'true');
     localStorage.setItem('htsk_session_token', token);
     localStorage.setItem('htsk_current_user', username);
     localStorage.setItem('htsk_user_name', fullName);
     localStorage.setItem('htsk_user_role', role);
+    localStorage.setItem('htsk_user_avatar', avatar);
+    localStorage.setItem('htsk_user_email', email);
 
     setCurrentUser(username);
     setCurrentUserName(fullName);
     setCurrentUserRole(role);
+    setCurrentUserAvatar(avatar);
+    setCurrentUserEmail(email);
     setIsAdminLoggedIn(true);
 
     showToast(`Welcome back, ${fullName}! Signed in as ${role}.`, 'success');
@@ -106,10 +152,14 @@ export default function App() {
     localStorage.removeItem('htsk_current_user');
     localStorage.removeItem('htsk_user_name');
     localStorage.removeItem('htsk_user_role');
+    localStorage.removeItem('htsk_user_avatar');
+    localStorage.removeItem('htsk_user_email');
     setIsAdminLoggedIn(false);
     setCurrentUser('');
     setCurrentUserName('');
     setCurrentUserRole('');
+    setCurrentUserAvatar('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80');
+    setCurrentUserEmail('');
     setRecords([]);
     showToast('You have been securely signed out.', 'info');
   };
@@ -168,6 +218,14 @@ export default function App() {
             setCurrentUser(data.user.username);
             setCurrentUserName(data.user.full_name || data.user.username);
             setCurrentUserRole(data.user.role || 'Admin');
+            if (data.user.avatar_url) {
+              setCurrentUserAvatar(data.user.avatar_url);
+              localStorage.setItem('htsk_user_avatar', data.user.avatar_url);
+            }
+            if (data.user.email) {
+              setCurrentUserEmail(data.user.email);
+              localStorage.setItem('htsk_user_email', data.user.email);
+            }
           } else {
             // Session expired or revoked
             handleAdminLogout();
@@ -310,15 +368,18 @@ export default function App() {
           <Menu size={24} />
         </button>
         <div className="mobile-brand">HTSK</div>
-        <div
-          onClick={handleAdminLogout}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
-          title="Logout"
-        >
-          <img
-            src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
-            alt="Shanaka"
-            className="mobile-avatar"
+        <div>
+          <UserProfileMenu
+            currentUser={currentUser}
+            currentUserName={currentUserName}
+            currentUserRole={currentUserRole}
+            currentUserEmail={currentUserEmail}
+            currentUserAvatar={currentUserAvatar}
+            onOpenProfile={() => handleOpenProfile('general')}
+            onOpenSecurity={() => handleOpenProfile('security')}
+            onLogout={handleAdminLogout}
+            setActiveTab={setActiveTab}
+            onRefresh={fetchRecords}
           />
         </div>
       </header>
@@ -353,6 +414,10 @@ export default function App() {
               setActiveTab={setActiveTab}
               currentUser={currentUser}
               currentUserName={currentUserName}
+              currentUserRole={currentUserRole}
+              currentUserEmail={currentUserEmail}
+              currentUserAvatar={currentUserAvatar}
+              onOpenProfile={handleOpenProfile}
               onLogout={handleAdminLogout}
             />
           )}
@@ -363,13 +428,41 @@ export default function App() {
               onDownloadTemplate={handleDownloadTemplate}
               setActiveTab={setActiveTab}
               groups={groups}
+              currentUser={currentUser}
+              currentUserName={currentUserName}
+              currentUserRole={currentUserRole}
+              currentUserEmail={currentUserEmail}
+              currentUserAvatar={currentUserAvatar}
+              onOpenProfile={handleOpenProfile}
               onLogout={handleAdminLogout}
             />
           )}
 
-          {activeTab === 'history' && <HistorySection onLogout={handleAdminLogout} />}
+          {activeTab === 'history' && (
+            <HistorySection
+              currentUser={currentUser}
+              currentUserName={currentUserName}
+              currentUserRole={currentUserRole}
+              currentUserEmail={currentUserEmail}
+              currentUserAvatar={currentUserAvatar}
+              onOpenProfile={handleOpenProfile}
+              setAppTab={setActiveTab}
+              onLogout={handleAdminLogout}
+            />
+          )}
 
-          {activeTab === 'usermanage' && <UserManageSection currentUser={currentUser} onLogout={handleAdminLogout} />}
+          {activeTab === 'usermanage' && (
+            <UserManageSection
+              currentUser={currentUser}
+              currentUserName={currentUserName}
+              currentUserRole={currentUserRole}
+              currentUserEmail={currentUserEmail}
+              currentUserAvatar={currentUserAvatar}
+              onOpenProfile={handleOpenProfile}
+              setActiveTab={setActiveTab}
+              onLogout={handleAdminLogout}
+            />
+          )}
 
           {activeTab === 'dailytask' && (
             <DailyTaskSection
@@ -379,15 +472,56 @@ export default function App() {
               groups={groups}
               refreshRecords={fetchRecords}
               setActiveTab={setActiveTab}
+              currentUser={currentUser}
+              currentUserName={currentUserName}
+              currentUserRole={currentUserRole}
+              currentUserEmail={currentUserEmail}
+              currentUserAvatar={currentUserAvatar}
+              onOpenProfile={handleOpenProfile}
               onLogout={handleAdminLogout}
             />
           )}
 
-          {activeTab === 'inventory' && <InventorySection onLogout={handleAdminLogout} />}
+          {activeTab === 'inventory' && (
+            <InventorySection
+              currentUser={currentUser}
+              currentUserName={currentUserName}
+              currentUserRole={currentUserRole}
+              currentUserEmail={currentUserEmail}
+              currentUserAvatar={currentUserAvatar}
+              onOpenProfile={handleOpenProfile}
+              setActiveTab={setActiveTab}
+              onLogout={handleAdminLogout}
+            />
+          )}
 
-          {activeTab === 'settings' && <SettingsSection onLogout={handleAdminLogout} />}
+          {activeTab === 'settings' && (
+            <SettingsSection
+              currentUser={currentUser}
+              currentUserName={currentUserName}
+              currentUserRole={currentUserRole}
+              currentUserEmail={currentUserEmail}
+              currentUserAvatar={currentUserAvatar}
+              onOpenProfile={handleOpenProfile}
+              setActiveTab={setActiveTab}
+              onLogout={handleAdminLogout}
+            />
+          )}
         </ErrorBoundary>
       </main>
+
+      {/* Profile Management Modal */}
+      <ProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        currentUser={currentUser}
+        currentUserName={currentUserName}
+        currentUserEmail={currentUserEmail}
+        currentUserAvatar={currentUserAvatar}
+        currentUserRole={currentUserRole}
+        onUpdateProfile={handleUpdateProfile}
+        initialTab={profileModalTab}
+      />
 
       {/* Manual Entry Modal */}
       <ManualEntryModal

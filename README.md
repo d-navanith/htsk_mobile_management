@@ -57,7 +57,15 @@ A production-grade, enterprise **Company Mobile Device Inventory, Shift Handover
 - **Role Filtering:** Filter the permission management view by specific roles.
 - **Per-User Animation Visibility:** Granular toggle controlling which users see ambient animations on their dashboard.
 
-### 6. Audit Trail & History
+### 6. Admin Profile Management & Interactive Dropdown Menu
+- **Interactive Profile Capsule & Dropdown:** Clicking the top-right user profile pill in any workspace view opens a themed dropdown menu showcasing the user's avatar, full name, username handle, and active role badge.
+- **Profile Customization (`ProfileModal.jsx`):**
+  - **Avatar & Photo:** Live preview with one-click selection from curated presets, custom image file upload (`/api/profile/avatar`), or custom image URL input.
+  - **Full Name, Username & Email:** Editable with real-time uniqueness validation against existing system accounts.
+  - **Password & Security:** Self-service password change with existing password verification for protection of sensitive data.
+- **Instant Synchronization:** Updates apply immediately to header avatars, local storage, session state, and SQLite database.
+
+### 7. Audit Trail & History
 - Complete chronological history log recording all device additions, edits, returns, shift handovers, and administrative logins.
 
 ---

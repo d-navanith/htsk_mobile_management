@@ -26,6 +26,8 @@ The frontend interface for the HTSK Mobile Management Platform, built with **Rea
 | `Sidebar.jsx` | Fixed navigation bar with responsive mobile drawer support. |
 | `SnowEffect.jsx` | 60fps CSS particle animation engine supporting Snow, Rain, and Sparkle ambient card effects. |
 | `AdminLogin.jsx` | Administrative authentication portal. |
+| `UserProfileMenu.jsx` | Dropdown menu for top-right profile capsule with avatar, role badge, and navigation actions. |
+| `ProfileModal.jsx` | Profile management dialog for passwords, usernames, email, preset avatars, and photo uploads. |
 
 ## 🛠 Available Scripts
 

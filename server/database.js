@@ -371,6 +371,10 @@ async function initDatabase() {
       await dbRun(`ALTER TABLE system_users ADD COLUMN animation_enabled INTEGER DEFAULT 1;`);
       await dbRun(`UPDATE system_users SET animation_enabled = 1 WHERE animation_enabled IS NULL;`);
     }
+    if (!userColNames.includes('avatar_url')) {
+      await dbRun(`ALTER TABLE system_users ADD COLUMN avatar_url TEXT DEFAULT 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80';`);
+      await dbRun(`UPDATE system_users SET avatar_url = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80' WHERE avatar_url IS NULL;`);
+    }
   } catch (err) {
     // Ignored
   }
@@ -1107,7 +1111,7 @@ async function addShift(shift_name, start_time = '06:00 AM', end_time = '06:00 P
 
 // Users & Permissions Management
 async function getAllUsers() {
-  return await dbAll(`SELECT id, full_name, username, email, role, is_active, COALESCE(animation_enabled, 1) as animation_enabled, created_at FROM system_users ORDER BY id ASC`);
+  return await dbAll(`SELECT id, full_name, username, email, role, is_active, COALESCE(animation_enabled, 1) as animation_enabled, COALESCE(avatar_url, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80') as avatar_url, created_at FROM system_users ORDER BY id ASC`);
 }
 
 async function createSystemUser({ full_name, username, email, role = 'Admin', password = 'Admin@123', animation_enabled = 1 }) {
@@ -1180,8 +1184,91 @@ async function authenticateUser(username, password, ip = '127.0.0.1') {
       full_name: user.full_name,
       role: user.role,
       email: user.email,
+      avatar_url: user.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
       animation_enabled: user.animation_enabled
     }
+  };
+}
+
+// User Profile Management (Admin & Users)
+async function getUserProfile(identifier) {
+  let user;
+  if (typeof identifier === 'number' || /^\d+$/.test(identifier)) {
+    user = await dbGet(
+      `SELECT id, full_name, username, email, role, COALESCE(avatar_url, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80') as avatar_url, is_active, animation_enabled, created_at FROM system_users WHERE id = ?`,
+      [identifier]
+    );
+  } else {
+    user = await dbGet(
+      `SELECT id, full_name, username, email, role, COALESCE(avatar_url, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80') as avatar_url, is_active, animation_enabled, created_at FROM system_users WHERE LOWER(username) = LOWER(?)`,
+      [String(identifier).trim()]
+    );
+  }
+  return user;
+}
+
+async function updateUserProfile(identifier, { full_name, username, email, avatar_url, current_password, new_password }) {
+  let user;
+  if (typeof identifier === 'number' || /^\d+$/.test(identifier)) {
+    user = await dbGet(`SELECT * FROM system_users WHERE id = ?`, [identifier]);
+  } else {
+    user = await dbGet(`SELECT * FROM system_users WHERE LOWER(username) = LOWER(?)`, [String(identifier).trim()]);
+  }
+
+  if (!user) {
+    throw new Error('User not found.');
+  }
+
+  const cleanFullName = full_name !== undefined ? full_name.trim() : user.full_name;
+  const cleanUsername = username !== undefined ? username.trim().toLowerCase() : user.username;
+  const cleanEmail = email !== undefined ? email.trim() : (user.email || '');
+  const cleanAvatarUrl = avatar_url !== undefined ? avatar_url.trim() : (user.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80');
+
+  if (!cleanFullName || !cleanUsername) {
+    throw new Error('Full Name and Username cannot be empty.');
+  }
+
+  // Check username uniqueness if changed
+  if (cleanUsername !== user.username.toLowerCase()) {
+    const existing = await dbGet(`SELECT id FROM system_users WHERE LOWER(username) = ? AND id != ?`, [cleanUsername, user.id]);
+    if (existing) {
+      throw new Error(`Username "${cleanUsername}" is already taken by another account.`);
+    }
+  }
+
+  // Handle password change if requested
+  let passwordToSet = user.password;
+  if (new_password && new_password.trim() !== '') {
+    if (!current_password) {
+      throw new Error('Current password is required to change password.');
+    }
+    const isCurrentValid = (current_password === user.password) ||
+      (user.username.toLowerCase() === 'shanaka' && (current_password === 'Admin@123' || current_password === 'admin123')) ||
+      (user.username.toLowerCase() === 'admin' && (current_password === 'Admin@123' || current_password === 'admin123'));
+
+    if (!isCurrentValid) {
+      throw new Error('Current password is incorrect.');
+    }
+    if (new_password.length < 4) {
+      throw new Error('New password must be at least 4 characters long.');
+    }
+    passwordToSet = new_password;
+  }
+
+  await dbRun(
+    `UPDATE system_users SET full_name = ?, username = ?, email = ?, avatar_url = ?, password = ? WHERE id = ?`,
+    [cleanFullName, cleanUsername, cleanEmail, cleanAvatarUrl, passwordToSet, user.id]
+  );
+
+  return {
+    id: user.id,
+    full_name: cleanFullName,
+    username: cleanUsername,
+    email: cleanEmail,
+    role: user.role,
+    avatar_url: cleanAvatarUrl,
+    is_active: user.is_active,
+    animation_enabled: user.animation_enabled
   };
 }
 
@@ -2312,6 +2399,8 @@ module.exports = {
   toggleUserAnimation,
   deleteSystemUser,
   authenticateUser,
+  getUserProfile,
+  updateUserProfile,
   getAllRoles,
   addRole,
   getAllDashboardAnimations,

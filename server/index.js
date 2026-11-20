@@ -30,6 +30,8 @@ const {
   toggleUserAnimation,
   deleteSystemUser,
   authenticateUser,
+  getUserProfile,
+  updateUserProfile,
   getAllRoles,
   addRole,
   getAllDashboardAnimations,
@@ -78,6 +80,36 @@ const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
+
+// Serve uploaded files statically
+app.use('/uploads', express.static(uploadDir));
+
+// Dedicated avatar upload storage
+const avatarDir = path.join(uploadDir, 'avatars');
+if (!fs.existsSync(avatarDir)) {
+  fs.mkdirSync(avatarDir, { recursive: true });
+}
+
+const avatarStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, avatarDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, 'avatar-' + uniqueSuffix + ext);
+  }
+});
+
+const uploadAvatar = multer({
+  storage: avatarStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed.'));
+    }
+  }
+});
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
@@ -936,6 +968,65 @@ app.post('/api/auth/logout', async (req, res) => {
       activeSessions.delete(token);
     }
     res.json({ success: true, message: 'Logged out successfully.' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Profile Management Endpoints
+app.get('/api/profile', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = (authHeader && authHeader.startsWith('Bearer ')) ? authHeader.slice(7) : null;
+    const session = token ? activeSessions.get(token) : null;
+    const identifier = req.query.username || (session ? session.username : 'shanaka');
+
+    const user = await getUserProfile(identifier);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User profile not found.' });
+    }
+    res.json({ success: true, user });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.put('/api/profile', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = (authHeader && authHeader.startsWith('Bearer ')) ? authHeader.slice(7) : null;
+    const session = token ? activeSessions.get(token) : null;
+    const targetUser = req.body.username_orig || (session ? session.username : req.body.username) || 'shanaka';
+
+    const updated = await updateUserProfile(targetUser, req.body);
+
+    // Synchronize active session if user updated username or name
+    if (session) {
+      session.username = updated.username;
+      session.full_name = updated.full_name;
+    }
+
+    res.json({
+      success: true,
+      user: updated,
+      message: 'Profile updated successfully!'
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/profile/avatar', uploadAvatar.single('avatar'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No image file uploaded.' });
+    }
+    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+    res.json({
+      success: true,
+      avatarUrl,
+      message: 'Avatar image uploaded successfully!'
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

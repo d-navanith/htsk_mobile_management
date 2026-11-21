@@ -2553,12 +2553,15 @@ async function resolveDroppedDevice({ task_number = 19, round_number, device_tag
   }
 
   const tNum = parseInt(task_number) || 19;
-  const rNum = parseInt(round_number) || 2;
+  const rNum = parseInt(round_number) || 1;
   const cleanTag = device_tag.trim();
   const normTag = normalizeDeviceTag(cleanTag);
 
-  // 1. Fetch round record
-  const round = await dbGet(`SELECT * FROM daily_task_rounds WHERE task_number = ? AND round_number = ?`, [tNum, rNum]);
+  // 1. Fetch round record (fallback to latest round for task if specific round not found)
+  let round = await dbGet(`SELECT * FROM daily_task_rounds WHERE task_number = ? AND round_number = ?`, [tNum, rNum]);
+  if (!round) {
+    round = await dbGet(`SELECT * FROM daily_task_rounds WHERE task_number = ? ORDER BY round_number DESC LIMIT 1`, [tNum]);
+  }
   if (!round) {
     throw new Error(`Round #${rNum} for Task ${tNum} not found`);
   }
@@ -2745,6 +2748,533 @@ async function resolveDroppedDevice({ task_number = 19, round_number, device_tag
   return { success: true, resolutions, status: action, device_tag: cleanTag };
 }
 
+// ==========================================
+// CROSS-TASK COMPARISON ENGINE (Dashboard Task A = Task B Compare)
+// ==========================================
+
+async function getAvailableTaskComparisonList() {
+  // Ensure initial rounds are seeded for any task in device_records
+  await seedInitialTaskRounds();
+
+  const rounds = await dbAll(`
+    SELECT id, task_number, round_number, round_name, task_date, check_time, total_devices, added_count, removed_count
+    FROM daily_task_rounds
+    ORDER BY task_number ASC, round_number ASC
+  `);
+
+  const distinctRecordTasks = await dbAll(`
+    SELECT task_number, task_date, COUNT(*) as total_records
+    FROM device_records
+    WHERE task_number IS NOT NULL
+    GROUP BY task_number
+    ORDER BY task_number ASC
+  `);
+
+  const optionMap = new Map();
+
+  for (const r of rounds) {
+    const key = `${r.task_number}.${r.round_number}`;
+    optionMap.set(key, {
+      key,
+      label: `Task ${r.task_number}.${r.round_number}`,
+      task_number: r.task_number,
+      round_number: r.round_number,
+      task_date: r.task_date,
+      check_time: r.check_time || '8.30 A.M.',
+      total_devices: r.total_devices || 0
+    });
+  }
+
+  for (const t of distinctRecordTasks) {
+    const hasAnyRound = Array.from(optionMap.values()).some(o => o.task_number === t.task_number);
+    if (!hasAnyRound) {
+      const key = `${t.task_number}.1`;
+      optionMap.set(key, {
+        key,
+        label: `Task ${t.task_number}.1`,
+        task_number: t.task_number,
+        round_number: 1,
+        task_date: t.task_date,
+        check_time: '8.30 A.M.',
+        total_devices: t.total_records || 0
+      });
+    }
+  }
+
+  const options = Array.from(optionMap.values()).sort((a, b) => {
+    if (a.task_number !== b.task_number) return a.task_number - b.task_number;
+    return a.round_number - b.round_number;
+  });
+
+  const defaultToKey = options.length > 0 ? options[options.length - 1].key : '21.1';
+  const defaultFromKey = options.length > 1 ? options[options.length - 2].key : defaultToKey;
+
+  return {
+    options,
+    defaultFromKey,
+    defaultToKey
+  };
+}
+
+async function loadSnapshotForTaskRound(taskNum, roundNum) {
+  const tNum = parseInt(taskNum, 10);
+  const rNum = parseInt(roundNum, 10) || 1;
+
+  const roundRow = await dbGet(
+    `SELECT * FROM daily_task_rounds WHERE task_number = ? AND round_number = ?`,
+    [tNum, rNum]
+  );
+
+  const dbRecords = await dbAll(
+    `SELECT * FROM device_records WHERE task_number = ? ORDER BY id ASC`,
+    [tNum]
+  );
+
+  // Build map of live DB records by normalized taking_device for real-time status/IDs
+  const liveByDevice = new Map();
+  for (const dbr of dbRecords) {
+    if (dbr.name === 'Office Return' || dbr.name === 'Missing Check') continue;
+    const norm = normalizeDeviceTag(dbr.taking_device);
+    if (norm && !liveByDevice.has(norm)) {
+      liveByDevice.set(norm, dbr);
+    }
+  }
+
+  let records = [];
+  if (roundRow && roundRow.records_json && roundRow.records_json !== '[]') {
+    try {
+      const parsed = JSON.parse(roundRow.records_json);
+      records = parsed.map((rec, idx) => {
+        const norm = normalizeDeviceTag(rec.taking_device);
+        const live = norm ? liveByDevice.get(norm) : null;
+        return {
+          ...rec,
+          id: live ? live.id : (rec.id || `round-${tNum}-${rNum}-${idx + 1}`),
+          name: live ? live.name : (rec.name || String(idx + 1).padStart(2, '0')),
+          shift: live ? live.shift : (rec.shift || 'Day'),
+          group_name: live ? live.group_name : (rec.group_name || ''),
+          issued_at: live ? live.issued_at : (rec.issued_at || roundRow.check_time || '7.30 A.M.'),
+          return_time: live && live.return_time ? live.return_time : (rec.return_time || ''),
+          return_device: live && live.return_device ? live.return_device : (rec.return_device || ''),
+          taking_device: rec.taking_device || (live ? live.taking_device : ''),
+          handover_to: live && live.handover_to ? live.handover_to : (rec.handover_to || ''),
+          sign: live && live.sign ? live.sign : (rec.sign || 'Done'),
+          task_number: tNum,
+          task_date: roundRow.task_date || (live ? live.task_date : ''),
+          round_number: rNum
+        };
+      });
+    } catch (e) {
+      records = [];
+    }
+  }
+
+  if (records.length === 0 && roundRow && roundRow.raw_list) {
+    const lines = roundRow.raw_list.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    records = lines.map((tag, idx) => {
+      const norm = normalizeDeviceTag(tag);
+      const live = norm ? liveByDevice.get(norm) : null;
+      const num = idx + 1;
+      const defaultName = num < 100 ? String(num).padStart(2, '0') : String(num);
+      return {
+        id: live ? live.id : `round-${tNum}-${rNum}-${num}`,
+        name: live ? live.name : defaultName,
+        shift: live ? live.shift : 'Day',
+        group_name: live ? live.group_name : '',
+        issued_at: live ? live.issued_at : (roundRow.check_time || '7.30 A.M.'),
+        return_time: live ? (live.return_time || '') : '',
+        return_device: live ? (live.return_device || '') : '',
+        taking_device: tag,
+        handover_to: live ? (live.handover_to || '') : '',
+        sign: live ? (live.sign || 'Done') : 'Done',
+        task_number: tNum,
+        task_date: roundRow.task_date || '',
+        round_number: rNum
+      };
+    });
+  }
+
+  if (records.length === 0) {
+    records = dbRecords.filter(r => r.name !== 'Office Return' && r.name !== 'Missing Check');
+  }
+
+  return {
+    task_number: tNum,
+    round_number: rNum,
+    task_date: (roundRow && roundRow.task_date) || (dbRecords[0] && dbRecords[0].task_date) || `2026-11-${String(tNum).padStart(2, '0')}`,
+    check_time: (roundRow && roundRow.check_time) || '8.30 A.M.',
+    label: `Task ${tNum}.${rNum}`,
+    roundRow,
+    records
+  };
+}
+
+async function compareTwoTasks(fromKey = '20.1', toKey = '21.1') {
+  const parseKey = (k, fallbackTask, fallbackRound) => {
+    const str = String(k || '').replace(/^Task\s*/i, '').trim();
+    const parts = str.split('.');
+    const tNum = parseInt(parts[0], 10) || fallbackTask;
+    const rNum = parts[1] ? (parseInt(parts[1], 10) || 1) : fallbackRound;
+    return { tNum, rNum, key: `${tNum}.${rNum}`, label: `Task ${tNum}.${rNum}` };
+  };
+
+  const fromParsed = parseKey(fromKey, 20, 1);
+  const toParsed = parseKey(toKey, 21, 1);
+
+  const [fromSnap, toSnap, invItems, allRoundsForRes] = await Promise.all([
+    loadSnapshotForTaskRound(fromParsed.tNum, fromParsed.rNum),
+    loadSnapshotForTaskRound(toParsed.tNum, toParsed.rNum),
+    dbAll(`SELECT device_tag, series, condition_status, manual_status FROM inventory_items`),
+    dbAll(`SELECT task_number, round_number, resolutions_json FROM daily_task_rounds WHERE task_number IN (?, ?)`, [fromParsed.tNum, toParsed.tNum])
+  ]);
+
+  // Master inventory lookup set
+  const inventoryMap = new Map();
+  for (const item of invItems) {
+    const norm = normalizeDeviceTag(item.device_tag);
+    if (norm) {
+      inventoryMap.set(norm, item);
+    }
+  }
+
+  // Aggregate resolutions from both tasks (preferring toTask resolutions)
+  const resolutions = {};
+  for (const r of allRoundsForRes) {
+    if (r.resolutions_json) {
+      try {
+        const parsed = JSON.parse(r.resolutions_json);
+        Object.assign(resolutions, parsed);
+      } catch (e) {}
+    }
+  }
+
+  // Also check device_records in both tasks for explicit Return or Missing rows
+  const explicitResRows = await dbAll(`
+    SELECT taking_device, return_device, return_time, sign, task_number
+    FROM device_records
+    WHERE task_number IN (?, ?) AND (
+      (return_device IS NOT NULL AND return_device != '') OR
+      LOWER(sign) = 'missing'
+    )
+  `, [fromParsed.tNum, toParsed.tNum]);
+
+  for (const er of explicitResRows) {
+    if (er.return_device && er.return_device.trim() !== '') {
+      for (const dev of parseDevices(er.return_device)) {
+        const norm = normalizeDeviceTag(dev);
+        if (norm && !resolutions[norm]) {
+          resolutions[norm] = {
+            status: 'returned',
+            device_tag: dev,
+            check_time: er.return_time || 'Office Returned'
+          };
+        }
+      }
+    }
+    if (er.sign && er.sign.toLowerCase() === 'missing' && er.taking_device) {
+      for (const dev of parseDevices(er.taking_device)) {
+        const norm = normalizeDeviceTag(dev);
+        if (norm && !resolutions[norm]) {
+          resolutions[norm] = {
+            status: 'missing',
+            device_tag: dev
+          };
+        }
+      }
+    }
+  }
+
+  // Build From Task device map
+  const fromDeviceMap = new Map();
+  for (const rec of fromSnap.records) {
+    const devs = parseDevices(rec.taking_device);
+    for (const rawDev of devs) {
+      const cleanDev = rawDev.replace(/[:;,]+$/g, '').trim();
+      const norm = normalizeDeviceTag(cleanDev);
+      if (norm && !fromDeviceMap.has(norm)) {
+        fromDeviceMap.set(norm, {
+          device_tag: cleanDev,
+          norm_tag: norm,
+          emp_name: rec.name,
+          shift: rec.shift || 'Day',
+          group_name: rec.group_name || '',
+          issued_at: rec.issued_at || fromSnap.check_time,
+          record: rec
+        });
+      }
+    }
+  }
+
+  // Build To Task device map and count duplicates
+  const toDeviceMap = new Map();
+  const toDeviceCounts = new Map();
+  for (const rec of toSnap.records) {
+    const devs = parseDevices(rec.taking_device);
+    for (const rawDev of devs) {
+      const cleanDev = rawDev.replace(/[:;,]+$/g, '').trim();
+      const norm = normalizeDeviceTag(cleanDev);
+      if (!norm) continue;
+      toDeviceCounts.set(norm, (toDeviceCounts.get(norm) || 0) + 1);
+      if (!toDeviceMap.has(norm)) {
+        toDeviceMap.set(norm, {
+          device_tag: cleanDev,
+          norm_tag: norm,
+          emp_name: rec.name,
+          shift: rec.shift || 'Day',
+          group_name: rec.group_name || '',
+          issued_at: rec.issued_at || toSnap.check_time,
+          return_device: rec.return_device || '',
+          return_time: rec.return_time || '',
+          sign: rec.sign || 'Done',
+          record: rec
+        });
+      }
+    }
+  }
+
+  // 1. Previously Available (Retained: present in From Task AND present in To Task)
+  const previouslyAvailable = [];
+  // 2. Newly Added (New Taking: present in To Task, NOT in From Task)
+  const newlyAdded = [];
+  // 3. Not Available (Dropped: present in From Task, NOT in To Task)
+  const notAvailable = [];
+  // 4. Not in System Inventory (Unregistered device names in To Task or From Task)
+  const notInSystem = [];
+  const notInSystemSet = new Set();
+  // 5. Returned & Missing & Duplicates
+  const returnedDevices = [];
+  const missingDevices = [];
+  const duplicateDevices = [];
+
+  for (const [norm, toEntry] of toDeviceMap.entries()) {
+    const inSystem = inventoryMap.has(norm);
+    const fromEntry = fromDeviceMap.get(norm);
+    const res = resolutions[norm] || null;
+
+    if (!inSystem && !notInSystemSet.has(norm)) {
+      notInSystemSet.add(norm);
+      notInSystem.push({
+        device_tag: toEntry.device_tag,
+        norm_tag: norm,
+        emp_name: toEntry.emp_name,
+        shift: toEntry.shift,
+        group_name: toEntry.group_name,
+        task_label: toSnap.label,
+        reason: 'Device name does not exist in master system inventory (241 phones)'
+      });
+    }
+
+    if ((toDeviceCounts.get(norm) || 0) > 1) {
+      duplicateDevices.push({
+        device_tag: toEntry.device_tag,
+        norm_tag: norm,
+        count: toDeviceCounts.get(norm),
+        emp_name: toEntry.emp_name
+      });
+    }
+
+    if (fromEntry) {
+      previouslyAvailable.push({
+        device_tag: toEntry.device_tag,
+        norm_tag: norm,
+        emp_name: toEntry.emp_name,
+        previous_emp_name: fromEntry.emp_name,
+        shift: toEntry.shift,
+        group_name: toEntry.group_name,
+        in_system: inSystem
+      });
+    } else {
+      newlyAdded.push({
+        device_tag: toEntry.device_tag,
+        norm_tag: norm,
+        emp_name: toEntry.emp_name,
+        shift: toEntry.shift,
+        group_name: toEntry.group_name,
+        in_system: inSystem
+      });
+    }
+
+    if (toEntry.return_device || (res && res.status === 'returned')) {
+      returnedDevices.push({
+        device_tag: toEntry.return_device || toEntry.device_tag,
+        norm_tag: norm,
+        emp_name: toEntry.emp_name,
+        return_time: toEntry.return_time || res?.check_time || 'Office Returned',
+        source: 'active_task'
+      });
+    }
+
+    if ((toEntry.sign && toEntry.sign.toLowerCase() === 'missing') || (res && res.status === 'missing')) {
+      missingDevices.push({
+        device_tag: toEntry.device_tag,
+        norm_tag: norm,
+        emp_name: toEntry.emp_name,
+        source: 'active_task'
+      });
+    }
+  }
+
+  for (const [norm, fromEntry] of fromDeviceMap.entries()) {
+    const inSystem = inventoryMap.has(norm);
+    if (!inSystem && !notInSystemSet.has(norm)) {
+      notInSystemSet.add(norm);
+      notInSystem.push({
+        device_tag: fromEntry.device_tag,
+        norm_tag: norm,
+        emp_name: fromEntry.emp_name,
+        shift: fromEntry.shift,
+        group_name: fromEntry.group_name,
+        task_label: fromSnap.label,
+        reason: `Device name from ${fromSnap.label} does not exist in master system inventory`
+      });
+    }
+
+    if (!toDeviceMap.has(norm)) {
+      const res = resolutions[norm] || null;
+      notAvailable.push({
+        device_tag: fromEntry.device_tag,
+        norm_tag: norm,
+        previous_emp_name: fromEntry.emp_name,
+        previous_shift: fromEntry.shift,
+        previous_group: fromEntry.group_name,
+        in_system: inSystem,
+        resolution: res
+      });
+
+      if (res && res.status === 'returned') {
+        returnedDevices.push({
+          device_tag: fromEntry.device_tag,
+          norm_tag: norm,
+          emp_name: fromEntry.emp_name,
+          return_time: res.check_time || 'Office Returned',
+          source: 'resolved_from_previous'
+        });
+      } else if (res && res.status === 'missing') {
+        missingDevices.push({
+          device_tag: fromEntry.device_tag,
+          norm_tag: norm,
+          emp_name: fromEntry.emp_name,
+          source: 'resolved_from_previous'
+        });
+      }
+    }
+  }
+
+  // Annotate To Task records for the Dashboard Table
+  const annotatedRecords = toSnap.records.map((rec, idx) => {
+    const devs = parseDevices(rec.taking_device);
+    const primaryDev = devs[0] ? devs[0].replace(/[:;,]+$/g, '').trim() : '';
+    const norm = normalizeDeviceTag(primaryDev);
+    const inFrom = norm ? fromDeviceMap.has(norm) : false;
+    const inSystem = norm ? inventoryMap.has(norm) : true;
+    const isDup = norm ? (toDeviceCounts.get(norm) || 0) > 1 : false;
+    const res = norm ? resolutions[norm] : null;
+
+    let effectiveReturnDevice = rec.return_device || '';
+    let effectiveReturnTime = rec.return_time || '';
+    let effectiveSign = rec.sign || 'Done';
+
+    if (res && res.status === 'returned' && !effectiveReturnDevice) {
+      effectiveReturnDevice = res.device_tag || primaryDev;
+      effectiveReturnTime = res.check_time || 'Office Returned';
+      effectiveSign = 'Done';
+    } else if (res && res.status === 'missing') {
+      effectiveSign = 'Missing';
+    }
+
+    let compStatus = inFrom ? 'previously_available' : 'newly_added';
+    if (effectiveSign.toLowerCase() === 'missing') {
+      compStatus = 'missing';
+    } else if (effectiveReturnDevice) {
+      compStatus = 'returned';
+    }
+
+    return {
+      ...rec,
+      return_device: effectiveReturnDevice,
+      return_time: effectiveReturnTime,
+      sign: effectiveSign,
+      is_newly_added: !inFrom && Boolean(norm),
+      is_previously_available: inFrom,
+      is_not_in_system: !inSystem && Boolean(norm),
+      is_duplicate: isDup,
+      previous_emp_name: inFrom ? fromDeviceMap.get(norm)?.emp_name : null,
+      comparison_status: compStatus,
+      compared_from_label: fromSnap.label,
+      compared_to_label: toSnap.label
+    };
+  });
+
+  // Also build virtual rows for dropped devices (if user filters table by "Not Available / Dropped")
+  const droppedRecords = notAvailable.map((item, idx) => {
+    const res = item.resolution;
+    return {
+      id: `dropped-${fromSnap.task_number}-${idx + 1}`,
+      name: item.previous_emp_name || `Prev #${idx + 1}`,
+      shift: item.previous_shift || 'Day',
+      group_name: item.previous_group || '',
+      issued_at: fromSnap.check_time || '7.30 A.M.',
+      return_time: res?.status === 'returned' ? (res.check_time || 'Office Returned') : '',
+      return_device: res?.status === 'returned' ? item.device_tag : '',
+      taking_device: item.device_tag,
+      handover_to: '',
+      sign: res?.status === 'missing' ? 'Missing' : (res?.status === 'returned' ? 'Done' : 'Pending'),
+      task_number: toSnap.task_number,
+      task_date: toSnap.task_date,
+      round_number: toSnap.round_number,
+      is_dropped_from_prev: true,
+      is_not_in_system: !item.in_system,
+      resolution: res,
+      comparison_status: res?.status === 'returned' ? 'returned' : (res?.status === 'missing' ? 'missing' : 'not_available'),
+      compared_from_label: fromSnap.label,
+      compared_to_label: toSnap.label
+    };
+  });
+
+  return {
+    fromTask: {
+      key: fromParsed.key,
+      label: fromSnap.label,
+      task_number: fromSnap.task_number,
+      round_number: fromSnap.round_number,
+      task_date: fromSnap.task_date,
+      check_time: fromSnap.check_time,
+      total_devices: fromDeviceMap.size
+    },
+    toTask: {
+      key: toParsed.key,
+      label: toSnap.label,
+      task_number: toSnap.task_number,
+      round_number: toSnap.round_number,
+      task_date: toSnap.task_date,
+      check_time: toSnap.check_time,
+      total_devices: toDeviceMap.size
+    },
+    summary: {
+      fromTotal: fromDeviceMap.size,
+      toTotal: toDeviceMap.size,
+      previouslyAvailableCount: previouslyAvailable.length,
+      newlyAddedCount: newlyAdded.length,
+      notAvailableCount: notAvailable.length,
+      awaitingVerificationCount: notAvailable.filter(d => !d.resolution).length,
+      notInSystemCount: notInSystem.length,
+      returnedCount: returnedDevices.length,
+      missingCount: missingDevices.length,
+      duplicateCount: duplicateDevices.length
+    },
+    previouslyAvailable,
+    newlyAdded,
+    notAvailable,
+    notInSystem,
+    returnedDevices,
+    missingDevices,
+    duplicateDevices,
+    resolutions,
+    records: annotatedRecords,
+    droppedRecords
+  };
+}
+
 module.exports = {
   db,
   initDatabase,
@@ -2801,6 +3331,8 @@ module.exports = {
   saveTaskRound,
   updateTaskRound,
   resolveDroppedDevice,
+  getAvailableTaskComparisonList,
+  compareTwoTasks,
   dbRun,
   dbGet,
   dbAll

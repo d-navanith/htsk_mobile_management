@@ -63,6 +63,17 @@ export default function Dashboard({
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  // Cross-Task Comparison State (Task A = Task B Compare on Dashboard)
+  const [taskOptions, setTaskOptions] = useState([]);
+  const [compareFromKey, setCompareFromKey] = useState('20.1');
+  const [compareToKey, setCompareToKey] = useState('21.1');
+  const [isComparing, setIsComparing] = useState(false);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
+  const [comparisonData, setComparisonData] = useState(null);
+  const [compareCategoryFilter, setCompareCategoryFilter] = useState('all'); // 'all' | 'newly_added' | 'previously_available' | 'not_available' | 'returned' | 'missing' | 'not_in_system'
+  const [showComparisonPopup, setShowComparisonPopup] = useState(false);
+  const [popupActiveTab, setPopupActiveTab] = useState('overview');
+
   const [kpis, setKpis] = useState({
     totalMobilePhones: 241,
     activeMobilePhones: 78,
@@ -146,9 +157,147 @@ export default function Dashboard({
     }
   };
 
+  // Run Cross-Task Comparison (Task A = Task B)
+  const runTaskComparison = async (fromKey = compareFromKey, toKey = compareToKey, openPopup = false) => {
+    setComparisonLoading(true);
+    try {
+      const res = await fetch(`/api/tasks/compare?from=${encodeURIComponent(fromKey)}&to=${encodeURIComponent(toKey)}`);
+      const json = await res.json();
+      if (json.success && json.data) {
+        setComparisonData(json.data);
+        setIsComparing(true);
+
+        if (openPopup) {
+          // Sync dashboard date header to the compared target task
+          const targetTask = json.data.toTask;
+          if (targetTask && targetTask.task_date) {
+            const parts = targetTask.task_date.split('-');
+            if (parts.length === 3) {
+              setSelectedYear(parseInt(parts[0], 10));
+              setCurrentMonthIndex(parseInt(parts[1], 10) - 1);
+              setSelectedDay(parseInt(parts[2], 10));
+              setSelectedDateStr(targetTask.task_date);
+              setSelectedTaskNumber(targetTask.task_number);
+              setIsViewAllDays(false);
+            }
+          }
+          setPopupActiveTab('overview');
+          setShowComparisonPopup(true);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to compare tasks:', err);
+    } finally {
+      setComparisonLoading(false);
+    }
+  };
+
+  const setSelectedYear = (yr) => {
+    if (!isNaN(yr)) setCurrentYear(yr);
+  };
+
+  // Load available tasks/rounds for comparison dropdowns
+  const fetchComparisonOptions = async (autoRun = true) => {
+    try {
+      const res = await fetch('/api/tasks/comparison-list');
+      const json = await res.json();
+      if (json.success && json.data) {
+        const opts = json.data.options || [];
+        setTaskOptions(opts);
+        const defFrom = json.data.defaultFromKey || '20.1';
+        const defTo = json.data.defaultToKey || '21.1';
+        setCompareFromKey(defFrom);
+        setCompareToKey(defTo);
+        if (autoRun && opts.length >= 1) {
+          await runTaskComparison(defFrom, defTo, false);
+        }
+      }
+    } catch (err) {
+      console.error('Error loading task comparison list:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchComparisonOptions(true);
+  }, []);
+
   useEffect(() => {
     fetchDashboardData(selectedTaskNumber, selectedDateStr, isViewAllDays);
   }, [selectedTaskNumber, selectedDateStr, isViewAllDays]);
+
+  // Resolve dropped device (Mark Returned or Missing) from Dashboard Attention Required banner or Comparison Popup
+  const handleResolveComparedDevice = async (deviceTag, action) => {
+    if (!canEdit) return;
+    const targetTaskNum = comparisonData?.toTask?.task_number || selectedTaskNumber || kpis.activeTaskNumber || 21;
+    const targetRoundNum = comparisonData?.toTask?.round_number || 1;
+    try {
+      const token = localStorage.getItem('htsk_session_token');
+      const res = await fetch('/api/daily-task/resolve-device', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          'X-User-Role': currentUserRole
+        },
+        body: JSON.stringify({
+          task_number: targetTaskNum,
+          round_number: targetRoundNum,
+          device_tag: deviceTag,
+          action,
+          admin_user: currentUserName || 'Shanaka'
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        await runTaskComparison(compareFromKey, compareToKey, false);
+        fetchDashboardData(selectedTaskNumber, selectedDateStr, isViewAllDays);
+        refreshRecords();
+      }
+    } catch (err) {
+      console.error('Error resolving device:', err);
+    }
+  };
+
+  // Delete record directly from Dashboard table (syncs both device_records and daily_task_rounds)
+  const handleDeleteDashboardRow = async (r, index) => {
+    if (!canDelete) return;
+    const devLabel = (r.taking_device || r.return_device || r.name || `Row #${index + 1}`).replace(/[:;,]+$/g, '').trim();
+    const taskNum = r.task_number || comparisonData?.toTask?.task_number || selectedTaskNumber || kpis.activeTaskNumber || 21;
+    const roundNum = r.round_number || comparisonData?.toTask?.round_number || 1;
+
+    if (!window.confirm(`Are you sure you want to delete "${devLabel}" from Task ${taskNum}.${roundNum}?`)) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('htsk_session_token');
+      const res = await fetch('/api/daily-task/delete-record', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          'X-User-Role': currentUserRole
+        },
+        body: JSON.stringify({
+          id: r.id,
+          task_number: taskNum,
+          task_date: r.task_date || selectedDateStr,
+          round_number: roundNum,
+          device_tag: r.taking_device || '',
+          emp_name: r.name || '',
+          admin_user: currentUserName || 'Shanaka'
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchDashboardData(selectedTaskNumber, selectedDateStr, isViewAllDays);
+        await runTaskComparison(compareFromKey, compareToKey, false);
+        refreshRecords();
+      }
+    } catch (err) {
+      console.error('Error deleting dashboard record:', err);
+    }
+  };
 
   // When parent triggers refresh (after modal save/edit), re-fetch
   useEffect(() => {
@@ -244,6 +393,21 @@ export default function Dashboard({
     return availableDays.find(d => d.task_date === dateStr || d.task_number === day);
   };
 
+  // Helper to sync comparison dropdowns when user selects a task day on the calendar
+  const syncComparisonForTaskNumber = (taskNum) => {
+    if (!taskNum || taskNum === 'all' || taskOptions.length === 0) return;
+    // Find latest round for this taskNum
+    const matchingOpts = taskOptions.filter(o => o.task_number === Number(taskNum));
+    if (matchingOpts.length > 0) {
+      const targetOpt = matchingOpts[matchingOpts.length - 1];
+      const targetIdx = taskOptions.findIndex(o => o.key === targetOpt.key);
+      const prevOpt = targetIdx > 0 ? taskOptions[targetIdx - 1] : targetOpt;
+      setCompareFromKey(prevOpt.key);
+      setCompareToKey(targetOpt.key);
+      runTaskComparison(prevOpt.key, targetOpt.key, false);
+    }
+  };
+
   // Select day from calendar
   const handleSelectDay = (day, mIdx = currentMonthIndex, yr = currentYear) => {
     const dateStr = `${yr}-${String(mIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -257,6 +421,7 @@ export default function Dashboard({
     setSelectedTaskNumber(taskNum);
     setIsViewAllDays(false);
     fetchDashboardData(taskNum, dateStr, false);
+    syncComparisonForTaskNumber(taskNum);
   };
 
   // Quick switch to specific task
@@ -282,6 +447,7 @@ export default function Dashboard({
     setSelectedTaskNumber(task.task_number);
     setIsViewAllDays(false);
     fetchDashboardData(task.task_number, task.task_date, false);
+    syncComparisonForTaskNumber(task.task_number);
   };
 
   // Reset to latest day
@@ -353,8 +519,19 @@ export default function Dashboard({
     }
   };
 
+  // Determine source records for table (use annotated comparison records when active)
+  const sourceRecordsForTable = useMemo(() => {
+    if (isComparing && comparisonData && !isViewAllDays) {
+      if (compareCategoryFilter === 'not_available') {
+        return comparisonData.droppedRecords || [];
+      }
+      return comparisonData.records || records;
+    }
+    return records;
+  }, [isComparing, comparisonData, compareCategoryFilter, records, isViewAllDays]);
+
   // Filter records
-  const filteredRecords = records.filter(r => {
+  const filteredRecords = sourceRecordsForTable.filter(r => {
     const term = searchTerm.toLowerCase();
     const nameMatch = (r.name || '').toLowerCase().includes(term);
     const returnDevMatch = (r.return_device || '').toLowerCase().includes(term);
@@ -372,7 +549,25 @@ export default function Dashboard({
       selectedStatus === 'all' ||
       (r.sign || '').toLowerCase() === selectedStatus.toLowerCase();
 
-    return matchesSearch && matchesGroup && matchesShift && matchesStatus;
+    // Comparison category filter
+    let matchesCompareCategory = true;
+    if (isComparing && comparisonData && compareCategoryFilter !== 'all') {
+      if (compareCategoryFilter === 'newly_added') {
+        matchesCompareCategory = Boolean(r.is_newly_added);
+      } else if (compareCategoryFilter === 'previously_available') {
+        matchesCompareCategory = Boolean(r.is_previously_available);
+      } else if (compareCategoryFilter === 'not_available') {
+        matchesCompareCategory = Boolean(r.is_dropped_from_prev);
+      } else if (compareCategoryFilter === 'returned') {
+        matchesCompareCategory = Boolean(r.return_device) || r.comparison_status === 'returned';
+      } else if (compareCategoryFilter === 'missing') {
+        matchesCompareCategory = (r.sign || '').toLowerCase() === 'missing' || r.comparison_status === 'missing';
+      } else if (compareCategoryFilter === 'not_in_system') {
+        matchesCompareCategory = Boolean(r.is_not_in_system);
+      }
+    }
+
+    return matchesSearch && matchesGroup && matchesShift && matchesStatus && matchesCompareCategory;
   });
 
   const isCurrentFilterLatest = kpis.isLatest || (availableDays[0] && availableDays[0].task_number === selectedTaskNumber);
@@ -906,135 +1101,449 @@ export default function Dashboard({
         </div>
       </div>
 
-      {/* Search and Filters Toolbar matching Image 4 */}
-      <div className="responsive-toolbar">
-        {/* Search bar pill */}
+      {/* ===================================================================== */}
+      {/* SELECT TASK COMPARISON BAR (Matching User Image 1: Task 20.2 = Task 21.1 Compare) */}
+      {/* ===================================================================== */}
+      <div style={{
+        marginTop: '24px',
+        marginBottom: '16px',
+        padding: '4px 2px'
+      }}>
+        <div style={{
+          fontSize: '15.5px',
+          fontWeight: 700,
+          color: '#111827',
+          marginBottom: '12px',
+          letterSpacing: '-0.01em'
+        }}>
+          Select task
+        </div>
+
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '10px',
-          backgroundColor: '#f3f4f6',
-          borderRadius: '9999px',
-          padding: '10px 20px',
-          width: '100%',
-          maxWidth: '380px',
-          boxSizing: 'border-box'
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '14px'
         }}>
-          <Search size={17} color="#9ca3af" />
-          <input
-            type="text"
-            placeholder="Search by name, device..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            style={{
-              border: 'none',
-              background: 'transparent',
-              outline: 'none',
-              fontSize: '13.5px',
-              color: '#374151',
-              width: '100%'
-            }}
-          />
-        </div>
+          {/* Left: [ Task A ▼ ] = [ Task B ▼ ] [ Compare ] */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            {/* Previous / Base Task Dropdown */}
+            <div style={{ position: 'relative' }}>
+              <select
+                value={compareFromKey}
+                onChange={e => setCompareFromKey(e.target.value)}
+                style={{
+                  appearance: 'none',
+                  WebkitAppearance: 'none',
+                  backgroundColor: '#e5e7eb',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '10px',
+                  padding: '10px 44px 10px 20px',
+                  fontSize: '15px',
+                  fontWeight: 600,
+                  color: '#111827',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  minWidth: '175px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+                }}
+              >
+                {taskOptions.map(opt => (
+                  <option key={`from-${opt.key}`} value={opt.key}>
+                    {opt.label} ({opt.total_devices} Mobiles)
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={16}
+                color="#374151"
+                style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+              />
+            </div>
 
-        {/* Filters and Add button */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          {/* Groups dropdown */}
-          <div style={{ position: 'relative' }}>
-            <select
-              value={selectedGroup}
-              onChange={e => setSelectedGroup(e.target.value)}
-              style={{
-                appearance: 'none',
-                backgroundColor: '#f3f4f6',
-                border: 'none',
-                borderRadius: '9999px',
-                padding: '9px 34px 9px 18px',
-                fontSize: '13.5px',
-                fontWeight: 500,
-                color: '#374151',
-                cursor: 'pointer',
-                outline: 'none'
-              }}
-            >
-              <option value="All Groups">All Groups</option>
-              <option value="No Group">No Group (Empty)</option>
-              <option value="Group A">Group A</option>
-              <option value="Group B">Group B</option>
-              <option value="Group C">Group C</option>
-              <option value="Group D">Group D</option>
-              <option value="Group AO">Group AO</option>
-            </select>
-            <ChevronDown size={14} color="#6b7280" style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-          </div>
+            <span style={{ fontSize: '18px', fontWeight: 700, color: '#374151', padding: '0 4px' }}>
+              =
+            </span>
 
-          {/* Shift dropdown */}
-          <div style={{ position: 'relative' }}>
-            <select
-              value={selectedShift}
-              onChange={e => setSelectedShift(e.target.value)}
-              style={{
-                appearance: 'none',
-                backgroundColor: '#f3f4f6',
-                border: 'none',
-                borderRadius: '9999px',
-                padding: '9px 34px 9px 18px',
-                fontSize: '13.5px',
-                fontWeight: 500,
-                color: '#374151',
-                cursor: 'pointer',
-                outline: 'none'
-              }}
-            >
-              <option value="All Shift">All Shift</option>
-              <option value="Day">Day</option>
-              <option value="Night">Night</option>
-            </select>
-            <ChevronDown size={14} color="#6b7280" style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-          </div>
+            {/* Target / Current Task Dropdown */}
+            <div style={{ position: 'relative' }}>
+              <select
+                value={compareToKey}
+                onChange={e => setCompareToKey(e.target.value)}
+                style={{
+                  appearance: 'none',
+                  WebkitAppearance: 'none',
+                  backgroundColor: '#e5e7eb',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '10px',
+                  padding: '10px 44px 10px 20px',
+                  fontSize: '15px',
+                  fontWeight: 600,
+                  color: '#111827',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  minWidth: '175px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+                }}
+              >
+                {taskOptions.map(opt => (
+                  <option key={`to-${opt.key}`} value={opt.key}>
+                    {opt.label} ({opt.total_devices} Mobiles)
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={16}
+                color="#374151"
+                style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+              />
+            </div>
 
-          {/* Status dropdown */}
-          <div style={{ position: 'relative' }}>
-            <select
-              value={selectedStatus}
-              onChange={e => setSelectedStatus(e.target.value)}
-              style={{
-                appearance: 'none',
-                backgroundColor: '#f3f4f6',
-                border: 'none',
-                borderRadius: '9999px',
-                padding: '9px 34px 9px 18px',
-                fontSize: '13.5px',
-                fontWeight: 500,
-                color: '#374151',
-                cursor: 'pointer',
-                outline: 'none'
-              }}
-            >
-              <option value="All Status">All Status</option>
-              <option value="Done">Done</option>
-              <option value="Pending">Pending</option>
-            </select>
-            <ChevronDown size={14} color="#6b7280" style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-          </div>
-
-          {/* Green Add button matching system theme (hidden for View only / non-editors) */}
-          {canEdit && (
+            {/* Lime Green Compare Button matching Image 1 */}
             <button
-              onClick={() => onOpenAddModal({ task_number: selectedTaskNumber, task_date: selectedDateStr })}
-              className="btn-primary-lime"
+              type="button"
+              onClick={() => runTaskComparison(compareFromKey, compareToKey, true)}
+              disabled={comparisonLoading}
+              style={{
+                backgroundColor: '#b5f23d',
+                color: '#111827',
+                border: '1.5px solid #84cc16',
+                borderRadius: '8px',
+                padding: '10px 22px',
+                fontSize: '13px',
+                fontWeight: 800,
+                cursor: comparisonLoading ? 'wait' : 'pointer',
+                marginLeft: '8px',
+                boxShadow: '0 2px 6px rgba(132, 204, 22, 0.2)',
+                transition: 'all 0.15s ease'
+              }}
             >
-              Add
+              {comparisonLoading ? 'Comparing...' : 'Compare'}
             </button>
+
+            {isComparing && comparisonData && (
+              <button
+                type="button"
+                onClick={() => setShowComparisonPopup(true)}
+                style={{
+                  backgroundColor: '#ffffff',
+                  color: '#0f766e',
+                  border: '1.5px solid #06b6d4',
+                  borderRadius: '8px',
+                  padding: '9px 16px',
+                  fontSize: '12.5px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <span>📊 View Comparison Popup</span>
+              </button>
+            )}
+          </div>
+
+          {/* Right: Quick Comparison Summary Status Pills (Filter Table by Category) */}
+          {isComparing && comparisonData && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setCompareCategoryFilter('all')}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '9999px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  border: compareCategoryFilter === 'all' ? '2px solid #111827' : '1px solid #d1d5db',
+                  backgroundColor: compareCategoryFilter === 'all' ? '#111827' : '#ffffff',
+                  color: compareCategoryFilter === 'all' ? '#ffffff' : '#374151'
+                }}
+              >
+                All in {comparisonData.toTask.label} ({comparisonData.summary.toTotal})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCompareCategoryFilter('previously_available')}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '9999px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  border: '1.5px solid #06b6d4',
+                  backgroundColor: compareCategoryFilter === 'previously_available' ? '#06b6d4' : '#ecfeff',
+                  color: compareCategoryFilter === 'previously_available' ? '#ffffff' : '#0e7490'
+                }}
+                title={`Active in ${comparisonData.fromTask.label} and still active in ${comparisonData.toTask.label}`}
+              >
+                ✓ Previously Available ({comparisonData.summary.previouslyAvailableCount})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCompareCategoryFilter('newly_added')}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '9999px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  border: '1.5px solid #16a34a',
+                  backgroundColor: compareCategoryFilter === 'newly_added' ? '#16a34a' : '#f0fdf4',
+                  color: compareCategoryFilter === 'newly_added' ? '#ffffff' : '#15803d'
+                }}
+                title={`Newly added in ${comparisonData.toTask.label} (was not in ${comparisonData.fromTask.label})`}
+              >
+                + Newly Added ({comparisonData.summary.newlyAddedCount})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCompareCategoryFilter('not_available')}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '9999px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  border: '1.5px solid #ef4444',
+                  backgroundColor: compareCategoryFilter === 'not_available' ? '#ef4444' : '#fef2f2',
+                  color: compareCategoryFilter === 'not_available' ? '#ffffff' : '#b91c1c'
+                }}
+                title={`Was active in ${comparisonData.fromTask.label} but NOT in ${comparisonData.toTask.label}`}
+              >
+                ⚠ Not Available / Dropped ({comparisonData.summary.notAvailableCount})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCompareCategoryFilter('returned')}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '9999px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  border: '1.5px solid #8b5cf6',
+                  backgroundColor: compareCategoryFilter === 'returned' ? '#8b5cf6' : '#f5f3ff',
+                  color: compareCategoryFilter === 'returned' ? '#ffffff' : '#6d28d9'
+                }}
+              >
+                ↩ Returned ({comparisonData.summary.returnedCount})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCompareCategoryFilter('missing')}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '9999px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  border: '1.5px solid #dc2626',
+                  backgroundColor: compareCategoryFilter === 'missing' ? '#dc2626' : '#fff1f2',
+                  color: compareCategoryFilter === 'missing' ? '#ffffff' : '#be123c'
+                }}
+              >
+                ✕ Missing ({comparisonData.summary.missingCount})
+              </button>
+
+              {comparisonData.summary.notInSystemCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setCompareCategoryFilter('not_in_system')}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '9999px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    border: '1.5px solid #d97706',
+                    backgroundColor: compareCategoryFilter === 'not_in_system' ? '#d97706' : '#fffbeb',
+                    color: compareCategoryFilter === 'not_in_system' ? '#ffffff' : '#b45309'
+                  }}
+                  title="Device names not found in our master 241 system inventory"
+                >
+                  ❓ Not in System ({comparisonData.summary.notInSystemCount})
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
 
-      {/* Main Table matching Image 4 */}
-      <div className="responsive-table-wrapper">
-        <table style={{ width: '100%', minWidth: '960px', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+      {/* ===================================================================== */}
+      {/* MAIN TABLE CARD CONTAINER (Matching Image 1 & Image 2) */}
+      {/* ===================================================================== */}
+      <div style={{
+        backgroundColor: '#ffffff',
+        border: '1.5px solid #e5e7eb',
+        borderRadius: '20px',
+        padding: '22px 24px',
+        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.03)'
+      }}>
+        {/* Card Toolbar: Date Pill & Search on Left, Filters & Add on Right matching Image 1 */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '14px',
+          marginBottom: '18px'
+        }}>
+          {/* Left: Date Pill matching Image 1 + Search input */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', flex: '1 1 auto' }}>
+            <div style={{
+              backgroundColor: '#f3f4f6',
+              border: '1px solid #d1d5db',
+              borderRadius: '8px',
+              padding: '8px 18px',
+              fontSize: '12.5px',
+              fontWeight: 600,
+              color: '#4b5563',
+              whiteSpace: 'nowrap'
+            }}>
+              {isViewAllDays
+                ? 'All Dates'
+                : isComparing && comparisonData
+                ? `${formatDayString(selectedDay)} (${comparisonData.fromTask.label} = ${comparisonData.toTask.label})`
+                : formatDayString(selectedDay) || '21st November'}
+            </div>
+
+            {/* Search bar pill */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              backgroundColor: '#f3f4f6',
+              borderRadius: '9999px',
+              padding: '8px 18px',
+              width: '100%',
+              maxWidth: '300px',
+              boxSizing: 'border-box'
+            }}>
+              <Search size={16} color="#9ca3af" />
+              <input
+                type="text"
+                placeholder="Search by name, device..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  outline: 'none',
+                  fontSize: '13px',
+                  color: '#374151',
+                  width: '100%'
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Right: Filters and Add button matching Image 1 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            {/* Groups dropdown */}
+            <div style={{ position: 'relative' }}>
+              <select
+                value={selectedGroup}
+                onChange={e => setSelectedGroup(e.target.value)}
+                style={{
+                  appearance: 'none',
+                  backgroundColor: '#f3f4f6',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  padding: '8px 34px 8px 16px',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  color: '#374151',
+                  cursor: 'pointer',
+                  outline: 'none'
+                }}
+              >
+                <option value="All Groups">All Groups</option>
+                <option value="No Group">No Group (Empty)</option>
+                <option value="Group A">Group A</option>
+                <option value="Group B">Group B</option>
+                <option value="Group C">Group C</option>
+                <option value="Group D">Group D</option>
+                <option value="Group AO">Group AO</option>
+              </select>
+              <ChevronDown size={14} color="#6b7280" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+            </div>
+
+            {/* Shift dropdown */}
+            <div style={{ position: 'relative' }}>
+              <select
+                value={selectedShift}
+                onChange={e => setSelectedShift(e.target.value)}
+                style={{
+                  appearance: 'none',
+                  backgroundColor: '#f3f4f6',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  padding: '8px 34px 8px 16px',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  color: '#374151',
+                  cursor: 'pointer',
+                  outline: 'none'
+                }}
+              >
+                <option value="All Shift">All Shift</option>
+                <option value="Day">Day</option>
+                <option value="Night">Night</option>
+              </select>
+              <ChevronDown size={14} color="#6b7280" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+            </div>
+
+            {/* Status dropdown */}
+            <div style={{ position: 'relative' }}>
+              <select
+                value={selectedStatus}
+                onChange={e => setSelectedStatus(e.target.value)}
+                style={{
+                  appearance: 'none',
+                  backgroundColor: '#f3f4f6',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  padding: '8px 34px 8px 16px',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  color: '#374151',
+                  cursor: 'pointer',
+                  outline: 'none'
+                }}
+              >
+                <option value="All Status">All Status</option>
+                <option value="Done">Done</option>
+                <option value="Pending">Pending</option>
+                <option value="Missing">Missing</option>
+              </select>
+              <ChevronDown size={14} color="#6b7280" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+            </div>
+
+            {/* Green Add button matching Image 1 */}
+            {canEdit && (
+              <button
+                onClick={() => onOpenAddModal({ task_number: selectedTaskNumber, task_date: selectedDateStr })}
+                className="btn-primary-lime"
+              >
+                Add
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Scrollable Table Container */}
+        <div className="responsive-table-wrapper" style={{ maxHeight: '540px', overflowY: 'auto', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
+          <table style={{ width: '100%', minWidth: '960px', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
+              <tr style={{ backgroundColor: '#f3f4f6', borderBottom: '1px solid #e5e7eb' }}>
                 <th style={{ padding: '16px 14px', fontSize: '13px', fontWeight: 700, color: '#111827', width: '70px', textAlign: 'center', borderRight: '1px solid #e5e7eb' }}>
                   Rec. No.
                 </th>
@@ -1053,7 +1562,7 @@ export default function Dashboard({
                 <th style={{ padding: '16px 14px', fontSize: '13px', fontWeight: 700, color: '#111827', width: '110px', borderRight: '1px solid #e5e7eb' }}>
                   Return Time
                 </th>
-                <th style={{ padding: '16px 16px', fontSize: '13px', fontWeight: 700, color: '#111827', minWidth: '180px', borderRight: '1px solid #e5e7eb' }}>
+                <th style={{ padding: '16px 16px', fontSize: '13px', fontWeight: 700, color: '#111827', minWidth: '240px', borderRight: '1px solid #e5e7eb' }}>
                   Device Details
                 </th>
                 <th style={{ padding: '16px 16px', fontSize: '13px', fontWeight: 700, color: '#111827', borderRight: '1px solid #e5e7eb' }}>
@@ -1071,20 +1580,30 @@ export default function Dashboard({
               {filteredRecords.length === 0 ? (
                 <tr>
                   <td colSpan={10} style={{ padding: '40px', textAlign: 'center', color: '#9ca3af', fontSize: '14px' }}>
-                    {loading ? 'Loading records...' : `No records found for ${isViewAllDays ? 'selected filters' : formatDayString(selectedDay)}.`}
+                    {loading || comparisonLoading ? 'Loading comparison records...' : `No records found for selected filter.`}
                   </td>
                 </tr>
               ) : (
                 filteredRecords.map((r, index) => {
                   const isDone = (r.sign || '').toLowerCase() === 'done';
-                  const isNewInRound = r.is_new_in_round === 1;
+                  const isMissing = (r.sign || '').toLowerCase() === 'missing';
+                  const isNewInRound = r.is_new_in_round === 1 || r.is_newly_added;
+                  const isPrevAvail = Boolean(r.is_previously_available);
+                  const isDropped = Boolean(r.is_dropped_from_prev);
+                  const isNotInSystem = Boolean(r.is_not_in_system);
+
+                  let rowBg = '#ecfbfb';
+                  if (isDropped) rowBg = '#fff5f5';
+                  else if (isNotInSystem) rowBg = '#fffbeb';
+                  else if (isNewInRound) rowBg = '#f0fdf4';
+                  else if (index % 2 === 1) rowBg = '#ffffff';
 
                   return (
                     <tr
-                      key={r.id}
+                      key={r.id || `row-${index}`}
                       style={{
                         borderBottom: '1px solid #e5e7eb',
-                        backgroundColor: isNewInRound ? '#f0fdf4' : '#ecfbfb',
+                        backgroundColor: rowBg,
                         transition: 'background-color 0.15s ease'
                       }}
                     >
@@ -1124,7 +1643,7 @@ export default function Dashboard({
                         {r.return_time || ''}
                       </td>
 
-                      {/* Device Details (Stacked Return & Taking pills matching Image 4 & multi-device support) */}
+                      {/* Device Details (Stacked Return & Taking pills + Comparison Status Badges) */}
                       <td style={{ padding: '14px 16px', borderRight: '1px solid #e5e7eb' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                           {/* Return row if device exists */}
@@ -1156,9 +1675,9 @@ export default function Dashboard({
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
                                 {r.taking_device.split(/[,+&/]/).map(d => d.trim()).filter(Boolean).map((dev, i) => (
                                   <span key={i} style={{
-                                    backgroundColor: isNewInRound ? '#ecfdf5' : '#f1f5f9',
-                                    color: isNewInRound ? '#047857' : '#1f2937',
-                                    border: isNewInRound ? '1px solid #86efac' : 'none',
+                                    backgroundColor: isDropped ? '#fee2e2' : (isNewInRound ? '#ecfdf5' : '#ffffff'),
+                                    color: isDropped ? '#b91c1c' : (isNewInRound ? '#047857' : '#1f2937'),
+                                    border: isDropped ? '1px solid #fca5a5' : (isNewInRound ? '1px solid #86efac' : '1px solid #e2e8f0'),
                                     fontWeight: 700,
                                     padding: '2px 8px',
                                     borderRadius: '6px',
@@ -1167,7 +1686,9 @@ export default function Dashboard({
                                     {dev}
                                   </span>
                                 ))}
-                                {isNewInRound && (
+
+                                {/* Comparison Badges */}
+                                {isNewInRound && !isDropped && (
                                   <span style={{
                                     backgroundColor: '#15803d',
                                     color: '#ffffff',
@@ -1177,7 +1698,51 @@ export default function Dashboard({
                                     borderRadius: '4px',
                                     whiteSpace: 'nowrap'
                                   }}>
-                                    + NEW TAKING {r.round_number ? `(Round ${r.round_number})` : ''}
+                                    + NEWLY ADDED {r.compared_from_label ? `(vs ${r.compared_from_label})` : ''}
+                                  </span>
+                                )}
+
+                                {isPrevAvail && !isNewInRound && !isDropped && (
+                                  <span style={{
+                                    backgroundColor: '#e0f2fe',
+                                    color: '#0369a1',
+                                    border: '1px solid #bae6fd',
+                                    fontSize: '10px',
+                                    fontWeight: 700,
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    whiteSpace: 'nowrap'
+                                  }}>
+                                    ✓ PREVIOUSLY AVAILABLE {r.compared_from_label ? `(${r.compared_from_label})` : ''}
+                                  </span>
+                                )}
+
+                                {isDropped && (
+                                  <span style={{
+                                    backgroundColor: '#dc2626',
+                                    color: '#ffffff',
+                                    fontSize: '10px',
+                                    fontWeight: 800,
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    whiteSpace: 'nowrap'
+                                  }}>
+                                    ⚠ NOT IN {r.compared_to_label} (Active in {r.compared_from_label})
+                                  </span>
+                                )}
+
+                                {isNotInSystem && (
+                                  <span style={{
+                                    backgroundColor: '#fef3c7',
+                                    color: '#b45309',
+                                    border: '1px solid #fcd34d',
+                                    fontSize: '10px',
+                                    fontWeight: 800,
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    whiteSpace: 'nowrap'
+                                  }}>
+                                    ❓ NOT IN SYSTEM INVENTORY
                                   </span>
                                 )}
                               </div>
@@ -1200,66 +1765,103 @@ export default function Dashboard({
                         <span style={{
                           fontWeight: 700,
                           fontSize: '13px',
-                          color: isDone ? '#16a34a' : '#ea580c'
+                          color: isMissing ? '#dc2626' : (isDone ? '#16a34a' : '#ea580c')
                         }}>
                           {r.sign || 'Done'}
                         </span>
                       </td>
 
-                      {/* Action (Edit and Delete buttons or View only indicator) */}
+                      {/* Action (Edit and Delete buttons or Resolve buttons for dropped items) */}
                       <td style={{ padding: '16px 14px', textAlign: 'center' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                          {canEdit && (
+                        {isDropped && canEdit ? (
+                          <div style={{ display: 'inline-flex', gap: '4px' }}>
                             <button
-                              onClick={() => onOpenEditModal(r)}
+                              type="button"
+                              onClick={() => handleResolveComparedDevice(r.taking_device, 'returned')}
                               style={{
-                                color: '#eab308',
-                                backgroundColor: 'transparent',
-                                border: 'none',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                padding: '4px',
-                                borderRadius: '6px'
+                                backgroundColor: r.resolution?.status === 'returned' ? '#15803d' : '#f0fdf4',
+                                color: r.resolution?.status === 'returned' ? '#ffffff' : '#15803d',
+                                border: '1px solid #86efac',
+                                fontSize: '10.5px',
+                                fontWeight: 700,
+                                padding: '3px 7px',
+                                borderRadius: '5px',
+                                cursor: 'pointer'
                               }}
-                              title="Edit Record"
                             >
-                              <Edit2 size={16} color="#eab308" />
+                              ✓ Returned
                             </button>
-                          )}
-                          {canDelete && (
                             <button
-                              onClick={() => onDeleteRecord(r.id)}
+                              type="button"
+                              onClick={() => handleResolveComparedDevice(r.taking_device, 'missing')}
                               style={{
-                                color: '#ef4444',
-                                backgroundColor: 'transparent',
-                                border: 'none',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                padding: '4px',
-                                borderRadius: '6px'
+                                backgroundColor: r.resolution?.status === 'missing' ? '#dc2626' : '#fef2f2',
+                                color: r.resolution?.status === 'missing' ? '#ffffff' : '#dc2626',
+                                border: '1px solid #fca5a5',
+                                fontSize: '10.5px',
+                                fontWeight: 700,
+                                padding: '3px 7px',
+                                borderRadius: '5px',
+                                cursor: 'pointer'
                               }}
-                              title="Delete Record"
                             >
-                              <Trash2 size={16} color="#ef4444" />
+                              ✕ Missing
                             </button>
-                          )}
-                          {!canEdit && !canDelete && (
-                            <span style={{
-                              fontSize: '11.5px',
-                              color: '#9ca3af',
-                              fontWeight: 600,
-                              backgroundColor: '#f3f4f6',
-                              padding: '3px 8px',
-                              borderRadius: '6px'
-                            }}>
-                              View only
-                            </span>
-                          )}
-                        </div>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                            {canEdit && (
+                              <button
+                                onClick={() => onOpenEditModal(r)}
+                                style={{
+                                  color: '#eab308',
+                                  backgroundColor: 'transparent',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  padding: '4px',
+                                  borderRadius: '6px'
+                                }}
+                                title="Edit Record"
+                              >
+                                <Edit2 size={16} color="#eab308" />
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button
+                                onClick={() => handleDeleteDashboardRow(r, index)}
+                                style={{
+                                  color: '#ef4444',
+                                  backgroundColor: 'transparent',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  padding: '4px',
+                                  borderRadius: '6px'
+                                }}
+                                title="Delete Record"
+                              >
+                                <Trash2 size={16} color="#ef4444" />
+                              </button>
+                            )}
+                            {!canEdit && !canDelete && (
+                              <span style={{
+                                fontSize: '11.5px',
+                                color: '#9ca3af',
+                                fontWeight: 600,
+                                backgroundColor: '#f3f4f6',
+                                padding: '3px 8px',
+                                borderRadius: '6px'
+                              }}>
+                                View only
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
@@ -1285,7 +1887,505 @@ export default function Dashboard({
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* ===================================================================== */}
+        {/* RED ATTENTION REQUIRED BANNER BELOW TABLE (Matching User Image 2)     */}
+        {/* ===================================================================== */}
+        {isComparing && comparisonData && comparisonData.notAvailable && comparisonData.notAvailable.length > 0 && (
+          <div style={{
+            backgroundColor: '#fff5f5',
+            border: '1.5px solid #f87171',
+            borderRadius: '14px',
+            padding: '16px 20px',
+            marginTop: '18px',
+            boxShadow: '0 2px 6px rgba(239, 68, 68, 0.08)'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '8px',
+              marginBottom: '12px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '16px' }}>⚠️</span>
+                <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#991b1b' }}>
+                  Attention Required: {comparisonData.notAvailable.length} Devices Not In List ({comparisonData.fromTask.label} → {comparisonData.toTask.label})
+                </span>
+              </div>
+              <span style={{ fontSize: '12px', color: '#b91c1c', fontWeight: 600 }}>
+                Active in previous check ({comparisonData.fromTask.label}) but missing in {comparisonData.toTask.label}. Check office return or mark missing:
+              </span>
+            </div>
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))',
+              gap: '10px'
+            }}>
+              {comparisonData.notAvailable.map((item, dIdx) => {
+                const resolution = item.resolution || null;
+                return (
+                  <div
+                    key={dIdx}
+                    style={{
+                      backgroundColor: '#ffffff',
+                      border: resolution
+                        ? (resolution.status === 'returned' ? '1.5px solid #86efac' : '1.5px solid #fca5a5')
+                        : '1.5px solid #fecaca',
+                      borderRadius: '10px',
+                      padding: '10px 14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '10px'
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#111827' }}>
+                        {item.device_tag}
+                      </div>
+                      <div style={{ fontSize: '11px', marginTop: '2px' }}>
+                        {resolution ? (
+                          resolution.status === 'returned' ? (
+                            <span style={{ color: '#15803d', fontWeight: 700 }}>✓ Returned to Office</span>
+                          ) : (
+                            <span style={{ color: '#dc2626', fontWeight: 700 }}>✕ Marked as Missing</span>
+                          )
+                        ) : (
+                          <span style={{ color: '#b91c1c', fontWeight: 600 }}>⚠️ Awaiting Verification</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {canEdit ? (
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleResolveComparedDevice(item.device_tag, 'returned')}
+                          style={{
+                            backgroundColor: resolution?.status === 'returned' ? '#15803d' : '#f0fdf4',
+                            color: resolution?.status === 'returned' ? '#ffffff' : '#15803d',
+                            border: '1px solid #86efac',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            padding: '5px 10px',
+                            borderRadius: '6px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          ✓ Returned
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleResolveComparedDevice(item.device_tag, 'missing')}
+                          style={{
+                            backgroundColor: resolution?.status === 'missing' ? '#dc2626' : '#fef2f2',
+                            color: resolution?.status === 'missing' ? '#ffffff' : '#dc2626',
+                            border: '1px solid #fca5a5',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            padding: '5px 10px',
+                            borderRadius: '6px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          ✕ Missing
+                        </button>
+                      </div>
+                    ) : (
+                      <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 600 }}>View Only</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ===================================================================== */}
+        {/* NAMES NOT AVAILABLE IN SYSTEM INVENTORY BANNER                        */}
+        {/* ===================================================================== */}
+        {isComparing && comparisonData && comparisonData.notInSystem && comparisonData.notInSystem.length > 0 && (
+          <div style={{
+            backgroundColor: '#fffbeb',
+            border: '1.5px solid #f59e0b',
+            borderRadius: '14px',
+            padding: '14px 18px',
+            marginTop: '14px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '16px' }}>🔍</span>
+                <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#92400e' }}>
+                  Names Not Available in Our System Inventory ({comparisonData.notInSystem.length})
+                </span>
+              </div>
+              <span style={{ fontSize: '12px', color: '#b45309', fontWeight: 600 }}>
+                These device names/tags do not match any of the 241 registered mobile units in system inventory:
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {comparisonData.notInSystem.map((u, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    border: '1.5px solid #fcd34d',
+                    borderRadius: '8px',
+                    padding: '6px 12px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '12.5px'
+                  }}
+                >
+                  <strong style={{ color: '#111827' }}>{u.device_tag}</strong>
+                  <span style={{ color: '#6b7280', fontSize: '11.5px' }}>
+                    (EMP: {u.emp_name} • {u.task_label})
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* ===================================================================== */}
+      {/* INTERACTIVE TASK COMPARISON INTELLIGENCE POPUP MODAL                  */}
+      {/* ===================================================================== */}
+      {showComparisonPopup && comparisonData && (
+        <div
+          onClick={() => setShowComparisonPopup(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(17, 24, 39, 0.55)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '20px',
+              border: '2px solid #84cc16',
+              width: '100%',
+              maxWidth: '940px',
+              maxHeight: '88vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              overflow: 'hidden'
+            }}
+          >
+            {/* Popup Header */}
+            <div style={{
+              padding: '18px 24px',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: '#f8fafc'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{
+                    backgroundColor: '#b5f23d',
+                    color: '#111827',
+                    fontWeight: 800,
+                    fontSize: '12px',
+                    padding: '4px 10px',
+                    borderRadius: '6px'
+                  }}>
+                    {comparisonData.fromTask.label} = {comparisonData.toTask.label}
+                  </span>
+                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#111827' }}>
+                    Task Comparison & Device Availability Report
+                  </h3>
+                </div>
+                <p style={{ margin: '4px 0 0 0', fontSize: '12.5px', color: '#6b7280' }}>
+                  Comparing previous active devices in <strong>{comparisonData.fromTask.label}</strong> ({comparisonData.summary.fromTotal} mobiles) with <strong>{comparisonData.toTask.label}</strong> ({comparisonData.summary.toTotal} mobiles)
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowComparisonPopup(false)}
+                style={{
+                  backgroundColor: '#f3f4f6',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  color: '#374151',
+                  cursor: 'pointer'
+                }}
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            {/* Popup Category Tabs */}
+            <div style={{
+              display: 'flex',
+              gap: '8px',
+              padding: '12px 24px',
+              borderBottom: '1px solid #e5e7eb',
+              backgroundColor: '#ffffff',
+              flexWrap: 'wrap'
+            }}>
+              {[
+                { id: 'overview', label: 'All Categories Overview' },
+                { id: 'previously_available', label: `✓ Previously Available (${comparisonData.summary.previouslyAvailableCount})` },
+                { id: 'not_available', label: `⚠ Not Available / Dropped (${comparisonData.summary.notAvailableCount})` },
+                { id: 'newly_added', label: `+ Newly Added (${comparisonData.summary.newlyAddedCount})` },
+                { id: 'not_in_system', label: `❓ Names Not in System (${comparisonData.summary.notInSystemCount})` }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setPopupActiveTab(tab.id)}
+                  style={{
+                    padding: '7px 14px',
+                    borderRadius: '8px',
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    border: popupActiveTab === tab.id ? '1.5px solid #84cc16' : '1px solid #e5e7eb',
+                    backgroundColor: popupActiveTab === tab.id ? '#f7fee7' : '#f9fafb',
+                    color: popupActiveTab === tab.id ? '#365314' : '#4b5563'
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Popup Body Content */}
+            <div style={{ padding: '20px 24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              {/* 4 Key KPI Summary Boxes inside Popup */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '12px' }}>
+                <div
+                  onClick={() => setPopupActiveTab('previously_available')}
+                  style={{ backgroundColor: '#ecfeff', border: '1.5px solid #67e8f9', borderRadius: '12px', padding: '12px 16px', cursor: 'pointer' }}
+                >
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#0e7490' }}>1. Previously Available</div>
+                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#0891b2', margin: '4px 0' }}>
+                    {comparisonData.summary.previouslyAvailableCount}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#155e75' }}>
+                    Active in {comparisonData.fromTask.label} & still in {comparisonData.toTask.label}
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => setPopupActiveTab('not_available')}
+                  style={{ backgroundColor: '#fef2f2', border: '1.5px solid #fca5a5', borderRadius: '12px', padding: '12px 16px', cursor: 'pointer' }}
+                >
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#b91c1c' }}>2. Not Available (Attention)</div>
+                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#dc2626', margin: '4px 0' }}>
+                    {comparisonData.summary.notAvailableCount}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#991b1b' }}>
+                    Was in {comparisonData.fromTask.label}, missing from {comparisonData.toTask.label}
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => setPopupActiveTab('newly_added')}
+                  style={{ backgroundColor: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '12px', padding: '12px 16px', cursor: 'pointer' }}
+                >
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#15803d' }}>3. Newly Added</div>
+                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#16a34a', margin: '4px 0' }}>
+                    +{comparisonData.summary.newlyAddedCount}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#166534' }}>
+                    Newly taken in {comparisonData.toTask.label}
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => setPopupActiveTab('not_in_system')}
+                  style={{ backgroundColor: '#fffbeb', border: '1.5px solid #fcd34d', borderRadius: '12px', padding: '12px 16px', cursor: 'pointer' }}
+                >
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#b45309' }}>4. Names Not in System</div>
+                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#d97706', margin: '4px 0' }}>
+                    {comparisonData.summary.notInSystemCount}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#92400e' }}>
+                    Unregistered device names not in 241 inventory
+                  </div>
+                </div>
+              </div>
+
+              {/* Section: Not Available / Dropped Devices */}
+              {(popupActiveTab === 'overview' || popupActiveTab === 'not_available') && (
+                <div style={{ backgroundColor: '#fff5f5', border: '1.5px solid #fca5a5', borderRadius: '12px', padding: '14px 16px' }}>
+                  <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#991b1b', marginBottom: '10px' }}>
+                    ⚠️ Not Available in {comparisonData.toTask.label} (Were Active in {comparisonData.fromTask.label}: {comparisonData.notAvailable.length} Mobiles)
+                  </div>
+                  {comparisonData.notAvailable.length === 0 ? (
+                    <div style={{ fontSize: '12.5px', color: '#6b7280' }}>All devices from {comparisonData.fromTask.label} are accounted for in {comparisonData.toTask.label}.</div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(245px, 1fr))', gap: '8px' }}>
+                      {comparisonData.notAvailable.map((item, idx) => {
+                        const res = item.resolution;
+                        return (
+                          <div key={idx} style={{ backgroundColor: '#ffffff', border: '1px solid #fecaca', borderRadius: '8px', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div>
+                              <div style={{ fontSize: '13px', fontWeight: 800, color: '#111827' }}>{item.device_tag}</div>
+                              <div style={{ fontSize: '11px', color: res?.status === 'returned' ? '#15803d' : (res?.status === 'missing' ? '#dc2626' : '#b91c1c'), fontWeight: 600 }}>
+                                {res?.status === 'returned' ? '✓ Returned' : (res?.status === 'missing' ? '✕ Missing' : '⚠️ Awaiting Verification')}
+                              </div>
+                            </div>
+                            {canEdit && (
+                              <div style={{ display: 'flex', gap: '4px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleResolveComparedDevice(item.device_tag, 'returned')}
+                                  style={{
+                                    backgroundColor: res?.status === 'returned' ? '#15803d' : '#f0fdf4',
+                                    color: res?.status === 'returned' ? '#ffffff' : '#15803d',
+                                    border: '1px solid #86efac',
+                                    fontSize: '10.5px',
+                                    fontWeight: 700,
+                                    padding: '4px 8px',
+                                    borderRadius: '5px',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  ✓ Returned
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleResolveComparedDevice(item.device_tag, 'missing')}
+                                  style={{
+                                    backgroundColor: res?.status === 'missing' ? '#dc2626' : '#fef2f2',
+                                    color: res?.status === 'missing' ? '#ffffff' : '#dc2626',
+                                    border: '1px solid #fca5a5',
+                                    fontSize: '10.5px',
+                                    fontWeight: 700,
+                                    padding: '4px 8px',
+                                    borderRadius: '5px',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  ✕ Missing
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Section: Newly Added Devices */}
+              {(popupActiveTab === 'overview' || popupActiveTab === 'newly_added') && (
+                <div style={{ backgroundColor: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '12px', padding: '14px 16px' }}>
+                  <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#166534', marginBottom: '10px' }}>
+                    + Newly Added in {comparisonData.toTask.label} ({comparisonData.newlyAdded.length} Mobiles)
+                  </div>
+                  {comparisonData.newlyAdded.length === 0 ? (
+                    <div style={{ fontSize: '12.5px', color: '#6b7280' }}>No newly added devices in {comparisonData.toTask.label}.</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                      {comparisonData.newlyAdded.map((item, idx) => (
+                        <span key={idx} style={{ backgroundColor: '#ffffff', border: '1.5px solid #86efac', color: '#15803d', fontWeight: 700, fontSize: '12.5px', padding: '5px 11px', borderRadius: '8px' }}>
+                          {item.device_tag} <span style={{ color: '#6b7280', fontWeight: 500, fontSize: '11px' }}>(EMP: {item.emp_name})</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Section: Previously Available (Retained) Devices */}
+              {(popupActiveTab === 'overview' || popupActiveTab === 'previously_available') && (
+                <div style={{ backgroundColor: '#ecfeff', border: '1.5px solid #a5f3fc', borderRadius: '12px', padding: '14px 16px' }}>
+                  <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#155e75', marginBottom: '10px' }}>
+                    ✓ Previously Available (Active in Both {comparisonData.fromTask.label} & {comparisonData.toTask.label}: {comparisonData.previouslyAvailable.length} Mobiles)
+                  </div>
+                  {comparisonData.previouslyAvailable.length === 0 ? (
+                    <div style={{ fontSize: '12.5px', color: '#6b7280' }}>No retained devices between these two tasks.</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                      {comparisonData.previouslyAvailable.map((item, idx) => (
+                        <span key={idx} style={{ backgroundColor: '#ffffff', border: '1px solid #67e8f9', color: '#0e7490', fontWeight: 700, fontSize: '12.5px', padding: '5px 11px', borderRadius: '8px' }}>
+                          {item.device_tag} <span style={{ color: '#6b7280', fontWeight: 500, fontSize: '11px' }}>(EMP: {item.emp_name})</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Section: Names Not Available in System Inventory */}
+              {(popupActiveTab === 'overview' || popupActiveTab === 'not_in_system') && (
+                <div style={{ backgroundColor: '#fffbeb', border: '1.5px solid #fcd34d', borderRadius: '12px', padding: '14px 16px' }}>
+                  <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#92400e', marginBottom: '10px' }}>
+                    ❓ Names Not Available in Our System Inventory ({comparisonData.notInSystem.length})
+                  </div>
+                  {comparisonData.notInSystem.length === 0 ? (
+                    <div style={{ fontSize: '12.5px', color: '#15803d', fontWeight: 600 }}>✓ All device names in both tasks match registered units in our system inventory!</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                      {comparisonData.notInSystem.map((item, idx) => (
+                        <div key={idx} style={{ backgroundColor: '#ffffff', border: '1.5px solid #f59e0b', borderRadius: '8px', padding: '6px 12px', fontSize: '12.5px' }}>
+                          <strong style={{ color: '#b45309' }}>{item.device_tag}</strong> — <span style={{ color: '#374151' }}>EMP: {item.emp_name} ({item.task_label})</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Popup Footer */}
+            <div style={{
+              padding: '14px 24px',
+              borderTop: '1px solid #e5e7eb',
+              backgroundColor: '#f8fafc',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '10px'
+            }}>
+              <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                Click any category pill above the Dashboard table to filter rows directly.
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowComparisonPopup(false)}
+                style={{
+                  backgroundColor: '#84cc16',
+                  color: '#000000',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '9px 20px',
+                  fontSize: '13px',
+                  fontWeight: 800,
+                  cursor: 'pointer'
+                }}
+              >
+                View in Dashboard Table
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

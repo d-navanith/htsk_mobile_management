@@ -64,6 +64,8 @@ const {
   saveTaskRound,
   updateTaskRound,
   resolveDroppedDevice,
+  getAvailableTaskComparisonList,
+  compareTwoTasks,
   dbRun,
   dbGet,
   dbAll
@@ -659,7 +661,7 @@ app.post('/api/daily-task/resolve-device', requireCapability('manage_devices'), 
     }
     const result = await resolveDroppedDevice({
       task_number: task_number ? parseInt(task_number) : 19,
-      round_number: round_number ? parseInt(round_number) : 2,
+      round_number: round_number ? parseInt(round_number) : 1,
       device_tag,
       action,
       admin_user: admin_user || 'Shanaka'
@@ -667,6 +669,40 @@ app.post('/api/daily-task/resolve-device', requireCapability('manage_devices'), 
     res.json({ success: true, ...result });
   } catch (err) {
     console.error('Error resolving device:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5h. Available Tasks / Rounds for Cross-Task Comparison Dropdowns
+app.get('/api/tasks/comparison-list', async (req, res) => {
+  try {
+    const data = await getAvailableTaskComparisonList();
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error('Error fetching comparison list:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5i. Cross-Task Comparison Engine (Compare any Task A = Task B)
+app.get('/api/tasks/compare', async (req, res) => {
+  try {
+    const { from = '20.1', to = '21.1' } = req.query;
+    const data = await compareTwoTasks(from, to);
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error('Error comparing tasks:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/tasks/compare', async (req, res) => {
+  try {
+    const { from = '20.1', to = '21.1' } = req.body;
+    const data = await compareTwoTasks(from, to);
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error('Error comparing tasks:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

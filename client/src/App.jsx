@@ -12,7 +12,6 @@ import DailyTaskSection from './components/DailyTaskSection';
 import InventorySection from './components/InventorySection';
 import ProfileModal from './components/ProfileModal';
 import UserProfileMenu from './components/UserProfileMenu';
-import SkyTechFluidEffect from './components/SkyTechFluidEffect';
 import { Menu } from 'lucide-react';
 
 class ErrorBoundary extends React.Component {
@@ -105,7 +104,6 @@ export default function App() {
   const [editingRecord, setEditingRecord] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [animationStatus, setAnimationStatus] = useState({ allowed: true, activeAnimation: null });
 
   const handleOpenProfile = (tab = 'general') => {
     setProfileModalTab(tab);
@@ -307,27 +305,6 @@ export default function App() {
     }
   }, [canManageUsers, canAccessUpdate, canAccessHistory, canAccessSettings, activeTab]);
 
-  // Sync active system animation status (e.g. SkyTech Fluid Animation)
-  useEffect(() => {
-    if (!isAdminLoggedIn) return;
-    const fetchAnimStatus = async () => {
-      try {
-        const username = currentUser || localStorage.getItem('htsk_current_user') || 'shanaka';
-        const res = await fetch(`/api/user-animation-status?username=${encodeURIComponent(username)}`);
-        const data = await res.json();
-        if (data.success) {
-          setAnimationStatus({
-            allowed: Boolean(data.allowed),
-            activeAnimation: data.activeAnimation
-          });
-        }
-      } catch (_) {}
-    };
-    fetchAnimStatus();
-    window.addEventListener('htsk-animation-updated', fetchAnimStatus);
-    return () => window.removeEventListener('htsk-animation-updated', fetchAnimStatus);
-  }, [isAdminLoggedIn, currentUser]);
-
   // Save manual record
   const handleSaveManualRecord = async recordData => {
     if (!canEdit) {
@@ -450,24 +427,6 @@ export default function App() {
 
   return (
     <div className="app-layout">
-      {/* Interactive SkyTech WebGL2 Fluid Simulation Overlay (when enabled in Animation Management) */}
-      {animationStatus.allowed && (animationStatus.activeAnimation === 'skytech' || animationStatus.activeAnimation === 'fluid') && (
-        <SkyTechFluidEffect
-          fullScreen={true}
-          simulationResolution={256}
-          dyeResolution={1024}
-          cursorRadius={0.011}
-          cursorForce={42}
-          densityAmount={1.15}
-          densityDissipation={0.992}
-          velocityDissipation={0.992}
-          viscosity={0.085}
-          pressureIterations={18}
-          autoPulse={false}
-          opacity={0.48}
-        />
-      )}
-
       {/* Toast Notification */}
       {toastMessage && (
         <div

@@ -22,11 +22,11 @@ export default function SnowEffect({
         fullScreen={false}
         simulationResolution={128}
         dyeResolution={512}
-        cursorRadius={0.025}
-        cursorForce={36}
-        densityAmount={0.95}
+        cursorRadius={0.035}
+        cursorForce={38}
+        densityAmount={1.1}
         autoPulse={true}
-        opacity={0.38}
+        opacity={0.52}
       />
     );
   }

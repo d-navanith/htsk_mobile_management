@@ -16,6 +16,7 @@ const {
   insertDeviceRecord,
   updateDeviceRecord,
   deleteDeviceRecord,
+  deleteRoundOrDeviceRecord,
   getDashboardKPIs,
   getDailyTaskKPIs,
   getActiveDevicesList,
@@ -508,14 +509,45 @@ app.put('/api/records/:id', requireCapability('manage_devices'), async (req, res
   }
 });
 
-// 4. Delete record
+// 4. Delete record (supports both numeric database record IDs and round snapshot records)
 app.delete('/api/records/:id', requireCapability('delete_records'), async (req, res) => {
   try {
     const { id } = req.params;
-    await deleteDeviceRecord(id, req.query.admin_user || 'Shanaka');
-    res.json({ success: true, message: `Record #${id} deleted successfully` });
+    const { task_number, task_date, round_number, round_id, device_tag, emp_name } = { ...req.query, ...req.body };
+    const result = await deleteRoundOrDeviceRecord({
+      id,
+      task_number,
+      task_date,
+      round_number,
+      round_id,
+      device_tag,
+      emp_name,
+      admin_user: req.query.admin_user || req.body?.admin_user || 'Shanaka'
+    });
+    res.json({ success: true, message: `Record #${id} deleted successfully`, data: result });
   } catch (err) {
     console.error('Error deleting record:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4b. Explicit Daily Task Round Record Deletion
+app.post('/api/daily-task/delete-record', requireCapability('delete_records'), async (req, res) => {
+  try {
+    const { id, task_number, task_date, round_number, round_id, device_tag, emp_name, admin_user } = req.body;
+    const result = await deleteRoundOrDeviceRecord({
+      id,
+      task_number,
+      task_date,
+      round_number,
+      round_id,
+      device_tag,
+      emp_name,
+      admin_user: admin_user || 'Shanaka'
+    });
+    res.json({ success: true, message: 'Record deleted from daily task round successfully', data: result });
+  } catch (err) {
+    console.error('Error deleting daily task record:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

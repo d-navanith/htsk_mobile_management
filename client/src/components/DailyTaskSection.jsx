@@ -243,7 +243,7 @@ export default function DailyTaskSection({
 
   useEffect(() => {
     fetchTaskData();
-  }, [selectedDay, currentMonthIndex, currentYear]);
+  }, [selectedDay, currentMonthIndex, currentYear, records]);
 
   // Handle inline shift change
   const handleInlineShiftChange = async (recordId, newShift) => {
@@ -363,6 +363,111 @@ export default function DailyTaskSection({
   const parseDevices = (str) => {
     if (!str) return [];
     return str.split(/[,+&/]/).map(s => s.trim()).filter(Boolean);
+  };
+
+  // Normalizes device key for robust cross-matching
+  const normalizeDeviceTag = (tag) => {
+    if (!tag) return '';
+    const clean = String(tag).replace(/[:;,]+$/g, '').trim().toLowerCase();
+    const m = clean.match(/^([a-z]+)\s*0*(\d+)$/i);
+    if (m) {
+      return `${m[1]}${parseInt(m[2], 10)}`;
+    }
+    return clean.replace(/\s+/g, '');
+  };
+
+  // Delete a record/device from a round with instant optimistic UI update and backend synchronization
+  const handleDeleteRoundRow = async (rnd, r, targetRecord, index) => {
+    if (!canDelete) {
+      alert('You do not have permission to delete records.');
+      return;
+    }
+
+    const devLabel = (r.taking_device || r.return_device || r.name || `Row #${index + 1}`).replace(/[:;,]+$/g, '').trim();
+    const roundTitle = `Task ${selectedDay}.${rnd.round_number}`;
+    if (!window.confirm(`Are you sure you want to delete "${devLabel}" from ${roundTitle}?`)) {
+      return;
+    }
+
+    const targetRecId = targetRecord?.id || r.id;
+    const targetDevTag = r.taking_device || targetRecord?.taking_device || '';
+    const cleanTargetDev = targetDevTag.replace(/[:;,]+$/g, '').trim().toLowerCase();
+    const normTargetDev = normalizeDeviceTag(targetDevTag);
+    const targetEmpName = (r.name || targetRecord?.name || '').trim();
+
+    // 1. Optimistic UI update: Remove row immediately from local state
+    setKpis(prevKpis => {
+      if (!prevKpis || !prevKpis.rounds) return prevKpis;
+      const updatedRounds = prevKpis.rounds.map(roundItem => {
+        if (roundItem.round_number !== rnd.round_number && roundItem.id !== rnd.id) {
+          return roundItem;
+        }
+        const updatedRecords = (roundItem.records || []).filter(item => {
+          if (targetRecId && item.id === targetRecId) return false;
+          const itemDevClean = (item.taking_device || '').replace(/[:;,]+$/g, '').trim().toLowerCase();
+          const itemDevNorm = normalizeDeviceTag(item.taking_device);
+          if (cleanTargetDev && (itemDevClean === cleanTargetDev || (normTargetDev && itemDevNorm === normTargetDev))) return false;
+          if (targetEmpName && (item.name || '').trim() === targetEmpName && (!cleanTargetDev || itemDevClean === cleanTargetDev)) return false;
+          return true;
+        });
+        const isNewTaking = r.is_new_in_round === 1;
+        return {
+          ...roundItem,
+          records: updatedRecords,
+          total_devices: Math.max(0, updatedRecords.length),
+          added_count: isNewTaking ? Math.max(0, (roundItem.added_count || 1) - 1) : (roundItem.added_count || 0)
+        };
+      });
+
+      return {
+        ...prevKpis,
+        rounds: updatedRounds,
+        todayActiveMobiles: Math.max(0, (prevKpis.todayActiveMobiles || 1) - 1)
+      };
+    });
+
+    setTaskRecords(prev => prev.filter(item => {
+      if (targetRecId && item.id === targetRecId) return false;
+      const itemDevClean = (item.taking_device || '').replace(/[:;,]+$/g, '').trim().toLowerCase();
+      const itemDevNorm = normalizeDeviceTag(item.taking_device);
+      if (cleanTargetDev && (itemDevClean === cleanTargetDev || (normTargetDev && itemDevNorm === normTargetDev))) return false;
+      return true;
+    }));
+
+    // 2. Call backend deletion API
+    try {
+      const monthStr = String(currentMonthIndex + 1).padStart(2, '0');
+      const dayStr = String(selectedDay).padStart(2, '0');
+      const selectedDateStr = `${currentYear}-${monthStr}-${dayStr}`;
+
+      const res = await fetch('/api/daily-task/delete-record', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          id: targetRecId,
+          task_number: selectedDay,
+          task_date: selectedDateStr,
+          round_number: rnd.round_number,
+          round_id: rnd.id,
+          device_tag: targetDevTag,
+          emp_name: targetEmpName,
+          admin_user: currentUserName || 'Shanaka'
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        await fetchTaskData();
+        refreshRecords();
+      } else {
+        alert(data.error || 'Failed to delete record.');
+        await fetchTaskData();
+      }
+    } catch (err) {
+      console.error('Error deleting round record:', err);
+      alert('Error deleting record from task round.');
+      await fetchTaskData();
+    }
   };
 
   // Per-round independent filter state
@@ -1014,8 +1119,22 @@ export default function DailyTaskSection({
                       const isNewInRound = rnd.round_number > 1 && r.is_new_in_round === 1;
 
                       // Map to actual DB record if present
-                      const actualRec = taskRecords.find(tr => tr.id === r.id || (tr.taking_device && tr.taking_device.trim().toLowerCase() === (r.taking_device || '').trim().toLowerCase()));
-                      const targetRecord = actualRec || r;
+                      const cleanRDev = (r.taking_device || '').replace(/[:;,]+$/g, '').trim().toLowerCase();
+                      const normRDev = normalizeDeviceTag(r.taking_device);
+                      const actualRec = taskRecords.find(tr => {
+                        if (tr.id && r.id && tr.id === r.id) return true;
+                        if (!cleanRDev) return false;
+                        const cleanTr = (tr.taking_device || '').replace(/[:;,]+$/g, '').trim().toLowerCase();
+                        if (cleanTr === cleanRDev) return true;
+                        if (normRDev && normalizeDeviceTag(tr.taking_device) === normRDev) return true;
+                        return false;
+                      });
+                      const targetRecord = {
+                        ...r,
+                        ...(actualRec || {}),
+                        task_number: selectedDay,
+                        round_number: rnd.round_number
+                      };
 
                       return (
                         <tr
@@ -1199,13 +1318,7 @@ export default function DailyTaskSection({
                               )}
                               {canDelete && (
                                 <button
-                                  onClick={() => {
-                                    if (targetRecord.id && typeof targetRecord.id === 'number') {
-                                      onDeleteRecord(targetRecord.id);
-                                    } else {
-                                      onDeleteRecord(r.id);
-                                    }
-                                  }}
+                                  onClick={() => handleDeleteRoundRow(rnd, r, targetRecord, index)}
                                   style={{
                                     color: '#ef4444',
                                     backgroundColor: 'transparent',

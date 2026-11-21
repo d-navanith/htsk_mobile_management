@@ -716,8 +716,66 @@ async function insertDeviceRecord({
 
 // Update existing record (e.g. Handover update, Return update, Edit)
 async function updateDeviceRecord(id, updates = {}, admin_user = 'Shanaka') {
-  const existing = await getRecordById(id);
-  if (!existing) throw new Error(`Record #${id} not found`);
+  let existing = await getRecordById(id);
+
+  // If not found by primary key in device_records (e.g. string ID like 'round-2-1'), search in daily_task_rounds
+  if (!existing) {
+    const rounds = await dbAll(`SELECT * FROM daily_task_rounds`);
+    let foundRound = null;
+    let foundRec = null;
+
+    for (const rnd of rounds) {
+      if (!rnd.records_json) continue;
+      try {
+        const parsed = JSON.parse(rnd.records_json);
+        const idx = parsed.findIndex(r => String(r.id) === String(id) || (updates.taking_device && r.taking_device && normalizeDeviceTag(r.taking_device) === normalizeDeviceTag(updates.taking_device)));
+        if (idx !== -1) {
+          foundRound = rnd;
+          foundRec = parsed[idx];
+          // Update record within round
+          parsed[idx] = {
+            ...parsed[idx],
+            ...updates,
+            name: updates.name !== undefined ? updates.name.trim() : parsed[idx].name,
+            shift: updates.shift !== undefined ? updates.shift.trim() : parsed[idx].shift,
+            group_name: updates.group !== undefined ? updates.group : (updates.group_name !== undefined ? updates.group_name : parsed[idx].group_name),
+            issued_at: (updates.issued_at || updates.time) !== undefined ? (updates.issued_at || updates.time).trim() : parsed[idx].issued_at,
+            return_time: updates.return_time !== undefined ? updates.return_time.trim() : parsed[idx].return_time,
+            return_device: updates.return_device !== undefined ? updates.return_device.trim() : parsed[idx].return_device,
+            taking_device: updates.taking_device !== undefined ? updates.taking_device.trim() : parsed[idx].taking_device,
+            handover_to: updates.handover_to !== undefined ? updates.handover_to.trim() : parsed[idx].handover_to,
+            sign: updates.sign !== undefined ? updates.sign.trim() : parsed[idx].sign
+          };
+          await dbRun(`UPDATE daily_task_rounds SET records_json = ? WHERE id = ?`, [JSON.stringify(parsed), rnd.id]);
+          break;
+        }
+      } catch (e) {}
+    }
+
+    if (foundRec) {
+      // Materialize into device_records
+      const tNum = updates.task_number || foundRound.task_number || 17;
+      const tDate = updates.task_date || foundRound.task_date || '2026-11-20';
+      const rNum = foundRound.round_number || 1;
+      return await insertDeviceRecord({
+        name: updates.name || foundRec.name,
+        shift: updates.shift || foundRec.shift || 'Day',
+        group: updates.group || updates.group_name || foundRec.group_name || '',
+        issued_at: updates.issued_at || updates.time || foundRec.issued_at || '7.30 A.M.',
+        return_time: updates.return_time || foundRec.return_time || '',
+        return_device: updates.return_device || foundRec.return_device || '',
+        taking_device: updates.taking_device || foundRec.taking_device || '',
+        handover_to: updates.handover_to || foundRec.handover_to || '',
+        sign: updates.sign || foundRec.sign || 'Done',
+        admin_user,
+        task_number: tNum,
+        task_date: tDate,
+        round_number: rNum
+      });
+    }
+
+    throw new Error(`Record #${id} not found`);
+  }
 
   const name = updates.name !== undefined ? updates.name.trim() : existing.name;
   const shift = updates.shift !== undefined ? updates.shift.trim() : existing.shift;
@@ -781,6 +839,43 @@ async function updateDeviceRecord(id, updates = {}, admin_user = 'Shanaka') {
     id
   ]);
 
+  // Synchronize update to any daily_task_rounds matching this record
+  try {
+    const rounds = await dbAll(`SELECT * FROM daily_task_rounds WHERE task_number = ?`, [task_number]);
+    for (const rnd of rounds) {
+      if (!rnd.records_json) continue;
+      const parsed = JSON.parse(rnd.records_json);
+      let changed = false;
+      for (let i = 0; i < parsed.length; i++) {
+        const item = parsed[i];
+        if (
+          String(item.id) === String(id) ||
+          (existing.taking_device && item.taking_device && normalizeDeviceTag(item.taking_device) === normalizeDeviceTag(existing.taking_device)) ||
+          (item.name === existing.name && item.taking_device === existing.taking_device)
+        ) {
+          parsed[i] = {
+            ...item,
+            name: finalEmpName,
+            shift,
+            group_name,
+            issued_at,
+            return_time,
+            return_device,
+            taking_device,
+            handover_to,
+            sign
+          };
+          changed = true;
+        }
+      }
+      if (changed) {
+        await dbRun(`UPDATE daily_task_rounds SET records_json = ? WHERE id = ?`, [JSON.stringify(parsed), rnd.id]);
+      }
+    }
+  } catch (syncErr) {
+    console.error('Error synchronizing round update:', syncErr);
+  }
+
   // Multi-device logging description
   const retDevs = (return_device || '').split(/[,+&/]/).map(d => d.trim()).filter(Boolean);
   const takeDevs = (taking_device || '').split(/[,+&/]/).map(d => d.trim()).filter(Boolean);
@@ -815,25 +910,197 @@ async function updateDeviceRecord(id, updates = {}, admin_user = 'Shanaka') {
   return await getRecordById(id);
 }
 
-// Delete record
-async function deleteDeviceRecord(id, admin_user = 'Shanaka') {
-  const existing = await getRecordById(id);
-  if (existing) {
-    await logHistoryEvent({
-      record_id: id,
-      emp_name: existing.name,
-      action: 'Record Deleted',
-      shift: existing.shift,
-      group_name: existing.group_name,
-      return_device: existing.return_device,
-      taking_device: existing.taking_device,
-      handover_to: existing.handover_to,
-      sign: existing.sign,
-      admin_user,
-      details: `Record #${id} for ${existing.name} was deleted by admin.`
-    });
+// Robust Delete record function: deletes from device_records AND synchronizes all daily_task_rounds
+async function deleteRoundOrDeviceRecord({
+  id = null,
+  task_number = null,
+  task_date = null,
+  round_number = null,
+  round_id = null,
+  device_tag = '',
+  emp_name = '',
+  admin_user = 'Shanaka'
+} = {}) {
+  let deletedFromRecords = 0;
+  let targetTaskNumber = task_number !== null && task_number !== undefined ? parseInt(task_number) : null;
+  let targetDeviceTag = (device_tag || '').trim();
+  let targetEmpName = (emp_name || '').trim();
+
+  // 1. If an ID is provided and is numeric, check device_records
+  const numId = id !== null && id !== undefined && !isNaN(Number(id)) ? Number(id) : null;
+  if (numId) {
+    const existing = await getRecordById(numId);
+    if (existing) {
+      if (!targetTaskNumber && existing.task_number) targetTaskNumber = existing.task_number;
+      if (!targetDeviceTag && existing.taking_device) targetDeviceTag = existing.taking_device;
+      if (!targetEmpName && existing.name) targetEmpName = existing.name;
+
+      await logHistoryEvent({
+        record_id: numId,
+        emp_name: existing.name,
+        action: 'Record Deleted',
+        shift: existing.shift,
+        group_name: existing.group_name,
+        return_device: existing.return_device,
+        taking_device: existing.taking_device,
+        handover_to: existing.handover_to,
+        sign: existing.sign,
+        admin_user,
+        details: `Record #${numId} for ${existing.name} (${existing.taking_device || 'No device'}) was deleted by ${admin_user}.`
+      });
+
+      const res = await dbRun(`DELETE FROM device_records WHERE id = ?`, [numId]);
+      deletedFromRecords += (res?.changes || 1);
+    }
   }
-  return await dbRun(`DELETE FROM device_records WHERE id = ?`, [id]);
+
+  // 2. Also search device_records if task_number and device_tag or emp_name are specified
+  const cleanTargetDev = targetDeviceTag.replace(/[:;,]+$/g, '').trim().toLowerCase();
+  const normTargetDev = normalizeDeviceTag(targetDeviceTag);
+
+  if (targetTaskNumber && (cleanTargetDev || targetEmpName)) {
+    let sql = `SELECT * FROM device_records WHERE task_number = ?`;
+    const params = [targetTaskNumber];
+    if (round_number) {
+      sql += ` AND round_number = ?`;
+      params.push(parseInt(round_number));
+    }
+    const candidateRecords = await dbAll(sql, params);
+    for (const cand of candidateRecords) {
+      const candTakingClean = (cand.taking_device || '').replace(/[:;,]+$/g, '').trim().toLowerCase();
+      const candTakingNorm = normalizeDeviceTag(cand.taking_device);
+      const candName = (cand.name || '').trim();
+
+      const matchDev = cleanTargetDev && (candTakingClean === cleanTargetDev || (normTargetDev && candTakingNorm === normTargetDev));
+      const matchEmp = targetEmpName && candName === targetEmpName && (matchDev || !cleanTargetDev);
+
+      if (matchDev || matchEmp) {
+        await logHistoryEvent({
+          record_id: cand.id,
+          emp_name: cand.name,
+          action: 'Record Deleted',
+          shift: cand.shift,
+          group_name: cand.group_name,
+          return_device: cand.return_device,
+          taking_device: cand.taking_device,
+          handover_to: cand.handover_to,
+          sign: cand.sign,
+          admin_user,
+          details: `Task #${targetTaskNumber} record #${cand.id} for ${cand.name} (${cand.taking_device}) was deleted by ${admin_user}.`
+        });
+        await dbRun(`DELETE FROM device_records WHERE id = ?`, [cand.id]);
+        deletedFromRecords++;
+      }
+    }
+  }
+
+  // 3. Synchronize with daily_task_rounds
+  let roundQuery = `SELECT * FROM daily_task_rounds WHERE 1=1`;
+  const rParams = [];
+  if (round_id) {
+    roundQuery += ` AND id = ?`;
+    rParams.push(round_id);
+  } else if (targetTaskNumber) {
+    roundQuery += ` AND task_number = ?`;
+    rParams.push(targetTaskNumber);
+    if (round_number) {
+      roundQuery += ` AND round_number = ?`;
+      rParams.push(parseInt(round_number));
+    }
+  } else if (task_date) {
+    roundQuery += ` AND task_date = ?`;
+    rParams.push(task_date);
+  }
+
+  const rounds = await dbAll(roundQuery, rParams);
+  let roundsUpdated = 0;
+
+  for (const rnd of rounds) {
+    let records = [];
+    if (rnd.records_json) {
+      try {
+        records = JSON.parse(rnd.records_json);
+      } catch (e) {
+        records = [];
+      }
+    }
+
+    const initialLength = records.length;
+    const strId = id !== null && id !== undefined ? String(id) : null;
+
+    const remainingRecords = records.filter(rec => {
+      const recIdStr = rec.id !== null && rec.id !== undefined ? String(rec.id) : null;
+      const recTakingClean = (rec.taking_device || '').replace(/[:;,]+$/g, '').trim().toLowerCase();
+      const recTakingNorm = normalizeDeviceTag(rec.taking_device);
+      const recEmp = (rec.name || rec.emp_name || '').trim();
+
+      const matchById = strId && recIdStr === strId;
+      const matchByDev = cleanTargetDev && (recTakingClean === cleanTargetDev || (normTargetDev && recTakingNorm === normTargetDev));
+      const matchByEmp = targetEmpName && recEmp === targetEmpName && (matchByDev || !cleanTargetDev);
+
+      return !(matchById || matchByDev || matchByEmp);
+    });
+
+    if (remainingRecords.length !== initialLength) {
+      // Also update added_devices if applicable
+      let addedDevices = [];
+      if (rnd.added_devices) {
+        try {
+          addedDevices = JSON.parse(rnd.added_devices);
+        } catch (e) {
+          addedDevices = [];
+        }
+      }
+      const newAddedDevices = addedDevices.filter(d => {
+        const dClean = String(d).replace(/[:;,]+$/g, '').trim().toLowerCase();
+        const dNorm = normalizeDeviceTag(d);
+        return !(cleanTargetDev && (dClean === cleanTargetDev || (normTargetDev && dNorm === normTargetDev)));
+      });
+
+      // Also update raw_list if applicable
+      let newRawList = rnd.raw_list || '';
+      if (newRawList && cleanTargetDev) {
+        const lines = newRawList.split(/\r?\n/);
+        const filteredLines = lines.filter(line => {
+          const lineClean = line.replace(/[:;,]+$/g, '').trim().toLowerCase();
+          const lineNorm = normalizeDeviceTag(line);
+          return !(lineClean === cleanTargetDev || (normTargetDev && lineNorm === normTargetDev));
+        });
+        newRawList = filteredLines.join('\n');
+      }
+
+      await dbRun(`
+        UPDATE daily_task_rounds SET
+          records_json = ?,
+          added_devices = ?,
+          added_count = ?,
+          total_devices = ?,
+          raw_list = ?
+        WHERE id = ?
+      `, [
+        JSON.stringify(remainingRecords),
+        JSON.stringify(newAddedDevices),
+        newAddedDevices.length,
+        remainingRecords.length,
+        newRawList,
+        rnd.id
+      ]);
+
+      roundsUpdated++;
+    }
+  }
+
+  return {
+    success: true,
+    deletedFromRecords,
+    roundsUpdated,
+    message: `Record successfully deleted.`
+  };
+}
+
+// Delete record (backwards compatible wrapper)
+async function deleteDeviceRecord(id, admin_user = 'Shanaka') {
+  return await deleteRoundOrDeviceRecord({ id, admin_user });
 }
 
 // Helper to split comma, plus, or slash separated device names
@@ -2486,6 +2753,7 @@ module.exports = {
   insertDeviceRecord,
   updateDeviceRecord,
   deleteDeviceRecord,
+  deleteRoundOrDeviceRecord,
   getDashboardKPIs,
   getDailyTaskKPIs,
   getActiveDevicesList,

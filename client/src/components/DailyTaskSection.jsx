@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 
 export default function DailyTaskSection({
+  records = [],
   onOpenAddModal = () => {},
   onOpenEditModal = () => {},
   onDeleteRecord = () => {},
@@ -243,7 +244,7 @@ export default function DailyTaskSection({
 
   useEffect(() => {
     fetchTaskData();
-  }, [selectedDay, currentMonthIndex, currentYear, records]);
+  }, [selectedDay, currentMonthIndex, currentYear]);
 
   // Handle inline shift change
   const handleInlineShiftChange = async (recordId, newShift) => {

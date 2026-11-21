@@ -572,6 +572,7 @@ export default function App() {
 
           {activeTab === 'dailytask' && (
             <DailyTaskSection
+              records={records}
               onOpenAddModal={() => setIsAddModalOpen(true)}
               onOpenEditModal={record => setEditingRecord(record)}
               onDeleteRecord={handleDeleteRecord}

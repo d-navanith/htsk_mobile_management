@@ -77,6 +77,10 @@ export default function Dashboard({
   const [showComparisonPopup, setShowComparisonPopup] = useState(false);
   const [popupActiveTab, setPopupActiveTab] = useState('overview');
 
+  // Full Task Table Deletion Modal State on Dashboard
+  const [showDeleteTableModal, setShowDeleteTableModal] = useState(false);
+  const [deletingTable, setDeletingTable] = useState(false);
+
   const [kpis, setKpis] = useState({
     totalMobilePhones: 241,
     activeMobilePhones: 78,
@@ -299,6 +303,44 @@ export default function Dashboard({
       }
     } catch (err) {
       console.error('Error deleting dashboard record:', err);
+    }
+  };
+
+  // Delete entire active Task / Round table from Dashboard
+  const handleConfirmDeleteDashboardTable = async () => {
+    if (!canDelete) return;
+    const targetTaskNum = comparisonData?.toTask?.task_number || selectedTaskNumber || kpis.activeTaskNumber || 21;
+    const targetRoundNum = comparisonData?.toTask?.round_number || 1;
+
+    setDeletingTable(true);
+    try {
+      const token = localStorage.getItem('htsk_session_token');
+      const res = await fetch('/api/daily-task/delete-round', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          'X-User-Role': currentUserRole
+        },
+        body: JSON.stringify({
+          task_number: targetTaskNum,
+          round_number: targetRoundNum,
+          admin_user: currentUserName || 'Shanaka'
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setShowDeleteTableModal(false);
+        await fetchComparisonOptions(true);
+        await fetchDashboardData(null, '', false);
+        refreshRecords();
+      } else {
+        alert(data.error || 'Failed to delete task table.');
+      }
+    } catch (err) {
+      console.error('Error deleting full task table from dashboard:', err);
+    } finally {
+      setDeletingTable(false);
     }
   };
 
@@ -1370,6 +1412,31 @@ export default function Dashboard({
                 Add
               </button>
             )}
+
+            {/* Delete Full Task Table button */}
+            {canDelete && !isViewAllDays && sourceRecordsForTable.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowDeleteTableModal(true)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  backgroundColor: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  color: '#dc2626',
+                  fontSize: '12.5px',
+                  fontWeight: 700,
+                  padding: '8px 14px',
+                  borderRadius: '8px',
+                  cursor: 'pointer'
+                }}
+                title="Delete entire active task table"
+              >
+                <Trash2 size={14} color="#dc2626" />
+                <span>Delete Table</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -2177,6 +2244,173 @@ export default function Dashboard({
                 }}
               >
                 Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* DELETE FULL TASK TABLE CONFIRMATION POPUP MODAL ON DASHBOARD          */}
+      {/* ===================================================================== */}
+      {showDeleteTableModal && (
+        <div
+          className="modal-overlay"
+          onClick={() => !deletingTable && setShowDeleteTableModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(17, 24, 39, 0.45)',
+            backdropFilter: 'blur(2px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px'
+          }}
+        >
+          <div
+            className="modal-card"
+            onClick={e => e.stopPropagation()}
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '20px',
+              border: '1px solid #e5e7eb',
+              width: '100%',
+              maxWidth: '480px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.12)',
+              overflow: 'hidden'
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{
+              padding: '18px 24px',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              backgroundColor: '#f9fafb'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '10px',
+                  backgroundColor: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Trash2 size={17} color="#dc2626" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '16.5px', fontWeight: 800, color: '#111827' }}>
+                    Delete {comparisonData?.toTask?.label || `Task ${selectedTaskNumber || kpis.activeTaskNumber}.1`} Table
+                  </h3>
+                  <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                    {formatDayString(selectedDay) || 'Active Task Table'}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={deletingTable}
+                onClick={() => setShowDeleteTableModal(false)}
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  width: '30px',
+                  height: '30px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#6b7280'
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '20px 24px' }}>
+              <p style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#374151', lineHeight: 1.5 }}>
+                Are you sure you want to permanently delete the entire{' '}
+                <strong style={{ color: '#111827' }}>
+                  {comparisonData?.toTask?.label || `Task ${selectedTaskNumber || kpis.activeTaskNumber}.1`}
+                </strong>{' '}
+                table ({sourceRecordsForTable.length} mobile records)?
+              </p>
+
+              <div style={{
+                backgroundColor: '#f9fafb',
+                border: '1px solid #e5e7eb',
+                borderRadius: '12px',
+                padding: '12px 14px',
+                fontSize: '12.5px',
+                color: '#4b5563',
+                lineHeight: 1.5
+              }}>
+                {(comparisonData?.toTask?.round_number || 1) > 1 ? (
+                  <span>
+                    Deleting <strong>{comparisonData?.toTask?.label}</strong> will remove this round table and restore Task {comparisonData?.toTask?.task_number} back to its previous round.
+                  </span>
+                ) : (
+                  <span>
+                    Deleting this task table will clear all records for this table so you can re-enter or upload the device list to the correct task.
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '14px 24px',
+              borderTop: '1px solid #e5e7eb',
+              backgroundColor: '#f9fafb',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '10px'
+            }}>
+              <button
+                type="button"
+                disabled={deletingTable}
+                onClick={() => setShowDeleteTableModal(false)}
+                style={{
+                  padding: '9px 18px',
+                  borderRadius: '10px',
+                  border: '1px solid #d1d5db',
+                  backgroundColor: '#ffffff',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: '#374151',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deletingTable}
+                onClick={handleConfirmDeleteDashboardTable}
+                style={{
+                  padding: '9px 20px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  backgroundColor: '#dc2626',
+                  color: '#ffffff',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: deletingTable ? 'wait' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Trash2 size={14} />
+                <span>{deletingTable ? 'Deleting Table...' : `Delete ${comparisonData?.toTask?.label || 'Task Table'}`}</span>
               </button>
             </div>
           </div>

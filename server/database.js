@@ -1103,6 +1103,153 @@ async function deleteDeviceRecord(id, admin_user = 'Shanaka') {
   return await deleteRoundOrDeviceRecord({ id, admin_user });
 }
 
+// Delete an entire Task Table / Round (and restore previous round if deleting round > 1)
+async function deleteFullTaskRound({
+  round_id = null,
+  task_number = null,
+  round_number = null,
+  admin_user = 'Shanaka'
+} = {}) {
+  let targetRound = null;
+  const numRoundId = round_id !== null && round_id !== undefined && !isNaN(Number(round_id)) ? Number(round_id) : null;
+
+  if (numRoundId) {
+    targetRound = await dbGet(`SELECT * FROM daily_task_rounds WHERE id = ?`, [numRoundId]);
+  }
+  if (!targetRound && task_number !== null && task_number !== undefined) {
+    const tNum = parseInt(task_number, 10);
+    if (round_number !== null && round_number !== undefined) {
+      targetRound = await dbGet(`SELECT * FROM daily_task_rounds WHERE task_number = ? AND round_number = ?`, [tNum, parseInt(round_number, 10)]);
+    } else {
+      targetRound = await dbGet(`SELECT * FROM daily_task_rounds WHERE task_number = ? ORDER BY round_number DESC LIMIT 1`, [tNum]);
+    }
+  }
+
+  const resolvedTaskNumber = targetRound ? targetRound.task_number : (task_number ? parseInt(task_number, 10) : null);
+  const resolvedRoundNumber = targetRound ? targetRound.round_number : (round_number ? parseInt(round_number, 10) : 1);
+
+  if (!resolvedTaskNumber) {
+    throw new Error('Valid task_number or round_id is required to delete task table.');
+  }
+
+  // 1. Delete the round from daily_task_rounds
+  if (targetRound && targetRound.id) {
+    await dbRun(`DELETE FROM daily_task_rounds WHERE id = ?`, [targetRound.id]);
+  } else {
+    await dbRun(`DELETE FROM daily_task_rounds WHERE task_number = ? AND round_number = ?`, [resolvedTaskNumber, resolvedRoundNumber]);
+  }
+
+  // 2. Check if any earlier rounds remain for this task_number
+  const remainingRounds = await dbAll(
+    `SELECT * FROM daily_task_rounds WHERE task_number = ? ORDER BY round_number ASC`,
+    [resolvedTaskNumber]
+  );
+
+  // Clear current device_records for this task_number
+  await dbRun(`DELETE FROM device_records WHERE task_number = ?`, [resolvedTaskNumber]);
+
+  let restoredRecordsCount = 0;
+  let restoredToRound = null;
+
+  // If an earlier round (e.g. Task 21.1 after deleting Task 21.2) exists, restore device_records to that round's snapshot
+  if (remainingRounds.length > 0) {
+    const latestRemaining = remainingRounds[remainingRounds.length - 1];
+    restoredToRound = latestRemaining.round_number;
+
+    let snapshotRows = [];
+    if (latestRemaining.records_json && latestRemaining.records_json !== '[]') {
+      try {
+        snapshotRows = JSON.parse(latestRemaining.records_json);
+      } catch (e) {
+        snapshotRows = [];
+      }
+    }
+
+    if (snapshotRows.length === 0 && latestRemaining.raw_list) {
+      const devList = latestRemaining.raw_list.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      snapshotRows = devList.map((tag, idx) => {
+        const num = idx + 1;
+        return {
+          name: num < 100 ? String(num).padStart(2, '0') : String(num),
+          shift: 'Day',
+          group_name: '',
+          issued_at: latestRemaining.check_time || '7.30 A.M.',
+          return_time: '',
+          return_device: '',
+          taking_device: tag,
+          handover_to: '',
+          sign: 'Done',
+          round_number: latestRemaining.round_number,
+          is_new_in_round: 0
+        };
+      });
+    }
+
+    for (const r of snapshotRows) {
+      const empName = (r.name || String(restoredRecordsCount + 1)).trim();
+      const takingDevice = (r.taking_device || '').trim();
+      if (!empName && !takingDevice) continue;
+
+      const details = r.device_details || (takingDevice ? `Taking: ${takingDevice}` : 'Standard Device');
+      await dbRun(`
+        INSERT INTO device_records (
+          name, shift, group_name, issued_at, return_time,
+          return_device, taking_device, device_details, handover_to, sign, active_user,
+          task_number, task_date, round_number, is_new_in_round, prev_round_status, check_time,
+          created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `, [
+        empName,
+        r.shift || 'Day',
+        r.group_name || '',
+        r.issued_at || '7.30 A.M.',
+        r.return_time || '',
+        r.return_device || '',
+        takingDevice,
+        details,
+        r.handover_to || '',
+        r.sign || 'Done',
+        r.handover_to ? r.handover_to : empName,
+        resolvedTaskNumber,
+        latestRemaining.task_date || `2026-11-${String(resolvedTaskNumber).padStart(2, '0')}`,
+        latestRemaining.round_number || 1,
+        r.is_new_in_round ? 1 : 0,
+        r.prev_round_status || 'retained',
+        latestRemaining.check_time || '8.30 A.M.'
+      ]);
+      restoredRecordsCount++;
+    }
+  }
+
+  // 3. Log in history
+  await logHistoryEvent({
+    emp_name: admin_user,
+    action: `Task ${resolvedTaskNumber}.${resolvedRoundNumber} Table Deleted`,
+    shift: 'Day',
+    group_name: '',
+    return_device: '',
+    taking_device: '',
+    handover_to: '',
+    sign: 'Done',
+    admin_user,
+    details: remainingRounds.length > 0
+      ? `Full table Task ${resolvedTaskNumber}.${resolvedRoundNumber} was deleted by ${admin_user}. Restored Task ${resolvedTaskNumber} to Round ${restoredToRound} (${restoredRecordsCount} records).`
+      : `Full table Task ${resolvedTaskNumber}.${resolvedRoundNumber} and all records for Task ${resolvedTaskNumber} were deleted by ${admin_user}.`
+  });
+
+  return {
+    success: true,
+    task_number: resolvedTaskNumber,
+    deleted_round: resolvedRoundNumber,
+    remaining_rounds: remainingRounds.length,
+    restored_round: restoredToRound,
+    restored_count: restoredRecordsCount,
+    message: remainingRounds.length > 0
+      ? `Task ${resolvedTaskNumber}.${resolvedRoundNumber} deleted. Restored to Task ${resolvedTaskNumber}.${restoredToRound}.`
+      : `Task ${resolvedTaskNumber}.${resolvedRoundNumber} table deleted completely.`
+  };
+}
+
 // Helper to split comma, plus, or slash separated device names
 function parseDevices(str) {
   if (!str || typeof str !== 'string') return [];
@@ -3284,6 +3431,7 @@ module.exports = {
   updateDeviceRecord,
   deleteDeviceRecord,
   deleteRoundOrDeviceRecord,
+  deleteFullTaskRound,
   getDashboardKPIs,
   getDailyTaskKPIs,
   getActiveDevicesList,

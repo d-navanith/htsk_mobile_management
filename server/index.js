@@ -17,6 +17,7 @@ const {
   updateDeviceRecord,
   deleteDeviceRecord,
   deleteRoundOrDeviceRecord,
+  deleteFullTaskRound,
   getDashboardKPIs,
   getDailyTaskKPIs,
   getActiveDevicesList,
@@ -550,6 +551,40 @@ app.post('/api/daily-task/delete-record', requireCapability('delete_records'), a
     res.json({ success: true, message: 'Record deleted from daily task round successfully', data: result });
   } catch (err) {
     console.error('Error deleting daily task record:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4c. Delete Full Task Table / Round (and restore previous round if deleting round > 1)
+app.post('/api/daily-task/delete-round', requireCapability('delete_records'), async (req, res) => {
+  try {
+    const { round_id, task_number, round_number, admin_user } = req.body;
+    const result = await deleteFullTaskRound({
+      round_id,
+      task_number,
+      round_number,
+      admin_user: admin_user || 'Shanaka'
+    });
+    res.json({ success: true, message: result.message, data: result });
+  } catch (err) {
+    console.error('Error deleting full task round:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/daily-task/rounds/:id', requireCapability('delete_records'), async (req, res) => {
+  try {
+    const roundId = req.params.id;
+    const { task_number, round_number, admin_user } = { ...req.query, ...req.body };
+    const result = await deleteFullTaskRound({
+      round_id: roundId,
+      task_number,
+      round_number,
+      admin_user: admin_user || 'Shanaka'
+    });
+    res.json({ success: true, message: result.message, data: result });
+  } catch (err) {
+    console.error('Error deleting task round by ID:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

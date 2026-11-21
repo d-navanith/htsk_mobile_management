@@ -474,6 +474,40 @@ export default function DailyTaskSection({
   // Per-round independent filter state
   const [roundFilters, setRoundFilters] = useState({});
 
+  // Full Task / Round Table Deletion Modal State
+  const [roundToDelete, setRoundToDelete] = useState(null);
+  const [deletingRound, setDeletingRound] = useState(false);
+
+  const handleConfirmDeleteFullRound = async () => {
+    if (!roundToDelete || !canDelete) return;
+    setDeletingRound(true);
+    try {
+      const res = await fetch('/api/daily-task/delete-round', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          round_id: typeof roundToDelete.id === 'number' ? roundToDelete.id : null,
+          task_number: selectedDay,
+          round_number: roundToDelete.round_number,
+          admin_user: currentUserName || 'Shanaka'
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setRoundToDelete(null);
+        await fetchTaskData();
+        refreshRecords();
+      } else {
+        alert(data.error || 'Failed to delete task table.');
+      }
+    } catch (err) {
+      console.error('Error deleting full task table:', err);
+      alert('Error deleting full task table.');
+    } finally {
+      setDeletingRound(false);
+    }
+  };
+
   const getRoundFilter = (roundKey) => {
     return roundFilters[roundKey] || {
       group: selectedGroup || 'All Groups',
@@ -930,18 +964,46 @@ export default function DailyTaskSection({
                 </div>
               )}
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span style={{
                   fontSize: '12px',
                   fontWeight: 700,
                   backgroundColor: rnd.round_number === kpis.latestRound ? '#dcfce7' : '#f1f5f9',
                   color: rnd.round_number === kpis.latestRound ? '#15803d' : '#4b5563',
-                  padding: '3px 10px',
+                  padding: '4px 10px',
                   borderRadius: '6px'
                 }}>
                   {rawRoundRecords.length} Mobiles
                   {rnd.added_count > 0 && rnd.round_number > 1 ? ` • +${rnd.added_count} Newly Taken` : ''}
                 </span>
+
+                {canDelete && (rawRoundRecords.length > 0 || typeof rnd.id === 'number') && (
+                  <button
+                    type="button"
+                    onClick={() => setRoundToDelete({
+                      ...rnd,
+                      recordCount: rawRoundRecords.length
+                    })}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      backgroundColor: '#fef2f2',
+                      border: '1px solid #fecaca',
+                      color: '#dc2626',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      padding: '4px 11px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                    title={`Delete entire Task ${selectedDay}.${rnd.round_number} table`}
+                  >
+                    <Trash2 size={13.5} color="#dc2626" />
+                    <span>Delete Table</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1660,6 +1722,170 @@ export default function DailyTaskSection({
                 }}
               >
                 {addingNextTask ? 'Saving Check...' : `Save & Run Task ${selectedDay}.${(kpis.rounds?.length || 1) + 1}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* DELETE FULL TASK / ROUND TABLE CONFIRMATION POPUP MODAL               */}
+      {/* ===================================================================== */}
+      {roundToDelete && (
+        <div
+          className="modal-overlay"
+          onClick={() => !deletingRound && setRoundToDelete(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(17, 24, 39, 0.45)',
+            backdropFilter: 'blur(2px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px'
+          }}
+        >
+          <div
+            className="modal-card"
+            onClick={e => e.stopPropagation()}
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '20px',
+              border: '1px solid #e5e7eb',
+              width: '100%',
+              maxWidth: '480px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.12)',
+              overflow: 'hidden'
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{
+              padding: '18px 24px',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              backgroundColor: '#f9fafb'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '10px',
+                  backgroundColor: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Trash2 size={17} color="#dc2626" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '16.5px', fontWeight: 800, color: '#111827' }}>
+                    Delete Task {selectedDay}.{roundToDelete.round_number} Table
+                  </h3>
+                  <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                    {formatDayString(selectedDay)} • Time {roundToDelete.check_time || '8.30 A.M.'}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={deletingRound}
+                onClick={() => setRoundToDelete(null)}
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  width: '30px',
+                  height: '30px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#6b7280'
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '20px 24px' }}>
+              <p style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#374151', lineHeight: 1.5 }}>
+                Are you sure you want to permanently delete the entire{' '}
+                <strong style={{ color: '#111827' }}>Task {selectedDay}.{roundToDelete.round_number}</strong> table ({roundToDelete.recordCount || 0} mobile records)?
+              </p>
+
+              <div style={{
+                backgroundColor: '#f9fafb',
+                border: '1px solid #e5e7eb',
+                borderRadius: '12px',
+                padding: '12px 14px',
+                fontSize: '12.5px',
+                color: '#4b5563',
+                lineHeight: 1.5
+              }}>
+                {roundToDelete.round_number > 1 ? (
+                  <span>
+                    Deleting <strong>Task {selectedDay}.{roundToDelete.round_number}</strong> will remove this table and restore Task {selectedDay} back to its previous round (<strong>Task {selectedDay}.{roundToDelete.round_number - 1}</strong>).
+                  </span>
+                ) : (
+                  <span>
+                    Deleting <strong>Task {selectedDay}.1</strong> will clear all device records for this task table so you can re-enter or upload the device list to the correct task.
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '14px 24px',
+              borderTop: '1px solid #e5e7eb',
+              backgroundColor: '#f9fafb',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '10px'
+            }}>
+              <button
+                type="button"
+                disabled={deletingRound}
+                onClick={() => setRoundToDelete(null)}
+                style={{
+                  padding: '9px 18px',
+                  borderRadius: '10px',
+                  border: '1px solid #d1d5db',
+                  backgroundColor: '#ffffff',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: '#374151',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deletingRound}
+                onClick={handleConfirmDeleteFullRound}
+                style={{
+                  padding: '9px 20px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  backgroundColor: '#dc2626',
+                  color: '#ffffff',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: deletingRound ? 'wait' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Trash2 size={14} />
+                <span>{deletingRound ? 'Deleting Table...' : `Delete Task ${selectedDay}.${roundToDelete.round_number}`}</span>
               </button>
             </div>
           </div>

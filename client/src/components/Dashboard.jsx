@@ -175,6 +175,8 @@ export default function Dashboard({
       }
     };
     fetchAnimationStatus();
+    window.addEventListener('htsk-animation-updated', fetchAnimationStatus);
+    return () => window.removeEventListener('htsk-animation-updated', fetchAnimationStatus);
   }, [currentUser]);
 
   // Calendar math

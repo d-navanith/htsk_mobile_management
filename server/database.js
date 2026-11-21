@@ -405,12 +405,19 @@ async function initDatabase() {
     );
   `);
 
-  // Seed default animations matching user mockup
+  // Seed default animations matching user mockup + SkyTech Fluid Animation
   const animCount = await dbGet(`SELECT COUNT(*) as count FROM dashboard_animations`);
   if (animCount.count === 0) {
-    await dbRun(`INSERT INTO dashboard_animations (animation_key, animation_name, status, is_active) VALUES ('snow', 'Snow Animation', 'Enable', 1)`);
+    await dbRun(`INSERT INTO dashboard_animations (animation_key, animation_name, status, is_active) VALUES ('snow', 'Snow Animation', 'Disable', 0)`);
     await dbRun(`INSERT INTO dashboard_animations (animation_key, animation_name, status, is_active) VALUES ('rain', 'Rain Animation', 'Disable', 0)`);
     await dbRun(`INSERT INTO dashboard_animations (animation_key, animation_name, status, is_active) VALUES ('sparkle', 'Sparkle Animation', 'Disable', 0)`);
+    await dbRun(`INSERT INTO dashboard_animations (animation_key, animation_name, status, is_active) VALUES ('skytech', 'SkyTech Fluid Animation', 'Enable', 1)`);
+  } else {
+    const skytechAnim = await dbGet(`SELECT id FROM dashboard_animations WHERE animation_key = 'skytech'`);
+    if (!skytechAnim) {
+      await dbRun(`UPDATE dashboard_animations SET is_active = 0, status = 'Disable'`);
+      await dbRun(`INSERT INTO dashboard_animations (animation_key, animation_name, status, is_active) VALUES ('skytech', 'SkyTech Fluid Animation', 'Enable', 1)`);
+    }
   }
 
   // Seed default 241 inventory items if empty

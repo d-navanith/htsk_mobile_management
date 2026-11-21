@@ -286,6 +286,7 @@ export default function UserManageSection({
         body: JSON.stringify({ animation_enabled: newStatus ? 1 : 0 })
       });
       loadData();
+      window.dispatchEvent(new CustomEvent('htsk-animation-updated'));
     } catch (e) {
       console.error('Error toggling user animation:', e);
     }
@@ -307,6 +308,7 @@ export default function UserManageSection({
       }
       setAnimSavedMessage(true);
       setTimeout(() => setAnimSavedMessage(false), 3000);
+      window.dispatchEvent(new CustomEvent('htsk-animation-updated'));
     } catch (e) {
       console.error('Error toggling dashboard animation:', e);
     }

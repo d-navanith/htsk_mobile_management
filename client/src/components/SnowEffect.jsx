@@ -1,8 +1,9 @@
 import React, { useMemo } from 'react';
+import SkyTechFluidEffect from './SkyTechFluidEffect';
 
 /**
  * SnowEffect Component
- * Renders lightweight, 60fps snow / ambient animation strictly inside its parent card.
+ * Renders lightweight, 60fps snow / ambient / SkyTech WebGL2 fluid animation strictly inside its parent card.
  * Parent card MUST have `position: relative` and `overflow: hidden`.
  */
 const SNOW_SYMBOLS = ['❄', '❅', '❆', '•', '✦', '❄', '❅'];
@@ -15,6 +16,20 @@ export default function SnowEffect({
   secondaryColor = '#93c5fd',
   type = 'snow'
 }) {
+  if (type === 'skytech' || type === 'fluid') {
+    return (
+      <SkyTechFluidEffect
+        fullScreen={false}
+        simulationResolution={128}
+        dyeResolution={512}
+        cursorRadius={0.025}
+        cursorForce={36}
+        densityAmount={0.95}
+        autoPulse={true}
+        opacity={0.38}
+      />
+    );
+  }
   // Generate stable particles so they don't jump on parent re-renders
   const flakes = useMemo(() => {
     const symbolPool = type === 'rain' ? RAIN_SYMBOLS : type === 'sparkle' ? SPARKLE_SYMBOLS : SNOW_SYMBOLS;

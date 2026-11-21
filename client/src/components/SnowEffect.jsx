@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import SkyTechFluidEffect from './SkyTechFluidEffect';
+import SkyTechFluidEffect, { BLUE_FLUID_COLOR, BLUE_HIGHLIGHT_COLOR } from './SkyTechFluidEffect';
 
 /**
  * SnowEffect Component
@@ -26,7 +26,9 @@ export default function SnowEffect({
         cursorForce={38}
         densityAmount={1.1}
         autoPulse={true}
-        opacity={0.52}
+        opacity={0.55}
+        color={BLUE_FLUID_COLOR}
+        highlightColor={BLUE_HIGHLIGHT_COLOR}
       />
     );
   }

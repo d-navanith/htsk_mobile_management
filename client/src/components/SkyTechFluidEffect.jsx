@@ -209,6 +209,36 @@ void main() {
 }
 `;
 
+// Blue color variables for fluid simulation
+export const BLUE_FLUID_COLOR = '#0284c7'; // Vibrant Electric / Azure Blue
+export const BLUE_HIGHLIGHT_COLOR = '#38bdf8'; // Luminous Ice-Cyan Highlight Core
+export const DEFAULT_BLUE_FLUID = [0.08, 0.50, 0.98]; // vec3(r, g, b) 0..1
+export const DEFAULT_BLUE_HIGHLIGHT = [0.38, 0.88, 1.0]; // vec3(r, g, b) 0..1
+
+function parseColorToRgb(color, defaultRgb) {
+  if (Array.isArray(color) && color.length >= 3) {
+    return color.map(c => (c > 1 ? c / 255 : c));
+  }
+  if (typeof color === 'string') {
+    const hex = color.replace('#', '').trim();
+    if (hex.length === 6) {
+      return [
+        parseInt(hex.slice(0, 2), 16) / 255,
+        parseInt(hex.slice(2, 4), 16) / 255,
+        parseInt(hex.slice(4, 6), 16) / 255
+      ];
+    }
+    if (hex.length === 3) {
+      return [
+        parseInt(hex[0] + hex[0], 16) / 255,
+        parseInt(hex[1] + hex[1], 16) / 255,
+        parseInt(hex[2] + hex[2], 16) / 255
+      ];
+    }
+  }
+  return defaultRgb;
+}
+
 function getResolution(baseRes, width, height) {
   const res = Math.max(2, Math.floor(baseRes));
   const aspect = width / Math.max(height, 1);
@@ -277,7 +307,9 @@ export default function SkyTechFluidEffect({
   pressureIterations = 18,
   maxDevicePixelRatio = 2,
   autoPulse = true,
-  opacity = 1
+  opacity = 1,
+  color = BLUE_FLUID_COLOR,
+  highlightColor = BLUE_HIGHLIGHT_COLOR
 }) {
   const canvasRef = useRef(null);
 
@@ -285,9 +317,9 @@ export default function SkyTechFluidEffect({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // SkyTech signature orange3: vec3(0.95686275, 0.31764706, 0.14509804) -> #F45125
-    const fluidRgb = [0.95686275, 0.31764706, 0.14509804];
-    const highlightRgb = [1.0, 0.56, 0.24];
+    // Blue Fluid Color Variables (Defaults to Electric Azure Blue with Luminous Ice-Cyan Core)
+    const fluidRgb = parseColorToRgb(color, DEFAULT_BLUE_FLUID);
+    const highlightRgb = parseColorToRgb(highlightColor, DEFAULT_BLUE_HIGHLIGHT);
 
     const gl = canvas.getContext('webgl2', {
       alpha: true,
@@ -323,13 +355,16 @@ export default function SkyTechFluidEffect({
           canvas.height = rect.height || 150;
         }
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const r = Math.round(fluidRgb[0] * 255);
+        const g = Math.round(fluidRgb[1] * 255);
+        const b = Math.round(fluidRgb[2] * 255);
         for (let i = particles.length - 1; i >= 0; i--) {
           const p = particles[i];
           p.r += 0.9;
           p.alpha *= 0.94;
           const grad = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, p.r);
-          grad.addColorStop(0, `rgba(244, 81, 37, ${p.alpha})`);
-          grad.addColorStop(1, 'rgba(244, 81, 37, 0)');
+          grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${p.alpha})`);
+          grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
           ctx.fillStyle = grad;
           ctx.beginPath();
           ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
@@ -749,7 +784,9 @@ export default function SkyTechFluidEffect({
     simulationResolution,
     velocityDissipation,
     viscosity,
-    autoPulse
+    autoPulse,
+    color,
+    highlightColor
   ]);
 
   return (

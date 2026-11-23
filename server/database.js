@@ -1049,15 +1049,23 @@ async function updateDeviceRecord(id, updates = {}, admin_user = 'Shanaka') {
       if (!rnd.records_json) continue;
       const parsed = JSON.parse(rnd.records_json);
       let changed = false;
+      const existingHasNumericId = id !== undefined && id !== null && /^\d+$/.test(String(id));
       for (let i = 0; i < parsed.length; i++) {
         const item = parsed[i];
-        if (
-          String(item.id) === String(id) ||
-          (existing.taking_device && item.taking_device && normalizeDeviceTag(item.taking_device) === normalizeDeviceTag(existing.taking_device)) ||
-          (item.name === existing.name && item.taking_device === existing.taking_device)
-        ) {
+        const itemHasNumericId = item.id !== undefined && item.id !== null && /^\d+$/.test(String(item.id));
+        const matchById = String(item.id) === String(id);
+        // Only fall back to device-tag matching when the round item doesn't already have a different numeric DB ID
+        const matchByDeviceFallback =
+          (!itemHasNumericId || !existingHasNumericId) &&
+          (
+            (existing.taking_device && item.taking_device && normalizeDeviceTag(item.taking_device) === normalizeDeviceTag(existing.taking_device)) ||
+            (item.name === existing.name && item.taking_device === existing.taking_device)
+          );
+
+        if (matchById || matchByDeviceFallback) {
           parsed[i] = {
             ...item,
+            id: existingHasNumericId ? Number(id) : item.id,
             name: finalEmpName,
             shift,
             group_name,
@@ -1069,6 +1077,7 @@ async function updateDeviceRecord(id, updates = {}, admin_user = 'Shanaka') {
             sign
           };
           changed = true;
+          if (matchById) break;
         }
       }
       if (changed) {
@@ -3210,13 +3219,19 @@ async function loadSnapshotForTaskRound(taskNum, roundNum) {
     [tNum]
   );
 
-  // Build map of live DB records by normalized taking_device for real-time status/IDs
-  const liveByDevice = new Map();
+  // Build maps of live DB records: first by exact numeric ID, then a FIFO queue per normalized taking_device for legacy preview rows
+  const liveById = new Map();
+  const usedDbIds = new Set();
+  const liveListByDevice = new Map();
   for (const dbr of dbRecords) {
     if (dbr.name === 'Office Return' || dbr.name === 'Missing Check') continue;
+    liveById.set(String(dbr.id), dbr);
     const norm = normalizeDeviceTag(dbr.taking_device);
-    if (norm && !liveByDevice.has(norm)) {
-      liveByDevice.set(norm, dbr);
+    if (norm) {
+      if (!liveListByDevice.has(norm)) {
+        liveListByDevice.set(norm, []);
+      }
+      liveListByDevice.get(norm).push(dbr);
     }
   }
 
@@ -3224,21 +3239,47 @@ async function loadSnapshotForTaskRound(taskNum, roundNum) {
   if (roundRow && roundRow.records_json && roundRow.records_json !== '[]') {
     try {
       const parsed = JSON.parse(roundRow.records_json);
+      // Pre-mark all numeric IDs explicitly referenced in records_json so fallback device lookup never steals them
+      for (const rec of parsed) {
+        if (rec.id !== undefined && rec.id !== null && /^\d+$/.test(String(rec.id))) {
+          usedDbIds.add(Number(rec.id));
+        }
+      }
+
       records = parsed.map((rec, idx) => {
         const norm = normalizeDeviceTag(rec.taking_device);
-        const live = norm ? liveByDevice.get(norm) : null;
+        const recHasNumericId = rec.id !== undefined && rec.id !== null && /^\d+$/.test(String(rec.id));
+        // 1. Match by exact numeric record ID if rec.id is a database ID
+        let live = recHasNumericId ? liveById.get(String(rec.id)) : null;
+        // 2. For bulk preview rows (e.g. 'preview-20'), consume the next unused DB record for that device tag
+        if (!live && !recHasNumericId && norm) {
+          const candidates = liveListByDevice.get(norm) || [];
+          live = candidates.find(c => !usedDbIds.has(c.id)) || null;
+          if (live) {
+            usedDbIds.add(live.id);
+          }
+        }
+        const recName = (rec.name || '').trim();
+        const recHasCustomName = recName !== '' && !/^\d+$/.test(recName);
+        const liveName = live && live.name ? live.name.trim() : '';
+        const resolvedName = recHasCustomName
+          ? recName
+          : (liveName || recName || String(idx + 1).padStart(2, '0'));
+
         return {
           ...rec,
-          id: live ? live.id : (rec.id || `round-${tNum}-${rNum}-${idx + 1}`),
-          name: live ? live.name : (rec.name || String(idx + 1).padStart(2, '0')),
-          shift: live ? live.shift : (rec.shift || 'Day'),
-          group_name: live ? live.group_name : (rec.group_name || ''),
-          issued_at: live ? live.issued_at : (rec.issued_at || roundRow.check_time || '7.30 A.M.'),
-          return_time: live && live.return_time ? live.return_time : (rec.return_time || ''),
-          return_device: live && live.return_device ? live.return_device : (rec.return_device || ''),
+          id: recHasNumericId
+            ? Number(rec.id)
+            : (live ? live.id : (rec.id || `round-${tNum}-${rNum}-${idx + 1}`)),
+          name: resolvedName,
+          shift: rec.shift || (live ? live.shift : 'Day'),
+          group_name: rec.group_name !== undefined && rec.group_name !== '' ? rec.group_name : (live ? live.group_name : ''),
+          issued_at: rec.issued_at || (live ? live.issued_at : (roundRow.check_time || '7.30 A.M.')),
+          return_time: (live && live.return_time) ? live.return_time : (rec.return_time || ''),
+          return_device: (live && live.return_device) ? live.return_device : (rec.return_device || ''),
           taking_device: rec.taking_device || (live ? live.taking_device : ''),
-          handover_to: live && live.handover_to ? live.handover_to : (rec.handover_to || ''),
-          sign: live && live.sign ? live.sign : (rec.sign || 'Done'),
+          handover_to: (live && live.handover_to) ? live.handover_to : (rec.handover_to || ''),
+          sign: (live && live.sign) ? live.sign : (rec.sign || 'Done'),
           task_number: tNum,
           task_date: roundRow.task_date || (live ? live.task_date : ''),
           round_number: rNum

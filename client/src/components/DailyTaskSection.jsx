@@ -949,6 +949,11 @@ export default function DailyTaskSection({
         const roundKey = rnd.id || `rnd-${rnd.round_number}-${rIdx}`;
         const curFilter = getRoundFilter(roundKey);
         const rndFilteredRecords = filterRoundRecords(rawRoundRecords, roundKey);
+        const roundExplicitNumericIds = new Set(
+          rawRoundRecords
+            .filter(item => item.id !== undefined && item.id !== null && (typeof item.id === 'number' || /^\d+$/.test(String(item.id))))
+            .map(item => Number(item.id))
+        );
 
         return (
           <div key={rnd.id || `round-${rnd.round_number}-${rIdx}`} style={{ marginBottom: '36px' }}>
@@ -1317,20 +1322,37 @@ export default function DailyTaskSection({
                       const isNewInRound = rnd.round_number > 1 && r.is_new_in_round === 1;
                       const displayIndex = r._originalIndex !== undefined ? r._originalIndex : index;
 
-                      // Map to actual DB record if present
+                      // Map to actual DB record if present (match by numeric ID first; only fall back to device tag for preview/non-numeric IDs)
                       const cleanRDev = (r.taking_device || '').replace(/[:;,]+$/g, '').trim().toLowerCase();
                       const normRDev = normalizeDeviceTag(r.taking_device);
-                      const actualRec = taskRecords.find(tr => {
-                        if (tr.id && r.id && tr.id === r.id) return true;
-                        if (!cleanRDev) return false;
-                        const cleanTr = (tr.taking_device || '').replace(/[:;,]+$/g, '').trim().toLowerCase();
-                        if (cleanTr === cleanRDev) return true;
-                        if (normRDev && normalizeDeviceTag(tr.taking_device) === normRDev) return true;
-                        return false;
-                      });
+                      const rHasNumericId = r.id !== undefined && r.id !== null && (typeof r.id === 'number' || /^\d+$/.test(String(r.id)));
+                      let actualRec = null;
+                      if (rHasNumericId) {
+                        actualRec = taskRecords.find(tr => String(tr.id) === String(r.id)) || null;
+                      } else {
+                        actualRec = taskRecords.find(tr => {
+                          if (tr.id !== undefined && tr.id !== null && roundExplicitNumericIds.has(Number(tr.id))) {
+                            return false;
+                          }
+                          if (!cleanRDev) return false;
+                          const cleanTr = (tr.taking_device || '').replace(/[:;,]+$/g, '').trim().toLowerCase();
+                          if (cleanTr === cleanRDev) return true;
+                          if (normRDev && normalizeDeviceTag(tr.taking_device) === normRDev) return true;
+                          return false;
+                        }) || null;
+                      }
+                      const rNameTrim = (r.name || '').trim();
+                      const rHasCustomName = rNameTrim !== '' && !/^\d+$/.test(rNameTrim);
+                      const actualNameTrim = actualRec && actualRec.name ? actualRec.name.trim() : '';
+                      const resolvedRowName = rHasCustomName
+                        ? rNameTrim
+                        : (actualNameTrim || rNameTrim);
+
                       const targetRecord = {
-                        ...r,
                         ...(actualRec || {}),
+                        ...r,
+                        id: rHasNumericId ? Number(r.id) : (actualRec?.id || r.id),
+                        name: resolvedRowName,
                         task_number: selectedDay,
                         round_number: rnd.round_number
                       };
@@ -1348,7 +1370,7 @@ export default function DailyTaskSection({
                             {displayIndex + 1}.
                           </td>
                           <td style={{ padding: '16px 16px', fontSize: '13.5px', fontWeight: 600, color: '#111827', borderRight: '1px solid #e5e7eb' }}>
-                            {r.name}
+                            {resolvedRowName}
                           </td>
                           <td style={{ padding: '16px 14px', fontSize: '13.5px', color: '#111827', borderRight: '1px solid #e5e7eb' }}>
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>

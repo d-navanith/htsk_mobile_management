@@ -436,7 +436,13 @@ app.post('/api/records', requireCapability('manage_devices'), async (req, res) =
     } = req.body;
 
     if (!name || !name.trim()) {
-      return res.status(400).json({ success: false, error: 'Employee name is required' });
+      return res.status(400).json({ success: false, error: 'Employee name is required when manually adding a device.' });
+    }
+    if (/^\d+$/.test(name.trim())) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please enter a valid Employee Name (e.g. Ramla, Arjun Narayan). Numbers (1, 01, 20...) are only for bulk device lists in the Update tab.'
+      });
     }
 
     const cleanSign = evaluateSignStatus(sign);

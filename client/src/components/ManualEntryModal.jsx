@@ -105,8 +105,13 @@ export default function ManualEntryModal({ isOpen, onClose, onSave, groups = [],
 
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!empName.trim()) {
-      setError('EMP. Name is required.');
+    const cleanedEmpName = empName.trim();
+    if (!cleanedEmpName) {
+      setError('EMP. Name is required when manually adding a device.');
+      return;
+    }
+    if (/^\d+$/.test(cleanedEmpName)) {
+      setError('Please enter a valid Employee Name (e.g. Ramla, Arjun Narayan). Numbers (1, 01, 20...) are only for bulk device lists in the Update tab.');
       return;
     }
 
@@ -115,7 +120,7 @@ export default function ManualEntryModal({ isOpen, onClose, onSave, groups = [],
 
     try {
       await onSave({
-        name: empName.trim(),
+        name: cleanedEmpName,
         shift: shift.trim() || 'Day',
         group: (group || '').trim(),
         issued_at: issuedAt.trim() || '7.30 A.M.',

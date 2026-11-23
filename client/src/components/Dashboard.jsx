@@ -623,44 +623,60 @@ export default function Dashboard({
   }, [isComparing, comparisonData, compareCategoryFilter, records, isViewAllDays]);
 
   // Filter records
-  const filteredRecords = sourceRecordsForTable.filter(r => {
-    const term = searchTerm.toLowerCase();
-    const nameMatch = (r.name || '').toLowerCase().includes(term);
-    const returnDevMatch = (r.return_device || '').toLowerCase().includes(term);
-    const takingDevMatch = (r.taking_device || '').toLowerCase().includes(term);
-    const handoverMatch = (r.handover_to || '').toLowerCase().includes(term);
-    const groupMatch = (r.group_name || '').toLowerCase().includes(term);
-    const matchesSearch = searchTerm === '' || nameMatch || returnDevMatch || takingDevMatch || handoverMatch || groupMatch;
+  const filteredRecords = sourceRecordsForTable
+    .map((r, idx) => ({ ...r, _originalIndex: idx }))
+    .filter(r => {
+      const term = searchTerm.trim().toLowerCase();
+      const normTerm = term.replace(/\s+/g, '');
+      const nameStr = (r.name || '').toLowerCase();
+      const returnDevStr = (r.return_device || '').toLowerCase();
+      const returnDevNorm = returnDevStr.replace(/\s+/g, '');
+      const takingDevStr = (r.taking_device || '').toLowerCase();
+      const takingDevNorm = takingDevStr.replace(/\s+/g, '');
+      const handoverStr = (r.handover_to || '').toLowerCase();
+      const groupStr = (r.group_name || '').toLowerCase();
+      const recNumStr = String(r._originalIndex + 1);
 
-    const matchesGroup = selectedGroup === 'All Groups' || selectedGroup === 'all' ||
-      (selectedGroup === 'No Group' && (!r.group_name || r.group_name.trim() === '')) ||
-      r.group_name === selectedGroup;
-    const matchesShift = selectedShift === 'All Shift' || selectedShift === 'all' || r.shift === selectedShift;
-    const matchesStatus =
-      selectedStatus === 'All Status' ||
-      selectedStatus === 'all' ||
-      (r.sign || '').toLowerCase() === selectedStatus.toLowerCase();
+      const matchesSearch =
+        term === '' ||
+        nameStr.includes(term) ||
+        returnDevStr.includes(term) ||
+        (normTerm && returnDevNorm.includes(normTerm)) ||
+        takingDevStr.includes(term) ||
+        (normTerm && takingDevNorm.includes(normTerm)) ||
+        handoverStr.includes(term) ||
+        groupStr.includes(term) ||
+        recNumStr === term;
 
-    // Comparison category filter
-    let matchesCompareCategory = true;
-    if (isComparing && comparisonData && compareCategoryFilter !== 'all') {
-      if (compareCategoryFilter === 'newly_added') {
-        matchesCompareCategory = Boolean(r.is_newly_added);
-      } else if (compareCategoryFilter === 'previously_available') {
-        matchesCompareCategory = Boolean(r.is_previously_available);
-      } else if (compareCategoryFilter === 'not_available') {
-        matchesCompareCategory = Boolean(r.is_dropped_from_prev);
-      } else if (compareCategoryFilter === 'returned') {
-        matchesCompareCategory = Boolean(r.return_device) || r.comparison_status === 'returned';
-      } else if (compareCategoryFilter === 'missing') {
-        matchesCompareCategory = (r.sign || '').toLowerCase() === 'missing' || r.comparison_status === 'missing';
-      } else if (compareCategoryFilter === 'not_in_system') {
-        matchesCompareCategory = Boolean(r.is_not_in_system);
+      const matchesGroup = selectedGroup === 'All Groups' || selectedGroup === 'all' ||
+        (selectedGroup === 'No Group' && (!r.group_name || r.group_name.trim() === '')) ||
+        r.group_name === selectedGroup;
+      const matchesShift = selectedShift === 'All Shift' || selectedShift === 'all' || r.shift === selectedShift;
+      const matchesStatus =
+        selectedStatus === 'All Status' ||
+        selectedStatus === 'all' ||
+        (r.sign || '').toLowerCase() === selectedStatus.toLowerCase();
+
+      // Comparison category filter
+      let matchesCompareCategory = true;
+      if (isComparing && comparisonData && compareCategoryFilter !== 'all') {
+        if (compareCategoryFilter === 'newly_added') {
+          matchesCompareCategory = Boolean(r.is_newly_added);
+        } else if (compareCategoryFilter === 'previously_available') {
+          matchesCompareCategory = Boolean(r.is_previously_available);
+        } else if (compareCategoryFilter === 'not_available') {
+          matchesCompareCategory = Boolean(r.is_dropped_from_prev);
+        } else if (compareCategoryFilter === 'returned') {
+          matchesCompareCategory = Boolean(r.return_device) || r.comparison_status === 'returned';
+        } else if (compareCategoryFilter === 'missing') {
+          matchesCompareCategory = (r.sign || '').toLowerCase() === 'missing' || r.comparison_status === 'missing';
+        } else if (compareCategoryFilter === 'not_in_system') {
+          matchesCompareCategory = Boolean(r.is_not_in_system);
+        }
       }
-    }
 
-    return matchesSearch && matchesGroup && matchesShift && matchesStatus && matchesCompareCategory;
-  });
+      return matchesSearch && matchesGroup && matchesShift && matchesStatus && matchesCompareCategory;
+    });
 
   const isCurrentFilterLatest = kpis.isLatest || (availableDays[0] && availableDays[0].task_number === selectedTaskNumber);
 
@@ -1342,18 +1358,20 @@ export default function Dashboard({
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '10px',
+              gap: '8px',
               backgroundColor: '#f3f4f6',
+              border: searchTerm ? '1.5px solid #84cc16' : '1px solid #e5e7eb',
               borderRadius: '9999px',
-              padding: '8px 18px',
+              padding: '7px 16px',
               width: '100%',
-              maxWidth: '290px',
-              boxSizing: 'border-box'
+              maxWidth: '300px',
+              boxSizing: 'border-box',
+              transition: 'border-color 0.15s ease'
             }}>
-              <Search size={16} color="#9ca3af" />
+              <Search size={15} color={searchTerm ? '#65a30d' : '#9ca3af'} />
               <input
                 type="text"
-                placeholder="Search by name, device..."
+                placeholder="Search in table (device, name...)"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 style={{
@@ -1361,10 +1379,28 @@ export default function Dashboard({
                   background: 'transparent',
                   outline: 'none',
                   fontSize: '13px',
-                  color: '#374151',
+                  color: '#111827',
                   width: '100%'
                 }}
               />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '2px',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    color: '#6b7280'
+                  }}
+                  title="Clear table search"
+                >
+                  <X size={14} />
+                </button>
+              )}
             </div>
           </div>
 
@@ -1528,7 +1564,11 @@ export default function Dashboard({
               {filteredRecords.length === 0 ? (
                 <tr>
                   <td colSpan={10} style={{ padding: '40px', textAlign: 'center', color: '#9ca3af', fontSize: '14px' }}>
-                    {loading || comparisonLoading ? 'Loading records...' : `No records found.`}
+                    {loading || comparisonLoading
+                      ? 'Loading records...'
+                      : searchTerm
+                      ? `No matching device or employee found for "${searchTerm}" in this table.`
+                      : `No records found.`}
                   </td>
                 </tr>
               ) : (
@@ -1536,10 +1576,11 @@ export default function Dashboard({
                   const isDone = (r.sign || '').toLowerCase() === 'done';
                   const isMissing = (r.sign || '').toLowerCase() === 'missing';
                   const isNewInRound = r.is_new_in_round === 1 || r.is_newly_added;
+                  const displayIndex = r._originalIndex !== undefined ? r._originalIndex : index;
 
                   return (
                     <tr
-                      key={r.id || `row-${index}`}
+                      key={r.id || `row-${displayIndex}`}
                       style={{
                         borderBottom: '1px solid #e5e7eb',
                         backgroundColor: index % 2 === 0 ? '#ecfbfb' : '#ffffff',
@@ -1548,7 +1589,7 @@ export default function Dashboard({
                     >
                       {/* Rec. No. */}
                       <td style={{ padding: '16px 14px', fontSize: '13.5px', fontWeight: 700, color: '#111827', textAlign: 'center', borderRight: '1px solid #e5e7eb' }}>
-                        {index + 1}.
+                        {displayIndex + 1}.
                       </td>
 
                       {/* EMP. Name */}

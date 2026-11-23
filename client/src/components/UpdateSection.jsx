@@ -14,7 +14,9 @@ import {
   RefreshCw,
   Copy,
   Plus,
-  Sparkles
+  Sparkles,
+  Search,
+  X
 } from 'lucide-react';
 
 const SAMPLE_DEVICE_LIST = `New 68
@@ -179,6 +181,7 @@ export default function UpdateSection({
   const [latestRound, setLatestRound] = useState(null);
   const [comparisonData, setComparisonData] = useState(null);
   const [previewFilter, setPreviewFilter] = useState('all'); // 'all', 'new', 'retained'
+  const [previewSearchTerm, setPreviewSearchTerm] = useState('');
 
   // Fetch rounds whenever targetTaskNumber or targetTaskDate changes
   const fetchTaskRounds = async (num, dateStr) => {
@@ -1135,7 +1138,54 @@ export default function UpdateSection({
           </div>
 
           {previewRows.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              {/* Unique Search Bar for Preview Table */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                backgroundColor: '#f3f4f6',
+                border: previewSearchTerm ? '1.5px solid #84cc16' : '1px solid #e5e7eb',
+                borderRadius: '9999px',
+                padding: '6px 14px',
+                width: '260px',
+                boxSizing: 'border-box'
+              }}>
+                <Search size={14} color={previewSearchTerm ? '#65a30d' : '#9ca3af'} />
+                <input
+                  type="text"
+                  placeholder="Search preview table (device, name...)"
+                  value={previewSearchTerm}
+                  onChange={e => setPreviewSearchTerm(e.target.value)}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    outline: 'none',
+                    fontSize: '12.5px',
+                    color: '#111827',
+                    width: '100%'
+                  }}
+                />
+                {previewSearchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setPreviewSearchTerm('')}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      padding: '1px',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      color: '#6b7280'
+                    }}
+                    title="Clear search"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+
               <span style={{
                 backgroundColor: '#ecfccb',
                 color: '#3f6212',
@@ -1149,7 +1199,7 @@ export default function UpdateSection({
               </span>
               <button
                 type="button"
-                onClick={() => { setPreviewRows([]); setSelectedFile(null); }}
+                onClick={() => { setPreviewRows([]); setSelectedFile(null); setPreviewSearchTerm(''); }}
                 style={{
                   fontSize: '12.5px',
                   color: '#ef4444',
@@ -1342,12 +1392,26 @@ export default function UpdateSection({
               </thead>
               <tbody>
                 {previewRows
+                  .map((r, originalIdx) => ({ ...r, _originalIdx: originalIdx }))
                   .filter(r => {
-                    if (previewFilter === 'new') return r.isNewInRound;
-                    if (previewFilter === 'retained') return !r.isNewInRound;
-                    return true;
+                    if (previewFilter === 'new' && !r.isNewInRound) return false;
+                    if (previewFilter === 'retained' && r.isNewInRound) return false;
+                    const term = previewSearchTerm.trim().toLowerCase();
+                    if (!term) return true;
+                    const normTerm = term.replace(/\s+/g, '');
+                    const nameStr = (r.name || '').toLowerCase();
+                    const takingStr = (r.taking_device || '').toLowerCase();
+                    const takingNorm = takingStr.replace(/\s+/g, '');
+                    const recNumStr = String(r._originalIdx + 1);
+                    return (
+                      nameStr.includes(term) ||
+                      takingStr.includes(term) ||
+                      (normTerm && takingNorm.includes(normTerm)) ||
+                      recNumStr === term
+                    );
                   })
-                  .map((row, idx) => {
+                  .map((row) => {
+                    const idx = row._originalIdx;
                     const isNew = Boolean(row.isNewInRound);
                     return (
                       <tr

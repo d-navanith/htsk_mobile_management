@@ -19,7 +19,8 @@ import {
   Layers,
   ArrowRight,
   SlidersHorizontal,
-  ChevronDown
+  ChevronDown,
+  X
 } from 'lucide-react';
 
 export default function HistorySection({
@@ -40,6 +41,9 @@ export default function HistorySection({
   const [availableDays, setAvailableDays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeTableSearch, setActiveTableSearch] = useState('');
+  const [activityTableSearch, setActivityTableSearch] = useState('');
+  const [loginTableSearch, setLoginTableSearch] = useState('');
 
   // Calendar filtering states (Default to 17th November 2026 / Task 17)
   const [selectedDay, setSelectedDay] = useState(17);
@@ -238,9 +242,14 @@ export default function HistorySection({
   // Filtered devices list
   const filteredActiveDevices = useMemo(() => {
     return activeDevices.filter(d => {
-      const term = searchTerm.toLowerCase();
+      const term = (activeTableSearch || searchTerm).trim().toLowerCase();
+      const normTerm = term.replace(/\s+/g, '');
+      const devIdStr = (d.device_id || '').toLowerCase();
+      const devIdNorm = devIdStr.replace(/\s+/g, '');
       const matchesSearch =
-        (d.device_id || '').toLowerCase().includes(term) ||
+        !term ||
+        devIdStr.includes(term) ||
+        (normTerm && devIdNorm.includes(normTerm)) ||
         (d.name || '').toLowerCase().includes(term) ||
         (d.active_user || '').toLowerCase().includes(term) ||
         (d.group_name || '').toLowerCase().includes(term) ||
@@ -253,7 +262,7 @@ export default function HistorySection({
 
       return matchesSearch && matchesSeries && matchesShift;
     });
-  }, [activeDevices, searchTerm, selectedSeries, selectedShift]);
+  }, [activeDevices, searchTerm, activeTableSearch, selectedSeries, selectedShift]);
 
   // Statistics for selected day
   const dayStats = useMemo(() => {
@@ -307,21 +316,31 @@ export default function HistorySection({
 
   // Filtered Audit logs
   const filteredHistoryLogs = historyLogs.filter(l => {
-    const term = searchTerm.toLowerCase();
+    const term = (activityTableSearch || searchTerm).trim().toLowerCase();
+    if (!term) return true;
+    const normTerm = term.replace(/\s+/g, '');
+    const takingStr = (l.taking_device || '').toLowerCase();
+    const returnStr = (l.return_device || '').toLowerCase();
     return (
       (l.emp_name || '').toLowerCase().includes(term) ||
       (l.action || '').toLowerCase().includes(term) ||
       (l.details || '').toLowerCase().includes(term) ||
-      (l.admin_user || '').toLowerCase().includes(term)
+      (l.admin_user || '').toLowerCase().includes(term) ||
+      takingStr.includes(term) ||
+      (normTerm && takingStr.replace(/\s+/g, '').includes(normTerm)) ||
+      returnStr.includes(term) ||
+      (normTerm && returnStr.replace(/\s+/g, '').includes(normTerm))
     );
   });
 
   const filteredAuditLogins = auditLogins.filter(log => {
-    const term = searchTerm.toLowerCase();
+    const term = (loginTableSearch || searchTerm).trim().toLowerCase();
+    if (!term) return true;
     return (
       (log.username || '').toLowerCase().includes(term) ||
       (log.role || '').toLowerCase().includes(term) ||
-      (log.status || '').toLowerCase().includes(term)
+      (log.status || '').toLowerCase().includes(term) ||
+      (log.ip_address || '').toLowerCase().includes(term)
     );
   });
 
@@ -1110,7 +1129,7 @@ export default function HistorySection({
               overflow: 'hidden',
               boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
             }}>
-              <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
                   <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#111827', margin: 0 }}>
                     Active Mobiles Table • {formatDayString(selectedDay)}
@@ -1119,9 +1138,40 @@ export default function HistorySection({
                     Documented mobile phones and custodians for Task #{selectedDay}
                   </p>
                 </div>
-                <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#059669', backgroundColor: '#ecfdf5', padding: '4px 12px', borderRadius: '9999px' }}>
-                  {filteredActiveDevices.length} Mobiles
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    backgroundColor: '#ffffff',
+                    border: activeTableSearch ? '1.5px solid #84cc16' : '1px solid #d1d5db',
+                    borderRadius: '9999px',
+                    padding: '6px 14px',
+                    width: '260px',
+                    boxSizing: 'border-box'
+                  }}>
+                    <Search size={14} color={activeTableSearch ? '#65a30d' : '#9ca3af'} />
+                    <input
+                      type="text"
+                      placeholder="Search in table (device, name...)"
+                      value={activeTableSearch}
+                      onChange={e => setActiveTableSearch(e.target.value)}
+                      style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '12.5px', color: '#111827', width: '100%' }}
+                    />
+                    {activeTableSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveTableSearch('')}
+                        style={{ background: 'transparent', border: 'none', padding: '1px', cursor: 'pointer', display: 'inline-flex', color: '#6b7280' }}
+                      >
+                        <X size={13} />
+                      </button>
+                    )}
+                  </div>
+                  <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#059669', backgroundColor: '#ecfdf5', padding: '4px 12px', borderRadius: '9999px' }}>
+                    {filteredActiveDevices.length} Mobiles
+                  </span>
+                </div>
               </div>
 
               <div className="responsive-table-wrapper">
@@ -1213,13 +1263,44 @@ export default function HistorySection({
           overflow: 'hidden',
           boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
         }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }}>
-            <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#111827', margin: 0 }}>
-              Audit Activity History
-            </h3>
-            <p style={{ fontSize: '12px', color: '#6b7280', margin: '3px 0 0' }}>
-              Full chronological log of device handovers, swaps, updates, and shift transitions
-            </p>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div>
+              <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#111827', margin: 0 }}>
+                Audit Activity History
+              </h3>
+              <p style={{ fontSize: '12px', color: '#6b7280', margin: '3px 0 0' }}>
+                Full chronological log of device handovers, swaps, updates, and shift transitions
+              </p>
+            </div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              backgroundColor: '#ffffff',
+              border: activityTableSearch ? '1.5px solid #84cc16' : '1px solid #d1d5db',
+              borderRadius: '9999px',
+              padding: '6px 14px',
+              width: '280px',
+              boxSizing: 'border-box'
+            }}>
+              <Search size={14} color={activityTableSearch ? '#65a30d' : '#9ca3af'} />
+              <input
+                type="text"
+                placeholder="Search activity table (device, action...)"
+                value={activityTableSearch}
+                onChange={e => setActivityTableSearch(e.target.value)}
+                style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '12.5px', color: '#111827', width: '100%' }}
+              />
+              {activityTableSearch && (
+                <button
+                  type="button"
+                  onClick={() => setActivityTableSearch('')}
+                  style={{ background: 'transparent', border: 'none', padding: '1px', cursor: 'pointer', display: 'inline-flex', color: '#6b7280' }}
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="responsive-table-wrapper">
@@ -1294,13 +1375,44 @@ export default function HistorySection({
           overflow: 'hidden',
           boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
         }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }}>
-            <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#111827', margin: 0 }}>
-              System Login Audit History
-            </h3>
-            <p style={{ fontSize: '12px', color: '#6b7280', margin: '3px 0 0' }}>
-              Tracks administrator and user system authentication events
-            </p>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div>
+              <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#111827', margin: 0 }}>
+                System Login Audit History
+              </h3>
+              <p style={{ fontSize: '12px', color: '#6b7280', margin: '3px 0 0' }}>
+                Tracks administrator and user system authentication events
+              </p>
+            </div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              backgroundColor: '#ffffff',
+              border: loginTableSearch ? '1.5px solid #84cc16' : '1px solid #d1d5db',
+              borderRadius: '9999px',
+              padding: '6px 14px',
+              width: '260px',
+              boxSizing: 'border-box'
+            }}>
+              <Search size={14} color={loginTableSearch ? '#65a30d' : '#9ca3af'} />
+              <input
+                type="text"
+                placeholder="Search login table (user, role...)"
+                value={loginTableSearch}
+                onChange={e => setLoginTableSearch(e.target.value)}
+                style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '12.5px', color: '#111827', width: '100%' }}
+              />
+              {loginTableSearch && (
+                <button
+                  type="button"
+                  onClick={() => setLoginTableSearch('')}
+                  style={{ background: 'transparent', border: 'none', padding: '1px', cursor: 'pointer', display: 'inline-flex', color: '#6b7280' }}
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="responsive-table-wrapper">

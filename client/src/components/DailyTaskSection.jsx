@@ -548,6 +548,7 @@ export default function DailyTaskSection({
 
   const getRoundFilter = (roundKey) => {
     return roundFilters[roundKey] || {
+      search: '',
       group: selectedGroup || 'All Groups',
       shift: selectedShift || 'All Shift',
       status: selectedStatus || 'All Status'
@@ -559,6 +560,7 @@ export default function DailyTaskSection({
       ...prev,
       [roundKey]: {
         ...(prev[roundKey] || {
+          search: '',
           group: selectedGroup || 'All Groups',
           shift: selectedShift || 'All Shift',
           status: selectedStatus || 'All Status'
@@ -568,23 +570,51 @@ export default function DailyTaskSection({
     }));
   };
 
-  // Filter records helper (supports per-round independent filters)
+  // Filter records helper (supports per-round independent search & filters)
   const filterRoundRecords = (records = [], roundKey = 'default') => {
     const curFilter = getRoundFilter(roundKey);
-    return records.filter(r => {
-      const groupMatch = curFilter.group === 'All Groups' ||
-        (curFilter.group === 'No Group' && (!r.group_name || r.group_name.trim() === '')) ||
-        (r.group_name && r.group_name.trim().toLowerCase() === curFilter.group.trim().toLowerCase());
-      const shiftMatch = curFilter.shift === 'All Shift' ||
-        (r.shift && r.shift.toLowerCase() === curFilter.shift.toLowerCase());
-      const statusMatch = curFilter.status === 'All Status' ||
-        (curFilter.status === 'Done' && (r.sign || '').toLowerCase() === 'done') ||
-        (curFilter.status === 'Pending' && (r.sign || '').toLowerCase() === 'pending');
-      const roundMatch = selectedRoundFilter === 'all' ||
-        (selectedRoundFilter === 'new' && r.is_new_in_round === 1) ||
-        (selectedRoundFilter === 'retained' && r.is_new_in_round !== 1);
-      return groupMatch && shiftMatch && statusMatch && roundMatch;
-    });
+    const term = (curFilter.search || '').trim().toLowerCase();
+    const normTerm = term.replace(/\s+/g, '');
+
+    return records
+      .map((r, idx) => ({ ...r, _originalIndex: idx }))
+      .filter(r => {
+        let searchMatch = true;
+        if (term) {
+          const nameStr = (r.name || '').toLowerCase();
+          const takingStr = (r.taking_device || '').toLowerCase();
+          const takingNorm = takingStr.replace(/\s+/g, '');
+          const returnStr = (r.return_device || '').toLowerCase();
+          const returnNorm = returnStr.replace(/\s+/g, '');
+          const handoverStr = (r.handover_to || '').toLowerCase();
+          const groupStr = (r.group_name || '').toLowerCase();
+          const recNumStr = String(r._originalIndex + 1);
+
+          searchMatch =
+            nameStr.includes(term) ||
+            takingStr.includes(term) ||
+            (normTerm && takingNorm.includes(normTerm)) ||
+            returnStr.includes(term) ||
+            (normTerm && returnNorm.includes(normTerm)) ||
+            handoverStr.includes(term) ||
+            groupStr.includes(term) ||
+            recNumStr === term;
+        }
+
+        const groupMatch = curFilter.group === 'All Groups' ||
+          (curFilter.group === 'No Group' && (!r.group_name || r.group_name.trim() === '')) ||
+          (r.group_name && r.group_name.trim().toLowerCase() === curFilter.group.trim().toLowerCase());
+        const shiftMatch = curFilter.shift === 'All Shift' ||
+          (r.shift && r.shift.toLowerCase() === curFilter.shift.toLowerCase());
+        const statusMatch = curFilter.status === 'All Status' ||
+          (curFilter.status === 'Done' && (r.sign || '').toLowerCase() === 'done') ||
+          (curFilter.status === 'Pending' && (r.sign || '').toLowerCase() === 'pending') ||
+          (curFilter.status === 'Missing' && (r.sign || '').toLowerCase() === 'missing');
+        const roundMatch = selectedRoundFilter === 'all' ||
+          (selectedRoundFilter === 'new' && r.is_new_in_round === 1) ||
+          (selectedRoundFilter === 'retained' && r.is_new_in_round !== 1);
+        return searchMatch && groupMatch && shiftMatch && statusMatch && roundMatch;
+      });
   };
 
   // Stacked Rounds to Render matching user mockup: Task 19.1 : Time 8.30 A.M., Task 19.2 : Time 02.00 P.M.
@@ -1047,19 +1077,71 @@ export default function DailyTaskSection({
 
             {/* Card Container wrapping Toolbar + Scrollable Table + Attention Banner matching uploaded image */}
             <div className="daily-task-round-card">
-              {/* Control Toolbar: Date Pill on Left, Filters & Add on Right matching Image */}
+              {/* Control Toolbar: Date Pill & Unique Table Search Bar on Left, Filters & Add on Right */}
               <div className="daily-task-card-toolbar">
-                <div style={{
-                  backgroundColor: '#f9fafb',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  padding: '8px 20px',
-                  fontSize: '12.5px',
-                  fontWeight: 600,
-                  color: '#374151',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-                }}>
-                  {formatDayString(selectedDay)}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', flex: '1 1 auto' }}>
+                  <div style={{
+                    backgroundColor: '#f9fafb',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    padding: '8px 20px',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    color: '#374151',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {formatDayString(selectedDay)}
+                  </div>
+
+                  {/* Unique Per-Table Search Bar for this Task / Round */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    backgroundColor: '#f3f4f6',
+                    border: curFilter.search ? '1.5px solid #84cc16' : '1px solid #e5e7eb',
+                    borderRadius: '9999px',
+                    padding: '7px 16px',
+                    width: '100%',
+                    maxWidth: '300px',
+                    boxSizing: 'border-box',
+                    transition: 'border-color 0.15s ease'
+                  }}>
+                    <Search size={15} color={curFilter.search ? '#65a30d' : '#9ca3af'} />
+                    <input
+                      type="text"
+                      placeholder={`Search in Task ${selectedDay}.${rnd.round_number} (device, name...)`}
+                      value={curFilter.search || ''}
+                      onChange={e => setRoundFilterProp(roundKey, 'search', e.target.value)}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        outline: 'none',
+                        fontSize: '12.5px',
+                        color: '#111827',
+                        width: '100%'
+                      }}
+                    />
+                    {curFilter.search && (
+                      <button
+                        type="button"
+                        onClick={() => setRoundFilterProp(roundKey, 'search', '')}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          padding: '2px',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          color: '#6b7280'
+                        }}
+                        title="Clear table search"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
@@ -1210,7 +1292,11 @@ export default function DailyTaskSection({
                   {rndFilteredRecords.length === 0 ? (
                     <tr>
                       <td colSpan={10} style={{ padding: '40px', textAlign: 'center', color: '#9ca3af', fontSize: '14px' }}>
-                        {loading ? 'Loading task records...' : `No records logged for Task ${selectedDay}.${rnd.round_number} (${formatDayString(selectedDay)}). Click '+ Add' to assign devices.`}
+                        {loading
+                          ? 'Loading task records...'
+                          : curFilter.search
+                          ? `No matching device or employee found for "${curFilter.search}" in Task ${selectedDay}.${rnd.round_number}.`
+                          : `No records logged for Task ${selectedDay}.${rnd.round_number} (${formatDayString(selectedDay)}). Click '+ Add' to assign devices.`}
                       </td>
                     </tr>
                   ) : (
@@ -1218,6 +1304,7 @@ export default function DailyTaskSection({
                       const isDone = (r.sign || '').toLowerCase() === 'done';
                       // Round 1 devices are baseline, NEVER marked as new taking
                       const isNewInRound = rnd.round_number > 1 && r.is_new_in_round === 1;
+                      const displayIndex = r._originalIndex !== undefined ? r._originalIndex : index;
 
                       // Map to actual DB record if present
                       const cleanRDev = (r.taking_device || '').replace(/[:;,]+$/g, '').trim().toLowerCase();
@@ -1239,7 +1326,7 @@ export default function DailyTaskSection({
 
                       return (
                         <tr
-                          key={r.id || `row-${index}`}
+                          key={r.id || `row-${displayIndex}`}
                           style={{
                             borderBottom: '1px solid #e5e7eb',
                             backgroundColor: isNewInRound ? '#f0fdf4' : '#ffffff',
@@ -1247,7 +1334,7 @@ export default function DailyTaskSection({
                           }}
                         >
                           <td style={{ padding: '16px 14px', fontSize: '13.5px', fontWeight: 700, color: '#111827', textAlign: 'center', borderRight: '1px solid #e5e7eb' }}>
-                            {index + 1}.
+                            {displayIndex + 1}.
                           </td>
                           <td style={{ padding: '16px 16px', fontSize: '13.5px', fontWeight: 600, color: '#111827', borderRight: '1px solid #e5e7eb' }}>
                             {r.name}

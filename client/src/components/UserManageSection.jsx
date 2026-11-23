@@ -16,7 +16,9 @@ import {
   EyeOff,
   Star,
   Filter,
-  Lock
+  Lock,
+  Search,
+  X
 } from 'lucide-react';
 
 export default function UserManageSection({
@@ -74,6 +76,8 @@ export default function UserManageSection({
   // Permissions & Role Filtering
   const [permissions, setPermissions] = useState([]);
   const [selectedPermRole, setSelectedPermRole] = useState('All');
+  const [userTableSearch, setUserTableSearch] = useState('');
+  const [permissionTableSearch, setPermissionTableSearch] = useState('');
 
   // Fetch initial data
   const loadData = async () => {
@@ -711,6 +715,42 @@ export default function UserManageSection({
           </div>
         </form>
 
+        {/* Existing Users Table Search Bar */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
+          <span style={{ fontSize: '13px', fontWeight: 700, color: '#374151' }}>
+            System User Accounts ({users.length})
+          </span>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            backgroundColor: '#f3f4f6',
+            border: userTableSearch ? '1.5px solid #84cc16' : '1px solid #e5e7eb',
+            borderRadius: '9999px',
+            padding: '6px 14px',
+            width: '250px',
+            boxSizing: 'border-box'
+          }}>
+            <Search size={14} color={userTableSearch ? '#65a30d' : '#9ca3af'} />
+            <input
+              type="text"
+              placeholder="Search users table..."
+              value={userTableSearch}
+              onChange={e => setUserTableSearch(e.target.value)}
+              style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '12.5px', color: '#111827', width: '100%' }}
+            />
+            {userTableSearch && (
+              <button
+                type="button"
+                onClick={() => setUserTableSearch('')}
+                style={{ background: 'transparent', border: 'none', padding: '1px', cursor: 'pointer', display: 'inline-flex', color: '#6b7280' }}
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Existing Users Table */}
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
@@ -725,7 +765,18 @@ export default function UserManageSection({
             </tr>
           </thead>
           <tbody>
-            {users.map(u => {
+            {users
+              .filter(u => {
+                const term = userTableSearch.trim().toLowerCase();
+                if (!term) return true;
+                return (
+                  (u.full_name || '').toLowerCase().includes(term) ||
+                  (u.username || '').toLowerCase().includes(term) ||
+                  (u.email || '').toLowerCase().includes(term) ||
+                  (u.role || '').toLowerCase().includes(term)
+                );
+              })
+              .map(u => {
               const isAnimAllowed = u.animation_enabled === 1 || u.animation_enabled === true;
               return (
                 <tr key={u.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
@@ -843,11 +894,43 @@ export default function UserManageSection({
         padding: '24px',
         boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-          <Key size={20} color="#84cc16" />
-          <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#111827', margin: 0 }}>
-            User Permission Management
-          </h2>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Key size={20} color="#84cc16" />
+            <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#111827', margin: 0 }}>
+              User Permission Management
+            </h2>
+          </div>
+
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            backgroundColor: '#f3f4f6',
+            border: permissionTableSearch ? '1.5px solid #84cc16' : '1px solid #e5e7eb',
+            borderRadius: '9999px',
+            padding: '6px 14px',
+            width: '260px',
+            boxSizing: 'border-box'
+          }}>
+            <Search size={14} color={permissionTableSearch ? '#65a30d' : '#9ca3af'} />
+            <input
+              type="text"
+              placeholder="Search capabilities..."
+              value={permissionTableSearch}
+              onChange={e => setPermissionTableSearch(e.target.value)}
+              style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '12.5px', color: '#111827', width: '100%' }}
+            />
+            {permissionTableSearch && (
+              <button
+                type="button"
+                onClick={() => setPermissionTableSearch('')}
+                style={{ background: 'transparent', border: 'none', padding: '1px', cursor: 'pointer', display: 'inline-flex', color: '#6b7280' }}
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
         </div>
 
         <div style={{ overflowX: 'auto' }}>
@@ -865,7 +948,13 @@ export default function UserManageSection({
               </tr>
             </thead>
             <tbody>
-              {SYSTEM_CAPABILITIES.map(cap => (
+              {SYSTEM_CAPABILITIES
+                .filter(cap => {
+                  const term = permissionTableSearch.trim().toLowerCase();
+                  if (!term) return true;
+                  return cap.label.toLowerCase().includes(term) || cap.key.toLowerCase().includes(term);
+                })
+                .map(cap => (
                 <tr
                   key={cap.key}
                   style={{

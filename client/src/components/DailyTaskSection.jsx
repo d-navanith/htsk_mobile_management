@@ -560,7 +560,7 @@ export default function DailyTaskSection({
       group: selectedGroup || 'All Groups',
       shift: selectedShift || 'All Shift',
       status: selectedStatus || 'All Status',
-      deviceType: 'All Devices'
+      deviceFilter: 'All Devices'
     };
   };
 
@@ -573,7 +573,7 @@ export default function DailyTaskSection({
           group: selectedGroup || 'All Groups',
           shift: selectedShift || 'All Shift',
           status: selectedStatus || 'All Status',
-          deviceType: 'All Devices'
+          deviceFilter: 'All Devices'
         }),
         [prop]: value
       }
@@ -621,21 +621,22 @@ export default function DailyTaskSection({
           (curFilter.status === 'Pending' && (r.sign || '').toLowerCase() === 'pending') ||
           (curFilter.status === 'Missing' && (r.sign || '').toLowerCase() === 'missing');
 
-        // Device Type filter (Taking Devices, Returned Devices, Missing Devices)
-        const devType = curFilter.deviceType || 'All Devices';
-        let deviceTypeMatch = true;
-        if (devType === 'Taking Devices') {
-          deviceTypeMatch = Boolean(r.taking_device && r.taking_device.trim() !== '') && (r.sign || '').toLowerCase() !== 'missing';
-        } else if (devType === 'Returned Devices') {
-          deviceTypeMatch = Boolean(r.return_device && r.return_device.trim() !== '') || r.device_type === 'returned' || r.is_resolved_returned === true || r.name === 'Office Return';
-        } else if (devType === 'Missing Devices') {
-          deviceTypeMatch = (r.sign || '').toLowerCase() === 'missing' || r.device_type === 'missing' || r.is_resolved_missing === true || r.name === 'Missing Check';
+        // Device Filter: Taking Devices, Returned Devices, Missing Devices
+        const devFilter = curFilter.deviceFilter || 'All Devices';
+        let deviceMatch = true;
+        if (devFilter === 'Taking Devices') {
+          const isMissing = (r.sign || '').toLowerCase() === 'missing' || Boolean(r.is_resolved_missing) || r.name === 'Missing Check';
+          deviceMatch = Boolean((r.taking_device || '').trim()) && !isMissing;
+        } else if (devFilter === 'Returned Devices') {
+          deviceMatch = Boolean((r.return_device || '').trim()) || Boolean((r.return_time || '').trim()) || Boolean(r.is_resolved_returned);
+        } else if (devFilter === 'Missing Devices') {
+          deviceMatch = (r.sign || '').toLowerCase() === 'missing' || Boolean(r.is_resolved_missing) || r.name === 'Missing Check';
         }
 
         const roundMatch = selectedRoundFilter === 'all' ||
           (selectedRoundFilter === 'new' && r.is_new_in_round === 1) ||
           (selectedRoundFilter === 'retained' && r.is_new_in_round !== 1);
-        return searchMatch && groupMatch && shiftMatch && statusMatch && deviceTypeMatch && roundMatch;
+        return searchMatch && groupMatch && shiftMatch && statusMatch && roundMatch && deviceMatch;
       });
   };
 
@@ -1068,7 +1069,9 @@ export default function DailyTaskSection({
                   padding: '4px 10px',
                   borderRadius: '6px'
                 }}>
-                  {rawRoundRecords.length} Mobiles
+                  {rndFilteredRecords.length !== rawRoundRecords.length
+                    ? `${rndFilteredRecords.length} / ${rawRoundRecords.length} Mobiles`
+                    : `${rawRoundRecords.length} Mobiles`}
                   {rnd.added_count > 0 && rnd.round_number > 1 ? ` • +${rnd.added_count} Newly Taken` : ''}
                 </span>
 
@@ -1236,37 +1239,7 @@ export default function DailyTaskSection({
                     />
                   </div>
 
-                  {/* Device Filter: Taking, Returned, Missing (per user request) */}
-                  <div style={{ position: 'relative' }}>
-                    <select
-                      value={curFilter.deviceType || 'All Devices'}
-                      onChange={e => setRoundFilterProp(roundKey, 'deviceType', e.target.value)}
-                      style={{
-                        appearance: 'none',
-                        backgroundColor: '#f3f4f6',
-                        border: curFilter.deviceType && curFilter.deviceType !== 'All Devices' ? '1.5px solid #84cc16' : 'none',
-                        borderRadius: '8px',
-                        padding: '9px 36px 9px 16px',
-                        fontSize: '12.5px',
-                        fontWeight: 600,
-                        color: curFilter.deviceType && curFilter.deviceType !== 'All Devices' ? '#15803d' : '#374151',
-                        cursor: 'pointer',
-                        outline: 'none'
-                      }}
-                      title="Filter table by Taking Devices, Returned Devices, or Missing Devices"
-                    >
-                      <option value="All Devices">All Devices</option>
-                      <option value="Taking Devices">Taking Devices</option>
-                      <option value="Returned Devices">Returned Devices</option>
-                      <option value="Missing Devices">Missing Devices</option>
-                    </select>
-                    <ChevronDown
-                      size={14}
-                      color={curFilter.deviceType && curFilter.deviceType !== 'All Devices' ? '#15803d' : '#6b7280'}
-                      style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
-                    />
-                  </div>
-
+                  {/* Status Dropdown */}
                   <div style={{ position: 'relative' }}>
                     <select
                       value={curFilter.status}
@@ -1292,6 +1265,38 @@ export default function DailyTaskSection({
                     <ChevronDown
                       size={14}
                       color="#6b7280"
+                      style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+                    />
+                  </div>
+
+                  {/* Device Filter Dropdown: Taking Devices, Returned Devices, Missing Devices */}
+                  <div style={{ position: 'relative' }}>
+                    <select
+                      value={curFilter.deviceFilter || 'All Devices'}
+                      onChange={e => setRoundFilterProp(roundKey, 'deviceFilter', e.target.value)}
+                      style={{
+                        appearance: 'none',
+                        backgroundColor: (curFilter.deviceFilter && curFilter.deviceFilter !== 'All Devices') ? '#f0fdf4' : '#f3f4f6',
+                        border: (curFilter.deviceFilter && curFilter.deviceFilter !== 'All Devices') ? '1.5px solid #84cc16' : 'none',
+                        borderRadius: '8px',
+                        padding: '9px 36px 9px 16px',
+                        fontSize: '12.5px',
+                        fontWeight: 600,
+                        color: (curFilter.deviceFilter && curFilter.deviceFilter !== 'All Devices') ? '#166534' : '#374151',
+                        cursor: 'pointer',
+                        outline: 'none',
+                        transition: 'all 0.15s ease'
+                      }}
+                      title="Filter devices by Taking, Returned, or Missing"
+                    >
+                      <option value="All Devices">All Devices</option>
+                      <option value="Taking Devices">Taking Devices</option>
+                      <option value="Returned Devices">Returned Devices</option>
+                      <option value="Missing Devices">Missing Devices</option>
+                    </select>
+                    <ChevronDown
+                      size={14}
+                      color={(curFilter.deviceFilter && curFilter.deviceFilter !== 'All Devices') ? '#16a34a' : '#6b7280'}
                       style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
                     />
                   </div>
@@ -1358,6 +1363,8 @@ export default function DailyTaskSection({
                           ? 'Loading task records...'
                           : curFilter.search
                           ? `No matching device or employee found for "${curFilter.search}" in Task ${selectedDay}.${rnd.round_number}.`
+                          : curFilter.deviceFilter && curFilter.deviceFilter !== 'All Devices'
+                          ? `No ${curFilter.deviceFilter.toLowerCase()} found in Task ${selectedDay}.${rnd.round_number}.`
                           : `No records logged for Task ${selectedDay}.${rnd.round_number} (${formatDayString(selectedDay)}). Click '+ Add' to assign devices.`}
                       </td>
                     </tr>

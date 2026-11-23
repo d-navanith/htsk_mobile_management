@@ -55,6 +55,7 @@ export default function HistorySection({
   const [viewMode, setViewMode] = useState('cards'); // 'cards' (card grid), 'grouped' (series grouped list), 'table'
   const [selectedSeries, setSelectedSeries] = useState('ALL'); // 'ALL', 'New', 'Pn', 'Cass'
   const [selectedShift, setSelectedShift] = useState('ALL'); // 'ALL', 'Day', 'Night'
+  const [selectedDeviceStatus, setSelectedDeviceStatus] = useState('ALL'); // 'ALL', 'Taking', 'Returned', 'Missing'
 
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -260,9 +261,19 @@ export default function HistorySection({
       const matchesSeries = selectedSeries === 'ALL' || series === selectedSeries;
       const matchesShift = selectedShift === 'ALL' || (d.shift || 'Day').toLowerCase() === selectedShift.toLowerCase();
 
-      return matchesSearch && matchesSeries && matchesShift;
+      let matchesDeviceStatus = true;
+      if (selectedDeviceStatus === 'Taking') {
+        const isMissing = (d.sign || '').toLowerCase() === 'missing';
+        matchesDeviceStatus = Boolean(d.device_id || d.taking_device) && !isMissing;
+      } else if (selectedDeviceStatus === 'Returned') {
+        matchesDeviceStatus = Boolean((d.return_device || '').trim()) || Boolean((d.return_time || '').trim());
+      } else if (selectedDeviceStatus === 'Missing') {
+        matchesDeviceStatus = (d.sign || '').toLowerCase() === 'missing';
+      }
+
+      return matchesSearch && matchesSeries && matchesShift && matchesDeviceStatus;
     });
-  }, [activeDevices, searchTerm, activeTableSearch, selectedSeries, selectedShift]);
+  }, [activeDevices, searchTerm, activeTableSearch, selectedSeries, selectedShift, selectedDeviceStatus]);
 
   // Statistics for selected day
   const dayStats = useMemo(() => {
@@ -1168,6 +1179,31 @@ export default function HistorySection({
                       </button>
                     )}
                   </div>
+                  <div style={{ position: 'relative' }}>
+                    <select
+                      value={selectedDeviceStatus}
+                      onChange={e => setSelectedDeviceStatus(e.target.value)}
+                      style={{
+                        appearance: 'none',
+                        backgroundColor: selectedDeviceStatus !== 'ALL' ? '#f0fdf4' : '#ffffff',
+                        border: selectedDeviceStatus !== 'ALL' ? '1.5px solid #84cc16' : '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        padding: '6px 30px 6px 12px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: selectedDeviceStatus !== 'ALL' ? '#166534' : '#374151',
+                        cursor: 'pointer',
+                        outline: 'none'
+                      }}
+                    >
+                      <option value="ALL">All Devices</option>
+                      <option value="Taking">Taking Devices</option>
+                      <option value="Returned">Returned Devices</option>
+                      <option value="Missing">Missing Devices</option>
+                    </select>
+                    <ChevronDown size={13} color={selectedDeviceStatus !== 'ALL' ? '#16a34a' : '#6b7280'} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                  </div>
+
                   <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#059669', backgroundColor: '#ecfdf5', padding: '4px 12px', borderRadius: '9999px' }}>
                     {filteredActiveDevices.length} Mobiles
                   </span>

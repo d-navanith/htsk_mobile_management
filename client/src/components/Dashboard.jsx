@@ -50,7 +50,7 @@ export default function Dashboard({
   const [selectedGroup, setSelectedGroup] = useState('All Groups');
   const [selectedShift, setSelectedShift] = useState('All Shift');
   const [selectedStatus, setSelectedStatus] = useState('All Status');
-  const [selectedDeviceType, setSelectedDeviceType] = useState('All Devices');
+  const [selectedDeviceFilter, setSelectedDeviceFilter] = useState('All Devices');
 
   // Animation Status (Controllable per user and globally in User Manage)
   const [animationStatus, setAnimationStatus] = useState({ allowed: true, activeAnimation: 'snow' });
@@ -627,22 +627,7 @@ export default function Dashboard({
       if (compareCategoryFilter === 'not_available') {
         return comparisonData.droppedRecords || [];
       }
-      if (compareCategoryFilter === 'returned') {
-        const fromActive = (comparisonData.records || []).filter(r => r.return_device || r.comparison_status === 'returned');
-        const fromDropped = (comparisonData.droppedRecords || []).filter(r => r.return_device || r.comparison_status === 'returned');
-        return [...fromActive, ...fromDropped];
-      }
-      if (compareCategoryFilter === 'missing') {
-        const fromActive = (comparisonData.records || []).filter(r => (r.sign || '').toLowerCase() === 'missing' || r.comparison_status === 'missing');
-        const fromDropped = (comparisonData.droppedRecords || []).filter(r => (r.sign || '').toLowerCase() === 'missing' || r.comparison_status === 'missing');
-        return [...fromActive, ...fromDropped];
-      }
-      // 'all' category: combine toTask records + resolved returned/missing dropped records
-      const baseRecs = comparisonData.records || records;
-      const resolvedDropped = (comparisonData.droppedRecords || []).filter(r => r.return_device || r.comparison_status === 'returned' || r.comparison_status === 'missing');
-      const baseKeys = new Set(baseRecs.map(r => r.taking_device || r.return_device).filter(Boolean));
-      const extraDropped = resolvedDropped.filter(r => !baseKeys.has(r.taking_device || r.return_device));
-      return [...baseRecs, ...extraDropped];
+      return comparisonData.records || records;
     }
     return records;
   }, [isComparing, comparisonData, compareCategoryFilter, records, isViewAllDays]);
@@ -682,14 +667,15 @@ export default function Dashboard({
         selectedStatus === 'all' ||
         (r.sign || '').toLowerCase() === selectedStatus.toLowerCase();
 
-      // Device Type filter (Taking Devices, Returned Devices, Missing Devices)
-      let matchesDeviceType = true;
-      if (selectedDeviceType === 'Taking Devices') {
-        matchesDeviceType = Boolean(r.taking_device && r.taking_device.trim() !== '') && (r.sign || '').toLowerCase() !== 'missing';
-      } else if (selectedDeviceType === 'Returned Devices') {
-        matchesDeviceType = Boolean(r.return_device && r.return_device.trim() !== '') || r.device_type === 'returned' || r.is_resolved_returned === true || r.comparison_status === 'returned' || r.name === 'Office Return';
-      } else if (selectedDeviceType === 'Missing Devices') {
-        matchesDeviceType = (r.sign || '').toLowerCase() === 'missing' || r.device_type === 'missing' || r.is_resolved_missing === true || r.comparison_status === 'missing' || r.name === 'Missing Check';
+      // Device Filter: Taking Devices, Returned Devices, Missing Devices
+      let matchesDevice = true;
+      if (selectedDeviceFilter === 'Taking Devices') {
+        const isMissing = (r.sign || '').toLowerCase() === 'missing' || Boolean(r.is_resolved_missing) || r.comparison_status === 'missing' || r.name === 'Missing Check';
+        matchesDevice = Boolean((r.taking_device || '').trim()) && !isMissing;
+      } else if (selectedDeviceFilter === 'Returned Devices') {
+        matchesDevice = Boolean((r.return_device || '').trim()) || Boolean((r.return_time || '').trim()) || Boolean(r.is_resolved_returned) || r.comparison_status === 'returned';
+      } else if (selectedDeviceFilter === 'Missing Devices') {
+        matchesDevice = (r.sign || '').toLowerCase() === 'missing' || Boolean(r.is_resolved_missing) || r.comparison_status === 'missing' || r.name === 'Missing Check';
       }
 
       // Comparison category filter
@@ -710,7 +696,7 @@ export default function Dashboard({
         }
       }
 
-      return matchesSearch && matchesGroup && matchesShift && matchesStatus && matchesDeviceType && matchesCompareCategory;
+      return matchesSearch && matchesGroup && matchesShift && matchesStatus && matchesCompareCategory && matchesDevice;
     });
 
   const isCurrentFilterLatest = kpis.isLatest || (availableDays[0] && availableDays[0].task_number === selectedTaskNumber);
@@ -1390,6 +1376,20 @@ export default function Dashboard({
               {isViewAllDays ? 'All Dates' : (formatDayString(selectedDay) || '21st November')}
             </div>
 
+            {filteredRecords.length !== sourceRecordsForTable.length && (
+              <span style={{
+                fontSize: '12px',
+                fontWeight: 700,
+                backgroundColor: '#dcfce7',
+                color: '#15803d',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                whiteSpace: 'nowrap'
+              }}>
+                {filteredRecords.length} / {sourceRecordsForTable.length} Mobiles
+              </span>
+            )}
+
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -1495,37 +1495,6 @@ export default function Dashboard({
               <ChevronDown size={14} color="#6b7280" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
             </div>
 
-            {/* Device Filter: Taking, Returned, Missing (per user request) */}
-            <div style={{ position: 'relative' }}>
-              <select
-                value={selectedDeviceType}
-                onChange={e => setSelectedDeviceType(e.target.value)}
-                style={{
-                  appearance: 'none',
-                  backgroundColor: '#f3f4f6',
-                  border: selectedDeviceType !== 'All Devices' ? '1.5px solid #84cc16' : '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  padding: '8px 34px 8px 16px',
-                  fontSize: '12.5px',
-                  fontWeight: 600,
-                  color: selectedDeviceType !== 'All Devices' ? '#15803d' : '#374151',
-                  cursor: 'pointer',
-                  outline: 'none'
-                }}
-                title="Filter table by Taking Devices, Returned Devices, or Missing Devices"
-              >
-                <option value="All Devices">All Devices</option>
-                <option value="Taking Devices">Taking Devices</option>
-                <option value="Returned Devices">Returned Devices</option>
-                <option value="Missing Devices">Missing Devices</option>
-              </select>
-              <ChevronDown
-                size={14}
-                color={selectedDeviceType !== 'All Devices' ? '#15803d' : '#6b7280'}
-                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
-              />
-            </div>
-
             {/* Status dropdown */}
             <div style={{ position: 'relative' }}>
               <select
@@ -1550,6 +1519,38 @@ export default function Dashboard({
                 <option value="Missing">Missing</option>
               </select>
               <ChevronDown size={14} color="#6b7280" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+            </div>
+
+            {/* Device Filter Dropdown: Taking Devices, Returned Devices, Missing Devices */}
+            <div style={{ position: 'relative' }}>
+              <select
+                value={selectedDeviceFilter}
+                onChange={e => setSelectedDeviceFilter(e.target.value)}
+                style={{
+                  appearance: 'none',
+                  backgroundColor: selectedDeviceFilter !== 'All Devices' ? '#f0fdf4' : '#f3f4f6',
+                  border: selectedDeviceFilter !== 'All Devices' ? '1.5px solid #84cc16' : '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  padding: '8px 34px 8px 16px',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  color: selectedDeviceFilter !== 'All Devices' ? '#166534' : '#374151',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  transition: 'all 0.15s ease'
+                }}
+                title="Filter devices by Taking, Returned, or Missing"
+              >
+                <option value="All Devices">All Devices</option>
+                <option value="Taking Devices">Taking Devices</option>
+                <option value="Returned Devices">Returned Devices</option>
+                <option value="Missing Devices">Missing Devices</option>
+              </select>
+              <ChevronDown
+                size={14}
+                color={selectedDeviceFilter !== 'All Devices' ? '#16a34a' : '#6b7280'}
+                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+              />
             </div>
 
             {/* Green Add button */}
@@ -1639,6 +1640,8 @@ export default function Dashboard({
                       ? 'Loading records...'
                       : searchTerm
                       ? `No matching device or employee found for "${searchTerm}" in this table.`
+                      : selectedDeviceFilter !== 'All Devices'
+                      ? `No ${selectedDeviceFilter.toLowerCase()} found in this table.`
                       : `No records found.`}
                   </td>
                 </tr>

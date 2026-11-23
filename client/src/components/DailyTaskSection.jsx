@@ -127,6 +127,44 @@ export default function DailyTaskSection({
     }
   };
 
+  // Attention Required Minimize & Bulk Mark All Returned State per Round
+  const [minimizedAttentionRounds, setMinimizedAttentionRounds] = useState({});
+  const [bulkResolvingRound, setBulkResolvingRound] = useState(null);
+
+  const toggleRoundAttentionMinimized = (roundKey) => {
+    setMinimizedAttentionRounds(prev => ({
+      ...prev,
+      [roundKey]: !prev[roundKey]
+    }));
+  };
+
+  const handleBulkMarkRoundReturned = async (taskNum, roundNum, deviceTags = [], roundKey) => {
+    if (!canEdit || !Array.isArray(deviceTags) || deviceTags.length === 0) return;
+    setBulkResolvingRound(roundKey);
+    try {
+      const res = await fetch('/api/daily-task/resolve-devices-bulk', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          task_number: taskNum,
+          round_number: roundNum,
+          device_tags: deviceTags,
+          action: 'returned',
+          admin_user: currentUserName || 'Shanaka'
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchTaskData();
+        refreshRecords();
+      }
+    } catch (e) {
+      console.error('Failed to bulk mark devices returned:', e);
+    } finally {
+      setBulkResolvingRound(null);
+    }
+  };
+
   // Handle adding next task check (Intra-day Round)
   const handleConfirmNextTask = async () => {
     if (!canEdit) {
@@ -1437,114 +1475,199 @@ export default function DailyTaskSection({
               </table>
             </div>
 
-            {/* Red Attention Banner for Dropped / Removed Devices in this Round */}
-            {rnd.removed_devices && rnd.removed_devices.length > 0 && (
-              <div style={{
-                backgroundColor: '#fff5f5',
-                border: '1.5px solid #f87171',
-                borderRadius: '12px',
-                padding: '14px 18px',
-                marginTop: '12px',
-                boxShadow: '0 2px 6px rgba(239, 68, 68, 0.08)'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '16px' }}>⚠️</span>
-                    <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#991b1b' }}>
-                      Attention Required: {rnd.removed_devices.length} Devices Not In List (Task {selectedDay}.{rnd.round_number})
-                    </span>
-                  </div>
-                  <span style={{ fontSize: '12px', color: '#b91c1c', fontWeight: 600 }}>
-                    Active in previous check but missing in this check. Check office return or mark missing:
-                  </span>
-                </div>
+            {/* Red Attention Banner for Dropped / Removed Devices in this Round (With Mark All Returned & Minimize) */}
+            {rnd.removed_devices && rnd.removed_devices.length > 0 && (() => {
+              const isMin = Boolean(minimizedAttentionRounds[roundKey]);
+              const isBulkLoading = bulkResolvingRound === roundKey;
+              const allReturned = rnd.removed_devices.every(devTag => {
+                const norm = devTag.toLowerCase().replace(/\s+/g, '');
+                const res = (rnd.resolutions && (rnd.resolutions[norm] || rnd.resolutions[devTag])) || null;
+                return res?.status === 'returned';
+              });
+              const unreturnedTags = rnd.removed_devices.filter(devTag => {
+                const norm = devTag.toLowerCase().replace(/\s+/g, '');
+                const res = (rnd.resolutions && (rnd.resolutions[norm] || rnd.resolutions[devTag])) || null;
+                return res?.status !== 'returned';
+              });
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '8px' }}>
-                  {rnd.removed_devices.map((devTag, dIdx) => {
-                    const norm = devTag.toLowerCase().replace(/\s+/g, '');
-                    const resolution = (rnd.resolutions && (rnd.resolutions[norm] || rnd.resolutions[devTag])) || null;
+              return (
+                <div style={{
+                  backgroundColor: '#fff5f5',
+                  border: '1.5px solid #f87171',
+                  borderRadius: '12px',
+                  padding: '14px 18px',
+                  marginTop: '12px',
+                  boxShadow: '0 2px 6px rgba(239, 68, 68, 0.08)'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '10px',
+                    marginBottom: isMin ? '0px' : '12px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <AlertTriangle size={16} color="#dc2626" />
+                      <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#991b1b' }}>
+                        Attention Required: {rnd.removed_devices.length} Devices Not In List (Task {selectedDay}.{rnd.round_number})
+                      </span>
+                      <span style={{ fontSize: '12px', color: '#b91c1c', fontWeight: 500 }}>
+                        — Active in previous check but missing in this check:
+                      </span>
+                    </div>
 
-                    return (
-                      <div
-                        key={dIdx}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      {canEdit && (
+                        <button
+                          type="button"
+                          disabled={isBulkLoading || allReturned}
+                          onClick={() => handleBulkMarkRoundReturned(selectedDay, rnd.round_number, unreturnedTags.length > 0 ? unreturnedTags : rnd.removed_devices, roundKey)}
+                          style={{
+                            backgroundColor: allReturned ? '#15803d' : '#f0fdf4',
+                            color: allReturned ? '#ffffff' : '#15803d',
+                            border: '1.5px solid #86efac',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            padding: '5px 12px',
+                            borderRadius: '8px',
+                            cursor: (isBulkLoading || allReturned) ? 'default' : 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                          title="Mark all devices in this list as Returned to office"
+                        >
+                          <CheckCircle2 size={14} />
+                          <span>
+                            {isBulkLoading
+                              ? 'Marking All...'
+                              : allReturned
+                              ? '✓ All Marked Returned'
+                              : '✓ Mark All Returned'}
+                          </span>
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => toggleRoundAttentionMinimized(roundKey)}
                         style={{
                           backgroundColor: '#ffffff',
-                          border: resolution
-                            ? (resolution.status === 'returned' ? '1.5px solid #86efac' : '1.5px solid #fca5a5')
-                            : '1.5px solid #fecaca',
+                          color: '#991b1b',
+                          border: '1px solid #fca5a5',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          padding: '5px 12px',
                           borderRadius: '8px',
-                          padding: '8px 12px',
-                          display: 'flex',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
                           alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '8px'
+                          gap: '6px'
                         }}
+                        title={isMin ? 'Expand device verification list' : 'Minimize device verification list'}
                       >
-                        <div>
-                          <div style={{ fontSize: '13px', fontWeight: 800, color: '#111827' }}>
-                            {devTag}
-                          </div>
-                          <div style={{ fontSize: '11px', marginTop: '2px' }}>
-                            {resolution ? (
-                              resolution.status === 'returned' ? (
-                                <span style={{ color: '#15803d', fontWeight: 700 }}>✓ Returned to Office</span>
-                              ) : (
-                                <span style={{ color: '#dc2626', fontWeight: 700 }}>✕ Marked as Missing</span>
-                              )
+                        <span>{isMin ? `Expand (${rnd.removed_devices.length})` : 'Minimize'}</span>
+                        <ChevronDown
+                          size={14}
+                          style={{
+                            transform: isMin ? 'rotate(0deg)' : 'rotate(180deg)',
+                            transition: 'transform 0.2s ease'
+                          }}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  {!isMin && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '8px' }}>
+                      {rnd.removed_devices.map((devTag, dIdx) => {
+                        const norm = devTag.toLowerCase().replace(/\s+/g, '');
+                        const resolution = (rnd.resolutions && (rnd.resolutions[norm] || rnd.resolutions[devTag])) || null;
+
+                        return (
+                          <div
+                            key={dIdx}
+                            style={{
+                              backgroundColor: '#ffffff',
+                              border: resolution
+                                ? (resolution.status === 'returned' ? '1.5px solid #86efac' : '1.5px solid #fca5a5')
+                                : '1.5px solid #fecaca',
+                              borderRadius: '8px',
+                              padding: '8px 12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: '8px'
+                            }}
+                          >
+                            <div>
+                              <div style={{ fontSize: '13px', fontWeight: 800, color: '#111827' }}>
+                                {devTag}
+                              </div>
+                              <div style={{ fontSize: '11px', marginTop: '2px' }}>
+                                {resolution ? (
+                                  resolution.status === 'returned' ? (
+                                    <span style={{ color: '#15803d', fontWeight: 700 }}>✓ Returned to Office</span>
+                                  ) : (
+                                    <span style={{ color: '#dc2626', fontWeight: 700 }}>✕ Marked as Missing</span>
+                                  )
+                                ) : (
+                                  <span style={{ color: '#b91c1c', fontWeight: 600 }}>⚠️ Awaiting Verification</span>
+                                )}
+                              </div>
+                            </div>
+
+                            {canEdit ? (
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleResolveDevice(selectedDay, rnd.round_number, devTag, 'returned')}
+                                  style={{
+                                    backgroundColor: resolution?.status === 'returned' ? '#15803d' : '#f0fdf4',
+                                    color: resolution?.status === 'returned' ? '#ffffff' : '#15803d',
+                                    border: '1px solid #86efac',
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    padding: '4px 8px',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer'
+                                  }}
+                                  title="Mark this device as found / returned to office"
+                                >
+                                  ✓ Returned
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleResolveDevice(selectedDay, rnd.round_number, devTag, 'missing')}
+                                  style={{
+                                    backgroundColor: resolution?.status === 'missing' ? '#dc2626' : '#fef2f2',
+                                    color: resolution?.status === 'missing' ? '#ffffff' : '#dc2626',
+                                    border: '1px solid #fca5a5',
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    padding: '4px 8px',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer'
+                                  }}
+                                  title="Mark this device as missing"
+                                >
+                                  ✕ Missing
+                                </button>
+                              </div>
                             ) : (
-                              <span style={{ color: '#b91c1c', fontWeight: 600 }}>⚠️ Awaiting Verification</span>
+                              <span style={{ fontSize: '11px', color: '#9ca3af', fontStyle: 'italic' }}>
+                                View only
+                              </span>
                             )}
                           </div>
-                        </div>
-
-                        {canEdit ? (
-                          <div style={{ display: 'flex', gap: '6px' }}>
-                            <button
-                              type="button"
-                              onClick={() => handleResolveDevice(selectedDay, rnd.round_number, devTag, 'returned')}
-                              style={{
-                                backgroundColor: resolution?.status === 'returned' ? '#15803d' : '#f0fdf4',
-                                color: resolution?.status === 'returned' ? '#ffffff' : '#15803d',
-                                border: '1px solid #86efac',
-                                fontSize: '11px',
-                                fontWeight: 700,
-                                padding: '4px 8px',
-                                borderRadius: '6px',
-                                cursor: 'pointer'
-                              }}
-                              title="Mark this device as found / returned to office"
-                            >
-                              ✓ Returned
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleResolveDevice(selectedDay, rnd.round_number, devTag, 'missing')}
-                              style={{
-                                backgroundColor: resolution?.status === 'missing' ? '#dc2626' : '#fef2f2',
-                                color: resolution?.status === 'missing' ? '#ffffff' : '#dc2626',
-                                border: '1px solid #fca5a5',
-                                fontSize: '11px',
-                                fontWeight: 700,
-                                padding: '4px 8px',
-                                borderRadius: '6px',
-                                cursor: 'pointer'
-                              }}
-                              title="Mark this device as missing"
-                            >
-                              ✕ Missing
-                            </button>
-                          </div>
-                        ) : (
-                          <span style={{ fontSize: '11px', color: '#9ca3af', fontStyle: 'italic' }}>
-                            View only
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
             </div>
           </div>
         );

@@ -2895,6 +2895,36 @@ async function resolveDroppedDevice({ task_number = 19, round_number, device_tag
   return { success: true, resolutions, status: action, device_tag: cleanTag };
 }
 
+async function resolveDroppedDevicesBulk({
+  task_number = 19,
+  round_number = 1,
+  device_tags = [],
+  action = 'returned',
+  admin_user = 'Shanaka'
+}) {
+  if (!Array.isArray(device_tags) || device_tags.length === 0) {
+    throw new Error('device_tags array is required for bulk resolution');
+  }
+  const results = [];
+  for (const tag of device_tags) {
+    if (!tag || !String(tag).trim()) continue;
+    const res = await resolveDroppedDevice({
+      task_number,
+      round_number,
+      device_tag: String(tag).trim(),
+      action,
+      admin_user
+    });
+    results.push(res);
+  }
+  return {
+    success: true,
+    count: results.length,
+    status: action,
+    message: `Marked ${results.length} devices as ${action}.`
+  };
+}
+
 // ==========================================
 // CROSS-TASK COMPARISON ENGINE (Dashboard Task A = Task B Compare)
 // ==========================================
@@ -3479,6 +3509,7 @@ module.exports = {
   saveTaskRound,
   updateTaskRound,
   resolveDroppedDevice,
+  resolveDroppedDevicesBulk,
   getAvailableTaskComparisonList,
   compareTwoTasks,
   dbRun,

@@ -65,6 +65,7 @@ const {
   saveTaskRound,
   updateTaskRound,
   resolveDroppedDevice,
+  resolveDroppedDevicesBulk,
   getAvailableTaskComparisonList,
   compareTwoTasks,
   dbRun,
@@ -704,6 +705,27 @@ app.post('/api/daily-task/resolve-device', requireCapability('manage_devices'), 
     res.json({ success: true, ...result });
   } catch (err) {
     console.error('Error resolving device:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5g-bulk. Bulk Resolve Dropped / Missing Devices (e.g. Mark All Returned)
+app.post('/api/daily-task/resolve-devices-bulk', requireCapability('manage_devices'), async (req, res) => {
+  try {
+    const { task_number, round_number, device_tags = [], action = 'returned', admin_user } = req.body;
+    if (!Array.isArray(device_tags) || device_tags.length === 0) {
+      return res.status(400).json({ success: false, error: 'device_tags array is required' });
+    }
+    const result = await resolveDroppedDevicesBulk({
+      task_number: task_number ? parseInt(task_number) : 19,
+      round_number: round_number ? parseInt(round_number) : 1,
+      device_tags,
+      action,
+      admin_user: admin_user || 'Shanaka'
+    });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('Error bulk resolving devices:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

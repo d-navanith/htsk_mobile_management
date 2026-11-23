@@ -81,6 +81,10 @@ export default function Dashboard({
   const [showDeleteTableModal, setShowDeleteTableModal] = useState(false);
   const [deletingTable, setDeletingTable] = useState(false);
 
+  // Attention Required Minimize & Bulk Mark All Returned State
+  const [isAttentionMinimized, setIsAttentionMinimized] = useState(false);
+  const [bulkResolving, setBulkResolving] = useState(false);
+
   const [kpis, setKpis] = useState({
     totalMobilePhones: 241,
     activeMobilePhones: 78,
@@ -262,6 +266,49 @@ export default function Dashboard({
       }
     } catch (err) {
       console.error('Error resolving device:', err);
+    }
+  };
+
+  // Bulk Mark All Dropped Devices as Returned
+  const handleMarkAllReturned = async () => {
+    if (!canEdit || !comparisonData || !comparisonData.notAvailable || comparisonData.notAvailable.length === 0) return;
+    const tagsToMark = comparisonData.notAvailable
+      .filter(item => item.resolution?.status !== 'returned')
+      .map(item => item.device_tag);
+
+    if (tagsToMark.length === 0) return;
+
+    const targetTaskNum = comparisonData?.toTask?.task_number || selectedTaskNumber || kpis.activeTaskNumber || 21;
+    const targetRoundNum = comparisonData?.toTask?.round_number || 1;
+
+    setBulkResolving(true);
+    try {
+      const token = localStorage.getItem('htsk_session_token');
+      const res = await fetch('/api/daily-task/resolve-devices-bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          'X-User-Role': currentUserRole
+        },
+        body: JSON.stringify({
+          task_number: targetTaskNum,
+          round_number: targetRoundNum,
+          device_tags: tagsToMark,
+          action: 'returned',
+          admin_user: currentUserName || 'Shanaka'
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        await runTaskComparison(compareFromKey, compareToKey, false);
+        fetchDashboardData(selectedTaskNumber, selectedDateStr, isViewAllDays);
+        refreshRecords();
+      }
+    } catch (err) {
+      console.error('Error bulk marking devices returned:', err);
+    } finally {
+      setBulkResolving(false);
     }
   };
 
@@ -1697,14 +1744,14 @@ export default function Dashboard({
         </div>
 
         {/* ===================================================================== */}
-        {/* RED ATTENTION REQUIRED BANNER BELOW TABLE (Matching User Image 2)     */}
+        {/* RED ATTENTION REQUIRED BANNER BELOW TABLE (With Mark All & Minimize)  */}
         {/* ===================================================================== */}
         {isComparing && comparisonData && comparisonData.notAvailable && comparisonData.notAvailable.length > 0 && (
           <div style={{
             backgroundColor: '#fff5f5',
             border: '1.5px solid #f87171',
             borderRadius: '14px',
-            padding: '16px 20px',
+            padding: '14px 20px',
             marginTop: '18px'
           }}>
             <div style={{
@@ -1712,102 +1759,166 @@ export default function Dashboard({
               alignItems: 'center',
               justifyContent: 'space-between',
               flexWrap: 'wrap',
-              gap: '8px',
-              marginBottom: '12px'
+              gap: '10px',
+              marginBottom: isAttentionMinimized ? '0px' : '12px'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 <AlertTriangle size={16} color="#dc2626" />
                 <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#991b1b' }}>
                   Attention Required: {comparisonData.notAvailable.length} Devices Not In List ({comparisonData.toTask.label})
                 </span>
+                <span style={{ fontSize: '12px', color: '#b91c1c', fontWeight: 500 }}>
+                  — Active in previous check but missing in this check:
+                </span>
               </div>
-              <span style={{ fontSize: '12px', color: '#b91c1c', fontWeight: 600 }}>
-                Active in previous check but missing in this check. Check office return or mark missing:
-              </span>
-            </div>
 
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(265px, 1fr))',
-              gap: '10px'
-            }}>
-              {comparisonData.notAvailable.map((item, dIdx) => {
-                const resolution = item.resolution || null;
-                return (
-                  <div
-                    key={dIdx}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                {canEdit && (
+                  <button
+                    type="button"
+                    disabled={bulkResolving || comparisonData.notAvailable.every(d => d.resolution?.status === 'returned')}
+                    onClick={handleMarkAllReturned}
                     style={{
-                      backgroundColor: '#ffffff',
-                      border: resolution
-                        ? (resolution.status === 'returned' ? '1.5px solid #86efac' : '1.5px solid #fca5a5')
-                        : '1.5px solid #fecaca',
-                      borderRadius: '10px',
-                      padding: '10px 14px',
-                      display: 'flex',
+                      backgroundColor: comparisonData.notAvailable.every(d => d.resolution?.status === 'returned') ? '#15803d' : '#f0fdf4',
+                      color: comparisonData.notAvailable.every(d => d.resolution?.status === 'returned') ? '#ffffff' : '#15803d',
+                      border: '1.5px solid #86efac',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      padding: '6px 14px',
+                      borderRadius: '8px',
+                      cursor: (bulkResolving || comparisonData.notAvailable.every(d => d.resolution?.status === 'returned')) ? 'default' : 'pointer',
+                      display: 'inline-flex',
                       alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '10px'
+                      gap: '6px',
+                      transition: 'all 0.15s ease'
                     }}
+                    title="Mark all devices in this list as Returned to office"
                   >
-                    <div>
-                      <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#111827' }}>
-                        {item.device_tag}
-                      </div>
-                      <div style={{ fontSize: '11px', marginTop: '2px' }}>
-                        {resolution ? (
-                          resolution.status === 'returned' ? (
-                            <span style={{ color: '#15803d', fontWeight: 700 }}>✓ Returned</span>
-                          ) : (
-                            <span style={{ color: '#dc2626', fontWeight: 700 }}>✕ Missing</span>
-                          )
-                        ) : (
-                          <span style={{ color: '#b91c1c', fontWeight: 600 }}>⚠️ Awaiting Verification</span>
-                        )}
-                      </div>
-                    </div>
+                    <CheckCircle2 size={14} />
+                    <span>
+                      {bulkResolving
+                        ? 'Marking All Returned...'
+                        : comparisonData.notAvailable.every(d => d.resolution?.status === 'returned')
+                        ? '✓ All Marked Returned'
+                        : '✓ Mark All Returned'}
+                    </span>
+                  </button>
+                )}
 
-                    {canEdit ? (
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleResolveComparedDevice(item.device_tag, 'returned')}
-                          style={{
-                            backgroundColor: resolution?.status === 'returned' ? '#15803d' : '#f0fdf4',
-                            color: resolution?.status === 'returned' ? '#ffffff' : '#15803d',
-                            border: '1px solid #86efac',
-                            fontSize: '11px',
-                            fontWeight: 700,
-                            padding: '5px 10px',
-                            borderRadius: '6px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          ✓ Returned
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleResolveComparedDevice(item.device_tag, 'missing')}
-                          style={{
-                            backgroundColor: resolution?.status === 'missing' ? '#dc2626' : '#fef2f2',
-                            color: resolution?.status === 'missing' ? '#ffffff' : '#dc2626',
-                            border: '1px solid #fca5a5',
-                            fontSize: '11px',
-                            fontWeight: 700,
-                            padding: '5px 10px',
-                            borderRadius: '6px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          ✕ Missing
-                        </button>
-                      </div>
-                    ) : (
-                      <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 600 }}>View Only</span>
-                    )}
-                  </div>
-                );
-              })}
+                <button
+                  type="button"
+                  onClick={() => setIsAttentionMinimized(prev => !prev)}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    color: '#991b1b',
+                    border: '1px solid #fca5a5',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                  title={isAttentionMinimized ? 'Expand device verification list' : 'Minimize device verification list'}
+                >
+                  <span>{isAttentionMinimized ? `Expand (${comparisonData.notAvailable.length})` : 'Minimize'}</span>
+                  <ChevronDown
+                    size={14}
+                    style={{
+                      transform: isAttentionMinimized ? 'rotate(0deg)' : 'rotate(180deg)',
+                      transition: 'transform 0.2s ease'
+                    }}
+                  />
+                </button>
+              </div>
             </div>
+
+            {!isAttentionMinimized && (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(265px, 1fr))',
+                gap: '10px'
+              }}>
+                {comparisonData.notAvailable.map((item, dIdx) => {
+                  const resolution = item.resolution || null;
+                  return (
+                    <div
+                      key={dIdx}
+                      style={{
+                        backgroundColor: '#ffffff',
+                        border: resolution
+                          ? (resolution.status === 'returned' ? '1.5px solid #86efac' : '1.5px solid #fca5a5')
+                          : '1.5px solid #fecaca',
+                        borderRadius: '10px',
+                        padding: '10px 14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '10px'
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#111827' }}>
+                          {item.device_tag}
+                        </div>
+                        <div style={{ fontSize: '11px', marginTop: '2px' }}>
+                          {resolution ? (
+                            resolution.status === 'returned' ? (
+                              <span style={{ color: '#15803d', fontWeight: 700 }}>✓ Returned</span>
+                            ) : (
+                              <span style={{ color: '#dc2626', fontWeight: 700 }}>✕ Missing</span>
+                            )
+                          ) : (
+                            <span style={{ color: '#b91c1c', fontWeight: 600 }}>⚠️ Awaiting Verification</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {canEdit ? (
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleResolveComparedDevice(item.device_tag, 'returned')}
+                            style={{
+                              backgroundColor: resolution?.status === 'returned' ? '#15803d' : '#f0fdf4',
+                              color: resolution?.status === 'returned' ? '#ffffff' : '#15803d',
+                              border: '1px solid #86efac',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              padding: '5px 10px',
+                              borderRadius: '6px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            ✓ Returned
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleResolveComparedDevice(item.device_tag, 'missing')}
+                            style={{
+                              backgroundColor: resolution?.status === 'missing' ? '#dc2626' : '#fef2f2',
+                              color: resolution?.status === 'missing' ? '#ffffff' : '#dc2626',
+                              border: '1px solid #fca5a5',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              padding: '5px 10px',
+                              borderRadius: '6px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            ✕ Missing
+                          </button>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 600 }}>View Only</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -2019,13 +2130,44 @@ export default function Dashboard({
                   borderRadius: '14px',
                   padding: '16px'
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '6px' }}>
-                    <span style={{ fontSize: '14px', fontWeight: 800, color: '#111827' }}>
-                      Not Available in {comparisonData.toTask.label} ({comparisonData.notAvailable.length})
-                    </span>
-                    <span style={{ fontSize: '12px', color: '#6b7280' }}>
-                      Were active in {comparisonData.fromTask.label} — verify return or mark missing
-                    </span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                    <div>
+                      <span style={{ fontSize: '14px', fontWeight: 800, color: '#111827', display: 'block' }}>
+                        Not Available in {comparisonData.toTask.label} ({comparisonData.notAvailable.length})
+                      </span>
+                      <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                        Were active in {comparisonData.fromTask.label} — verify return or mark missing
+                      </span>
+                    </div>
+                    {canEdit && comparisonData.notAvailable.length > 0 && (
+                      <button
+                        type="button"
+                        disabled={bulkResolving || comparisonData.notAvailable.every(d => d.resolution?.status === 'returned')}
+                        onClick={handleMarkAllReturned}
+                        style={{
+                          backgroundColor: comparisonData.notAvailable.every(d => d.resolution?.status === 'returned') ? '#15803d' : '#f0fdf4',
+                          color: comparisonData.notAvailable.every(d => d.resolution?.status === 'returned') ? '#ffffff' : '#15803d',
+                          border: '1.5px solid #86efac',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          padding: '6px 14px',
+                          borderRadius: '8px',
+                          cursor: (bulkResolving || comparisonData.notAvailable.every(d => d.resolution?.status === 'returned')) ? 'default' : 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <CheckCircle2 size={14} />
+                        <span>
+                          {bulkResolving
+                            ? 'Marking All...'
+                            : comparisonData.notAvailable.every(d => d.resolution?.status === 'returned')
+                            ? '✓ All Marked Returned'
+                            : '✓ Mark All Returned'}
+                        </span>
+                      </button>
+                    )}
                   </div>
                   {comparisonData.notAvailable.length === 0 ? (
                     <div style={{ fontSize: '13px', color: '#6b7280' }}>No missing devices from {comparisonData.fromTask.label}.</div>

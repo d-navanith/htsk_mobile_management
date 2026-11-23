@@ -2582,6 +2582,16 @@ async function getTaskRounds(taskNumber, taskDate) {
     }
   } catch (err) {}
 
+  let dbRecordsForTask = [];
+  try {
+    if (rounds.length > 0 && rounds[0].task_number) {
+      dbRecordsForTask = await dbAll(
+        `SELECT * FROM device_records WHERE task_number = ? ORDER BY id ASC`,
+        [rounds[0].task_number]
+      );
+    }
+  } catch (err) {}
+
   return rounds.map(r => {
     let records = [];
     if (r.records_json && r.records_json !== '[]') {
@@ -2643,6 +2653,7 @@ async function getTaskRounds(taskNumber, taskDate) {
             return_time: res.check_time || checkTime || 'Office Returned',
             sign: 'Done',
             device_details: `Return: ${res.device_tag || rec.taking_device} | Taking: ${rec.taking_device}`,
+            device_type: 'both',
             is_resolved_returned: true
           };
         } else if (res.status === 'missing') {
@@ -2652,11 +2663,117 @@ async function getTaskRounds(taskNumber, taskDate) {
             return_time: '',
             sign: 'Missing',
             device_details: 'Missing Device (Attention Required)',
+            device_type: 'missing',
             is_resolved_missing: true
           };
         }
       }
-      return rec;
+      return {
+        ...rec,
+        device_type: rec.return_device && rec.taking_device ? 'both' : (rec.return_device ? 'returned' : 'taking')
+      };
+    });
+
+    // Also include dropped devices resolved as returned or missing in this round, so they appear in table & filters
+    const existingTakingTags = new Set(
+      records
+        .map(rec => normalizeDeviceTag(rec.taking_device))
+        .filter(Boolean)
+    );
+    const existingReturnTags = new Set(
+      records
+        .map(rec => normalizeDeviceTag(rec.return_device))
+        .filter(Boolean)
+    );
+    const existingDbIds = new Set(
+      records
+        .filter(rec => rec.id !== undefined && rec.id !== null && /^\d+$/.test(String(rec.id)))
+        .map(rec => Number(rec.id))
+    );
+
+    // 1. Add resolved returned or missing dropped devices from parsedResolutions
+    Object.keys(parsedResolutions).forEach((normTag) => {
+      const res = parsedResolutions[normTag];
+      if (!res || !res.device_tag) return;
+      if (existingTakingTags.has(normTag) || existingReturnTags.has(normTag)) return;
+
+      const matchingDb = dbRecordsForTask.find(dbr => {
+        if (existingDbIds.has(dbr.id)) return false;
+        const normRet = normalizeDeviceTag(dbr.return_device);
+        const normTak = normalizeDeviceTag(dbr.taking_device);
+        return normRet === normTag || (res.status === 'missing' && normTak === normTag);
+      });
+
+      if (matchingDb) {
+        existingDbIds.add(matchingDb.id);
+      }
+      existingReturnTags.add(normTag);
+
+      const isRet = res.status === 'returned';
+      const rowId = matchingDb ? matchingDb.id : `res-${r.id}-${normTag}`;
+      const rowName = (matchingDb && matchingDb.name && matchingDb.name !== 'Office Return' && matchingDb.name !== 'Missing Check')
+        ? matchingDb.name
+        : (isRet ? 'Office Return' : 'Missing Check');
+
+      records.push({
+        id: rowId,
+        emp_number: records.length + 1,
+        name: rowName,
+        shift: matchingDb?.shift || 'Day',
+        group_name: matchingDb?.group_name || '',
+        issued_at: matchingDb?.issued_at || '7.30 A.M.',
+        return_time: res.check_time || matchingDb?.return_time || checkTime || (isRet ? 'Office Returned' : ''),
+        return_device: isRet ? (res.device_tag || '') : '',
+        taking_device: isRet ? '' : (res.device_tag || ''),
+        handover_to: matchingDb?.handover_to || '',
+        sign: isRet ? 'Done' : 'Missing',
+        is_new_in_round: 0,
+        round_number: r.round_number,
+        check_time: checkTime,
+        device_details: isRet ? `Return: ${res.device_tag}` : `Missing Device: ${res.device_tag}`,
+        device_type: isRet ? 'returned' : 'missing',
+        is_resolved_dropped: true,
+        is_resolved_returned: isRet,
+        is_resolved_missing: !isRet
+      });
+    });
+
+    // 2. Also add any unlinked Office Return / Missing Check records from dbRecordsForTask
+    dbRecordsForTask.forEach(dbr => {
+      if (existingDbIds.has(dbr.id)) return;
+      if (dbr.round_number && dbr.round_number !== r.round_number) return;
+      if (dbr.name === 'Office Return' || dbr.name === 'Missing Check' || (dbr.return_device && !dbr.taking_device)) {
+        const normRet = normalizeDeviceTag(dbr.return_device);
+        const normTak = normalizeDeviceTag(dbr.taking_device);
+        if (normRet && existingReturnTags.has(normRet)) return;
+        if (normTak && existingTakingTags.has(normTak)) return;
+
+        existingDbIds.add(dbr.id);
+        if (normRet) existingReturnTags.add(normRet);
+
+        const isRet = Boolean(dbr.return_device && dbr.return_device.trim() !== '') || dbr.name === 'Office Return';
+        records.push({
+          id: dbr.id,
+          emp_number: records.length + 1,
+          name: dbr.name || (isRet ? 'Office Return' : 'Missing Check'),
+          shift: dbr.shift || 'Day',
+          group_name: dbr.group_name || '',
+          issued_at: dbr.issued_at || '7.30 A.M.',
+          return_time: dbr.return_time || checkTime || (isRet ? 'Office Returned' : ''),
+          return_device: dbr.return_device || '',
+          taking_device: dbr.taking_device || '',
+          handover_to: dbr.handover_to || '',
+          sign: dbr.sign || (isRet ? 'Done' : 'Missing'),
+          is_new_in_round: 0,
+          round_number: r.round_number,
+          check_time: checkTime,
+          device_details: dbr.device_details || (isRet ? `Return: ${dbr.return_device}` : `Missing: ${dbr.taking_device}`),
+          device_type: isRet ? 'returned' : 'missing',
+          is_resolved_dropped: true,
+          is_resolved_returned: isRet,
+          is_resolved_missing: !isRet
+        });
+      }
     });
 
     return {
@@ -3315,8 +3432,48 @@ async function loadSnapshotForTaskRound(taskNum, roundNum) {
     });
   }
 
+  // Also include resolved returned or missing dropped records for this round so snapshot displays them
+  const existingSnapshotTaking = new Set(records.map(r => normalizeDeviceTag(r.taking_device)).filter(Boolean));
+  const existingSnapshotReturn = new Set(records.map(r => normalizeDeviceTag(r.return_device)).filter(Boolean));
+  const existingSnapshotIds = new Set(records.map(r => Number(r.id)).filter(id => !isNaN(id)));
+
+  for (const dbr of dbRecords) {
+    if (existingSnapshotIds.has(dbr.id)) continue;
+    if (dbr.round_number && dbr.round_number !== rNum) continue;
+    if (dbr.name === 'Office Return' || dbr.name === 'Missing Check' || (dbr.return_device && !dbr.taking_device)) {
+      const normRet = normalizeDeviceTag(dbr.return_device);
+      const normTak = normalizeDeviceTag(dbr.taking_device);
+      if (normRet && existingSnapshotReturn.has(normRet)) continue;
+      if (normTak && existingSnapshotTaking.has(normTak)) continue;
+
+      existingSnapshotIds.add(dbr.id);
+      if (normRet) existingSnapshotReturn.add(normRet);
+
+      const isRet = Boolean(dbr.return_device && dbr.return_device.trim() !== '') || dbr.name === 'Office Return';
+      records.push({
+        id: dbr.id,
+        name: dbr.name || (isRet ? 'Office Return' : 'Missing Check'),
+        shift: dbr.shift || 'Day',
+        group_name: dbr.group_name || '',
+        issued_at: dbr.issued_at || (roundRow?.check_time || '7.30 A.M.'),
+        return_time: dbr.return_time || (roundRow?.check_time || 'Office Returned'),
+        return_device: dbr.return_device || '',
+        taking_device: dbr.taking_device || '',
+        handover_to: dbr.handover_to || '',
+        sign: dbr.sign || (isRet ? 'Done' : 'Missing'),
+        task_number: tNum,
+        task_date: roundRow?.task_date || dbr.task_date || '',
+        round_number: rNum,
+        device_type: isRet ? 'returned' : 'missing',
+        is_resolved_dropped: true,
+        is_resolved_returned: isRet,
+        is_resolved_missing: !isRet
+      });
+    }
+  }
+
   if (records.length === 0) {
-    records = dbRecords.filter(r => r.name !== 'Office Return' && r.name !== 'Missing Check');
+    records = dbRecords;
   }
 
   return {

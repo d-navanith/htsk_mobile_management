@@ -123,7 +123,7 @@ export default function Sidebar({
           </nav>
         </div>
 
-        {/* Logout button matching Image 1, 2, 3, 4 bottom-left */}
+        {/* Logout button matching Image 1, 2, 3, 4 bottom-left and Semantic Versioning */}
         <div style={{ paddingBottom: '16px' }}>
           <button
             onClick={() => {
@@ -153,6 +153,24 @@ export default function Sidebar({
             <span>Logout</span>
             <LogOut size={16} />
           </button>
+
+          {/* Semantic Versioning badge matching user mockup */}
+          <div style={{
+            marginTop: '16px',
+            paddingTop: '12px',
+            borderTop: '1px solid #e5e7eb',
+            width: '100%'
+          }}>
+            <span style={{
+              fontSize: '12.5px',
+              fontWeight: 700,
+              color: '#059669',
+              letterSpacing: '0.02em',
+              fontFamily: 'system-ui, -apple-system, sans-serif'
+            }}>
+              V 1.0.0 - alpha 1
+            </span>
+          </div>
         </div>
       </aside>
     </>

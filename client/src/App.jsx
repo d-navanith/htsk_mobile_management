@@ -328,6 +328,7 @@ export default function App() {
     showToast(result.message || `Saved record for ${recordData.name} successfully!`);
     fetchRecords();
     fetchGroups();
+    window.dispatchEvent(new CustomEvent('htsk-records-changed', { detail: result.data }));
   };
 
   // Update existing record
@@ -353,6 +354,7 @@ export default function App() {
     showToast(`Updated record #${id} successfully!`);
     fetchRecords();
     fetchGroups();
+    window.dispatchEvent(new CustomEvent('htsk-records-changed', { detail: result.data }));
   };
 
   // Delete record
@@ -573,7 +575,10 @@ export default function App() {
           {activeTab === 'dailytask' && (
             <DailyTaskSection
               records={records}
-              onOpenAddModal={() => setIsAddModalOpen(true)}
+              onOpenAddModal={ctx => {
+                setAddModalContext(ctx || {});
+                setIsAddModalOpen(true);
+              }}
               onOpenEditModal={record => setEditingRecord(record)}
               onDeleteRecord={handleDeleteRecord}
               groups={groups}

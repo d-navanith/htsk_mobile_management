@@ -627,7 +627,7 @@ async function getRecordById(id) {
   return await dbGet(`SELECT * FROM device_records WHERE id = ?`, [id]);
 }
 
-// Insert new record (Dashboard Add button)
+// Insert new record (Dashboard & Daily Task Table Add button — syncs both device_records and daily_task_rounds)
 async function insertDeviceRecord({
   name,
   shift = 'Day',
@@ -640,27 +640,88 @@ async function insertDeviceRecord({
   sign = 'Done',
   admin_user = 'Shanaka',
   task_number,
-  task_date
+  task_date,
+  round_number,
+  round_id
 }) {
-  // If task_number or task_date are not provided, default dynamically to the latest active task and date
-  if (!task_number || !task_date) {
-    const latestRow = await dbGet(`SELECT MAX(task_number) as latestTask, MAX(task_date) as latestDate FROM device_records`);
-    if (!task_number) task_number = (latestRow && latestRow.latestTask) ? latestRow.latestTask : 19;
-    if (!task_date) task_date = (latestRow && latestRow.latestDate) ? latestRow.latestDate : '2026-11-19';
+  // 1. Resolve target round if round_id is provided
+  let targetRound = null;
+  if (round_id !== undefined && round_id !== null && !isNaN(Number(round_id))) {
+    targetRound = await dbGet(`SELECT * FROM daily_task_rounds WHERE id = ?`, [Number(round_id)]);
   }
+
+  if (targetRound) {
+    if (!task_number) task_number = targetRound.task_number;
+    if (!task_date) task_date = targetRound.task_date;
+    if (!round_number) round_number = targetRound.round_number;
+  }
+
+  // 2. If task_number or task_date are still not provided, default dynamically to the latest active task and date
+  if (!task_number || !task_date) {
+    const latestRoundRow = await dbGet(`SELECT task_number, task_date, round_number FROM daily_task_rounds ORDER BY task_number DESC, round_number DESC LIMIT 1`);
+    const latestRecRow = await dbGet(`SELECT MAX(task_number) as latestTask, MAX(task_date) as latestDate FROM device_records`);
+    if (!task_number) {
+      task_number = (latestRoundRow && latestRoundRow.task_number) || (latestRecRow && latestRecRow.latestTask) || 21;
+    }
+    if (!task_date) {
+      task_date = (latestRoundRow && latestRoundRow.task_date) || (latestRecRow && latestRecRow.latestDate) || `2026-11-${String(task_number).padStart(2, '0')}`;
+    }
+  }
+
+  const tNum = parseInt(task_number, 10) || 21;
+  const tDate = task_date || `2026-11-${String(tNum).padStart(2, '0')}`;
+
+  // 3. Find the matching round in daily_task_rounds for (tNum, round_number) or latest round for tNum
+  if (!targetRound) {
+    if (round_number !== undefined && round_number !== null && !isNaN(Number(round_number))) {
+      targetRound = await dbGet(
+        `SELECT * FROM daily_task_rounds WHERE task_number = ? AND round_number = ?`,
+        [tNum, parseInt(round_number, 10)]
+      );
+    }
+    if (!targetRound) {
+      targetRound = await dbGet(
+        `SELECT * FROM daily_task_rounds WHERE task_number = ? ORDER BY round_number DESC LIMIT 1`,
+        [tNum]
+      );
+    }
+  }
+
+  const assignedRoundNumber = targetRound
+    ? targetRound.round_number
+    : (round_number ? parseInt(round_number, 10) : 1);
+
   const cleanName = (name || '').trim();
   const cleanShift = (shift || 'Day').trim();
   const cleanGroup = group !== undefined && group !== null ? String(group).trim() : '';
-  const cleanIssuedAt = (issued_at || '7.30 A.M.').trim();
+  const cleanIssuedAt = (issued_at || (targetRound && targetRound.check_time) || '7.30 A.M.').trim();
   const cleanReturnTime = return_time !== undefined && return_time !== null ? String(return_time).trim() : '';
   const cleanReturnDevice = (return_device || '').trim();
   const cleanTakingDevice = (taking_device || '').trim();
   const cleanHandoverTo = (handover_to || '').trim();
-  const cleanSign = (sign || (cleanHandoverTo ? 'Done' : (cleanTakingDevice ? 'Pending' : 'Done'))).trim();
+  const cleanSign = (sign || (cleanHandoverTo ? 'Done' : 'Done')).trim();
 
-  // Active user determination:
-  // If handover_to is specified and sign is Done, active user is handover_to!
-  // Otherwise, if taking device is active, active user is cleanName
+  // Check if this device is newly added in round > 1
+  let isNewInRound = 0;
+  if (assignedRoundNumber > 1 && cleanTakingDevice) {
+    const round1 = await dbGet(`SELECT records_json, raw_list FROM daily_task_rounds WHERE task_number = ? AND round_number = 1`, [tNum]);
+    let inRound1 = false;
+    const normTaking = normalizeDeviceTag(cleanTakingDevice);
+    if (round1 && normTaking) {
+      if (round1.records_json) {
+        try {
+          const r1List = JSON.parse(round1.records_json);
+          inRound1 = r1List.some(item => normalizeDeviceTag(item.taking_device) === normTaking);
+        } catch (e) {}
+      } else if (round1.raw_list) {
+        inRound1 = round1.raw_list.split(/\r?\n/).some(line => normalizeDeviceTag(line) === normTaking);
+      }
+    }
+    if (!inRound1) {
+      isNewInRound = 1;
+    }
+  }
+
   let activeUser = cleanHandoverTo ? cleanHandoverTo : cleanName;
 
   // Build composite details
@@ -673,16 +734,158 @@ async function insertDeviceRecord({
     INSERT INTO device_records (
       name, shift, group_name, issued_at, return_time,
       return_device, taking_device, device_details, handover_to, sign, active_user,
-      task_number, task_date,
+      task_number, task_date, round_number, is_new_in_round, prev_round_status, check_time,
       created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
   `, [
-    cleanName, cleanShift, cleanGroup, cleanIssuedAt, cleanReturnTime,
-    cleanReturnDevice, cleanTakingDevice, compositeDetails, cleanHandoverTo, cleanSign, activeUser,
-    task_number || 17, task_date || '2026-08-17'
+    cleanName,
+    cleanShift,
+    cleanGroup,
+    cleanIssuedAt,
+    cleanReturnTime,
+    cleanReturnDevice,
+    cleanTakingDevice,
+    compositeDetails,
+    cleanHandoverTo,
+    cleanSign,
+    activeUser,
+    tNum,
+    tDate,
+    assignedRoundNumber,
+    isNewInRound,
+    isNewInRound ? 'new_taking' : 'retained',
+    (targetRound && targetRound.check_time) || cleanIssuedAt
   ]);
 
   const newId = res.lastID;
+
+  // 4. Synchronize new record into daily_task_rounds so the table immediately displays it
+  try {
+    if (targetRound) {
+      let currentRecords = [];
+      if (targetRound.records_json && targetRound.records_json !== '[]') {
+        try {
+          currentRecords = JSON.parse(targetRound.records_json);
+        } catch (e) {
+          currentRecords = [];
+        }
+      } else if (targetRound.raw_list) {
+        const lines = targetRound.raw_list.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        currentRecords = lines.map((tag, idx) => ({
+          id: `round-${targetRound.round_number}-${idx + 1}`,
+          emp_number: idx + 1,
+          name: String(idx + 1).padStart(2, '0'),
+          shift: 'Day',
+          group_name: '',
+          issued_at: targetRound.check_time || '7.30 A.M.',
+          return_time: '',
+          return_device: '',
+          taking_device: tag,
+          handover_to: '',
+          sign: 'Done',
+          is_new_in_round: 0,
+          round_number: targetRound.round_number,
+          check_time: targetRound.check_time || '8.30 A.M.'
+        }));
+      }
+
+      const newRoundItem = {
+        id: newId,
+        emp_number: currentRecords.length + 1,
+        name: cleanName,
+        shift: cleanShift,
+        group_name: cleanGroup,
+        issued_at: cleanIssuedAt,
+        return_time: cleanReturnTime,
+        return_device: cleanReturnDevice,
+        taking_device: cleanTakingDevice,
+        handover_to: cleanHandoverTo,
+        sign: cleanSign,
+        is_new_in_round: isNewInRound,
+        round_number: assignedRoundNumber,
+        prev_round_status: isNewInRound ? 'new_taking' : 'retained',
+        check_time: targetRound.check_time || cleanIssuedAt
+      };
+
+      currentRecords.push(newRoundItem);
+
+      let addedDevices = [];
+      if (targetRound.added_devices) {
+        try {
+          addedDevices = JSON.parse(targetRound.added_devices);
+        } catch (e) {
+          addedDevices = [];
+        }
+      }
+      if (isNewInRound && cleanTakingDevice) {
+        const normNew = normalizeDeviceTag(cleanTakingDevice);
+        if (!addedDevices.some(d => normalizeDeviceTag(d) === normNew)) {
+          addedDevices.push(cleanTakingDevice);
+        }
+      }
+
+      let removedDevices = [];
+      if (targetRound.removed_devices) {
+        try {
+          removedDevices = JSON.parse(targetRound.removed_devices);
+        } catch (e) {
+          removedDevices = [];
+        }
+      }
+      if (cleanTakingDevice) {
+        const normTaking = normalizeDeviceTag(cleanTakingDevice);
+        removedDevices = removedDevices.filter(d => normalizeDeviceTag(d) !== normTaking);
+      }
+
+      const updatedRawList = currentRecords
+        .map(r => r.taking_device)
+        .filter(Boolean)
+        .join('\n');
+
+      await dbRun(`
+        UPDATE daily_task_rounds SET
+          records_json = ?,
+          total_devices = ?,
+          added_devices = ?,
+          added_count = ?,
+          removed_devices = ?,
+          removed_count = ?,
+          raw_list = ?
+        WHERE id = ?
+      `, [
+        JSON.stringify(currentRecords),
+        currentRecords.length,
+        JSON.stringify(addedDevices),
+        addedDevices.length,
+        JSON.stringify(removedDevices),
+        removedDevices.length,
+        updatedRawList,
+        targetRound.id
+      ]);
+    } else {
+      // Create initial round in daily_task_rounds if this task didn't have one yet
+      const allTaskRecs = await dbAll(`SELECT * FROM device_records WHERE task_number = ? ORDER BY id ASC`, [tNum]);
+      const rawList = allTaskRecs.map(r => r.taking_device).filter(Boolean).join('\n');
+      await dbRun(`
+        INSERT OR REPLACE INTO daily_task_rounds (
+          task_number, task_date, round_number, round_name, check_time, total_devices,
+          added_count, removed_count, retained_count, added_devices, removed_devices, raw_list, records_json
+        ) VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, '[]', '[]', ?, ?)
+      `, [
+        tNum,
+        tDate,
+        assignedRoundNumber,
+        `Task ${tNum}.${assignedRoundNumber}`,
+        cleanIssuedAt,
+        allTaskRecs.length,
+        allTaskRecs.length,
+        rawList,
+        JSON.stringify(allTaskRecs)
+      ]);
+    }
+  } catch (roundSyncErr) {
+    console.error('Error syncing newly inserted record to daily_task_rounds:', roundSyncErr);
+  }
 
   // Multi-device logging description
   const retDevs = cleanReturnDevice.split(/[,+&/]/).map(d => d.trim()).filter(Boolean);
@@ -708,7 +911,7 @@ async function insertDeviceRecord({
     handover_to: cleanHandoverTo,
     sign: cleanSign,
     admin_user,
-    details: `Task #${task_number || 17}: Record #${newId} created for ${cleanName}. Returned: [${cleanReturnDevice || 'None'}], Taking: [${cleanTakingDevice || 'None'}], Handover: ${cleanHandoverTo || 'None'}, Sign: ${cleanSign}`
+    details: `Task ${tNum}.${assignedRoundNumber}: Record #${newId} created for ${cleanName}. Returned: [${cleanReturnDevice || 'None'}], Taking: [${cleanTakingDevice || 'None'}], Handover: ${cleanHandoverTo || 'None'}, Sign: ${cleanSign}`
   });
 
   return await getRecordById(newId);

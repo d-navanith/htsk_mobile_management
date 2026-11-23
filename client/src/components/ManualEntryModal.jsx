@@ -35,9 +35,16 @@ export default function ManualEntryModal({ isOpen, onClose, onSave, groups = [],
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Fetch shifts & groups on open
+  // Fetch shifts & groups on open and initialize context defaults
   useEffect(() => {
     if (isOpen) {
+      setError('');
+      if (initialContext?.check_time) {
+        setIssuedAt(initialContext.check_time);
+      } else {
+        setIssuedAt('7.30 A.M.');
+      }
+
       fetch('/api/shifts')
         .then(r => r.json())
         .then(d => {
@@ -56,7 +63,7 @@ export default function ManualEntryModal({ isOpen, onClose, onSave, groups = [],
         })
         .catch(() => {});
     }
-  }, [isOpen]);
+  }, [isOpen, initialContext]);
 
   if (!isOpen) return null;
 
@@ -118,7 +125,9 @@ export default function ManualEntryModal({ isOpen, onClose, onSave, groups = [],
         handover_to: handoverTo.trim(),
         sign: sign || 'Done',
         task_number: initialContext?.task_number || undefined,
-        task_date: initialContext?.task_date || undefined
+        task_date: initialContext?.task_date || undefined,
+        round_number: initialContext?.round_number || undefined,
+        round_id: initialContext?.round_id || undefined
       });
 
       // Reset
@@ -171,9 +180,24 @@ export default function ManualEntryModal({ isOpen, onClose, onSave, groups = [],
           backgroundColor: '#f9fafb'
         }}>
           <div>
-            <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#111827', margin: 0 }}>
-              Add Mobile Management Record
-            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#111827', margin: 0 }}>
+                Add Mobile Management Record
+              </h3>
+              {initialContext?.task_number && (
+                <span style={{
+                  backgroundColor: '#f7fee7',
+                  border: '1.5px solid #84cc16',
+                  color: '#365314',
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  padding: '3px 10px',
+                  borderRadius: '8px'
+                }}>
+                  Task {initialContext.task_number}.{initialContext.round_number || 1}
+                </span>
+              )}
+            </div>
             <p style={{ fontSize: '12.5px', color: '#6b7280', margin: '3px 0 0' }}>
               Rec. No. - Auto Increment | Mobile Device Issue &amp; Handover
             </p>

@@ -415,7 +415,7 @@ app.get('/api/records', async (req, res) => {
   }
 });
 
-// 2. Add record manually (Dashboard Add Record popup)
+// 2. Add record manually (Dashboard & Daily Task Table Add Record popup)
 app.post('/api/records', requireCapability('manage_devices'), async (req, res) => {
   try {
     const {
@@ -430,7 +430,9 @@ app.post('/api/records', requireCapability('manage_devices'), async (req, res) =
       sign,
       admin_user,
       task_number,
-      task_date
+      task_date,
+      round_number,
+      round_id
     } = req.body;
 
     if (!name || !name.trim()) {
@@ -450,14 +452,16 @@ app.post('/api/records', requireCapability('manage_devices'), async (req, res) =
       handover_to: handover_to || '',
       sign: cleanSign,
       admin_user: admin_user || 'Shanaka',
-      task_number: task_number ? parseInt(task_number) : 17,
-      task_date: task_date || '2026-08-17'
+      task_number: task_number ? parseInt(task_number, 10) : undefined,
+      task_date: task_date || undefined,
+      round_number: round_number ? parseInt(round_number, 10) : undefined,
+      round_id: round_id || undefined
     });
 
     res.status(201).json({
       success: true,
       data: record,
-      message: `Record #${record.id} for ${name} added successfully!`
+      message: `Record #${record.id} for ${name} added to Task ${record.task_number}.${record.round_number || 1} successfully!`
     });
   } catch (err) {
     console.error('Error adding record:', err);

@@ -398,6 +398,15 @@ export default function Dashboard({
     }
   }, [parentRecords]);
 
+  useEffect(() => {
+    const handleRecordsChanged = () => {
+      fetchDashboardData(selectedTaskNumber, selectedDateStr, isViewAllDays);
+      runTaskComparison(compareFromKey, compareToKey, false);
+    };
+    window.addEventListener('htsk-records-changed', handleRecordsChanged);
+    return () => window.removeEventListener('htsk-records-changed', handleRecordsChanged);
+  }, [selectedTaskNumber, selectedDateStr, isViewAllDays, compareFromKey, compareToKey]);
+
   // Fetch Dashboard Animation visibility status for current user
   useEffect(() => {
     const fetchAnimationStatus = async () => {
@@ -1489,7 +1498,12 @@ export default function Dashboard({
             {/* Green Add button */}
             {canEdit && (
               <button
-                onClick={() => onOpenAddModal({ task_number: selectedTaskNumber, task_date: selectedDateStr })}
+                onClick={() => onOpenAddModal({
+                  task_number: comparisonData?.toTask?.task_number || selectedTaskNumber || kpis.activeTaskNumber,
+                  task_date: comparisonData?.toTask?.task_date || selectedDateStr || kpis.activeTaskDate,
+                  round_number: comparisonData?.toTask?.round_number || 1,
+                  check_time: comparisonData?.toTask?.check_time || '7.30 A.M.'
+                })}
                 className="btn-primary-lime"
               >
                 Add

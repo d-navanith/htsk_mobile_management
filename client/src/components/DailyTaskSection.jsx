@@ -284,6 +284,14 @@ export default function DailyTaskSection({
     fetchTaskData();
   }, [selectedDay, currentMonthIndex, currentYear]);
 
+  useEffect(() => {
+    const handleRecordsChanged = () => {
+      fetchTaskData();
+    };
+    window.addEventListener('htsk-records-changed', handleRecordsChanged);
+    return () => window.removeEventListener('htsk-records-changed', handleRecordsChanged);
+  }, [selectedDay, currentMonthIndex, currentYear]);
+
   // Handle inline shift change
   const handleInlineShiftChange = async (recordId, newShift) => {
     if (!canEdit) return;
@@ -1241,7 +1249,10 @@ export default function DailyTaskSection({
                     <button
                       onClick={() => onOpenAddModal({
                         task_number: selectedDay,
-                        task_date: `${currentYear}-${String(currentMonthIndex + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`
+                        task_date: `${currentYear}-${String(currentMonthIndex + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`,
+                        round_number: rnd.round_number,
+                        round_id: typeof rnd.id === 'number' ? rnd.id : undefined,
+                        check_time: rnd.check_time || '7.30 A.M.'
                       })}
                       className="btn-primary-lime"
                     >

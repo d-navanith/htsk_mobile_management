@@ -3208,6 +3208,7 @@ async function loadSnapshotForTaskRound(taskNum, roundNum) {
 
   // Build maps of live DB records: first by exact numeric ID, then a FIFO queue per normalized taking_device for legacy preview rows
   const liveById = new Map();
+  const liveByDevice = new Map();
   const usedDbIds = new Set();
   const liveListByDevice = new Map();
   for (const dbr of dbRecords) {
@@ -3215,6 +3216,9 @@ async function loadSnapshotForTaskRound(taskNum, roundNum) {
     liveById.set(String(dbr.id), dbr);
     const norm = normalizeDeviceTag(dbr.taking_device);
     if (norm) {
+      if (!liveByDevice.has(norm)) {
+        liveByDevice.set(norm, dbr);
+      }
       if (!liveListByDevice.has(norm)) {
         liveListByDevice.set(norm, []);
       }
@@ -3233,7 +3237,8 @@ async function loadSnapshotForTaskRound(taskNum, roundNum) {
         }
       }
 
-      records = parsed.map((rec, idx) => {
+      records = parsed.map((item, idx) => {
+        const rec = (item && typeof item === 'object') ? item : { taking_device: String(item || '') };
         const norm = normalizeDeviceTag(rec.taking_device);
         const recHasNumericId = rec.id !== undefined && rec.id !== null && /^\d+$/.test(String(rec.id));
         // 1. Match by exact numeric record ID if rec.id is a database ID
@@ -3303,7 +3308,10 @@ async function loadSnapshotForTaskRound(taskNum, roundNum) {
   }
 
   if (records.length === 0) {
-    records = dbRecords.filter(r => r.name !== 'Office Return' && r.name !== 'Missing Check');
+    const roundMatches = dbRecords.filter(r => r.round_number === rNum && r.name !== 'Office Return' && r.name !== 'Missing Check');
+    records = roundMatches.length > 0
+      ? roundMatches
+      : dbRecords.filter(r => r.name !== 'Office Return' && r.name !== 'Missing Check');
   }
 
   return {

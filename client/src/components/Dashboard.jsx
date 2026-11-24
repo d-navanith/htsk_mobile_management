@@ -196,9 +196,17 @@ export default function Dashboard({
           setPopupActiveTab('overview');
           setShowComparisonPopup(true);
         }
+      } else {
+        console.error('Comparison error:', json.error);
+        if (openPopup) {
+          alert(json.error || `Failed to compare ${fromKey} vs ${toKey}`);
+        }
       }
     } catch (err) {
       console.error('Failed to compare tasks:', err);
+      if (openPopup) {
+        alert(`Error comparing tasks: ${err.message || 'Please check your connection'}`);
+      }
     } finally {
       setComparisonLoading(false);
     }
@@ -2050,7 +2058,7 @@ export default function Dashboard({
             inset: 0,
             backgroundColor: 'rgba(17, 24, 39, 0.45)',
             backdropFilter: 'blur(2px)',
-            zIndex: 1000,
+            zIndex: 9999,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -2085,10 +2093,10 @@ export default function Dashboard({
               <div>
                 <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#111827', display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <ArrowRightLeft size={18} color="#65a30d" />
-                  <span>Task Comparison: {comparisonData.fromTask.label} vs {comparisonData.toTask.label}</span>
+                  <span>Task Comparison: {comparisonData.fromTask?.label || 'Previous Task'} vs {comparisonData.toTask?.label || 'Current Task'}</span>
                 </h3>
                 <p style={{ margin: '4px 0 0 0', fontSize: '12.5px', color: '#6b7280' }}>
-                  Comparing {comparisonData.summary.fromTotal} active mobile phones in {comparisonData.fromTask.label} with {comparisonData.summary.toTotal} mobile phones in {comparisonData.toTask.label}
+                  Comparing {comparisonData.summary?.fromTotal || 0} active mobile phones in {comparisonData.fromTask?.label || 'Previous Task'} with {comparisonData.summary?.toTotal || 0} mobile phones in {comparisonData.toTask?.label || 'Current Task'}
                 </p>
               </div>
 
@@ -2134,7 +2142,7 @@ export default function Dashboard({
                 >
                   <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#4b5563' }}>Previously Available</div>
                   <div style={{ fontSize: '28px', fontWeight: 800, color: '#06b6d4', lineHeight: 1.2, margin: '4px 0' }}>
-                    {comparisonData.summary.previouslyAvailableCount}
+                    {comparisonData.summary?.previouslyAvailableCount ?? 0}
                   </div>
                   <div style={{ fontSize: '11px', color: '#9ca3af' }}>
                     Active in both tasks
@@ -2155,10 +2163,10 @@ export default function Dashboard({
                 >
                   <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#4b5563' }}>Newly Added</div>
                   <div style={{ fontSize: '28px', fontWeight: 800, color: '#84cc16', lineHeight: 1.2, margin: '4px 0' }}>
-                    +{comparisonData.summary.newlyAddedCount}
+                    +{comparisonData.summary?.newlyAddedCount ?? 0}
                   </div>
                   <div style={{ fontSize: '11px', color: '#9ca3af' }}>
-                    New in {comparisonData.toTask.label}
+                    New in {comparisonData.toTask?.label || 'Target Task'}
                   </div>
                 </div>
 
@@ -2176,10 +2184,10 @@ export default function Dashboard({
                 >
                   <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#4b5563' }}>Not Available</div>
                   <div style={{ fontSize: '28px', fontWeight: 800, color: '#ef4444', lineHeight: 1.2, margin: '4px 0' }}>
-                    {comparisonData.summary.notAvailableCount}
+                    {comparisonData.summary?.notAvailableCount ?? 0}
                   </div>
                   <div style={{ fontSize: '11px', color: '#9ca3af' }}>
-                    Not in {comparisonData.toTask.label} list
+                    Not in {comparisonData.toTask?.label || 'Target Task'} list
                   </div>
                 </div>
 
@@ -2197,7 +2205,7 @@ export default function Dashboard({
                 >
                   <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#4b5563' }}>Not in System</div>
                   <div style={{ fontSize: '28px', fontWeight: 800, color: '#eab308', lineHeight: 1.2, margin: '4px 0' }}>
-                    {comparisonData.summary.notInSystemCount}
+                    {comparisonData.summary?.notInSystemCount ?? 0}
                   </div>
                   <div style={{ fontSize: '11px', color: '#9ca3af' }}>
                     Unregistered device names
@@ -2209,10 +2217,10 @@ export default function Dashboard({
               <div style={{ display: 'flex', gap: '8px', marginTop: '14px', flexWrap: 'wrap' }}>
                 {[
                   { id: 'overview', label: 'All Summary' },
-                  { id: 'not_available', label: `Not Available (${comparisonData.summary.notAvailableCount})` },
-                  { id: 'newly_added', label: `Newly Added (${comparisonData.summary.newlyAddedCount})` },
-                  { id: 'previously_available', label: `Previously Available (${comparisonData.summary.previouslyAvailableCount})` },
-                  { id: 'not_in_system', label: `Not in System (${comparisonData.summary.notInSystemCount})` }
+                  { id: 'not_available', label: `Not Available (${comparisonData.summary?.notAvailableCount ?? 0})` },
+                  { id: 'newly_added', label: `Newly Added (${comparisonData.summary?.newlyAddedCount ?? 0})` },
+                  { id: 'previously_available', label: `Previously Available (${comparisonData.summary?.previouslyAvailableCount ?? 0})` },
+                  { id: 'not_in_system', label: `Not in System (${comparisonData.summary?.notInSystemCount ?? 0})` }
                 ].map(tab => (
                   <button
                     key={tab.id}
@@ -2248,13 +2256,13 @@ export default function Dashboard({
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
                     <div>
                       <span style={{ fontSize: '14px', fontWeight: 800, color: '#111827', display: 'block' }}>
-                        Not Available in {comparisonData.toTask.label} ({comparisonData.notAvailable.length})
+                        Not Available in {comparisonData.toTask?.label || 'Target Task'} ({comparisonData.notAvailable?.length || 0})
                       </span>
                       <span style={{ fontSize: '12px', color: '#6b7280' }}>
-                        Were active in {comparisonData.fromTask.label} — verify return or mark missing
+                        Were active in {comparisonData.fromTask?.label || 'Previous Task'} — verify return or mark missing
                       </span>
                     </div>
-                    {canEdit && comparisonData.notAvailable.length > 0 && (
+                    {canEdit && (comparisonData.notAvailable?.length || 0) > 0 && (
                       <button
                         type="button"
                         disabled={bulkResolving || comparisonData.notAvailable.every(d => d.resolution?.status === 'returned')}
@@ -2284,8 +2292,8 @@ export default function Dashboard({
                       </button>
                     )}
                   </div>
-                  {comparisonData.notAvailable.length === 0 ? (
-                    <div style={{ fontSize: '13px', color: '#6b7280' }}>No missing devices from {comparisonData.fromTask.label}.</div>
+                  {(!comparisonData.notAvailable || comparisonData.notAvailable.length === 0) ? (
+                    <div style={{ fontSize: '13px', color: '#6b7280' }}>No missing devices from {comparisonData.fromTask?.label || 'Previous Task'}.</div>
                   ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(235px, 1fr))', gap: '8px' }}>
                       {comparisonData.notAvailable.map((item, idx) => {
@@ -2307,7 +2315,7 @@ export default function Dashboard({
                             <div>
                               <div style={{ fontSize: '13px', fontWeight: 700, color: '#111827' }}>{item.device_tag}</div>
                               <div style={{ fontSize: '11px', color: res?.status === 'returned' ? '#15803d' : (res?.status === 'missing' ? '#dc2626' : '#6b7280'), fontWeight: 600 }}>
-                                {res?.status === 'returned' ? 'Returned' : (res?.status === 'missing' ? 'Missing' : `EMP: ${item.previous_emp_name}`)}
+                                {res?.status === 'returned' ? 'Returned' : (res?.status === 'missing' ? 'Missing' : (item.previous_emp_name ? `EMP: ${item.previous_emp_name}` : 'Not Returned'))}
                               </div>
                             </div>
                             {canEdit && (
@@ -2364,13 +2372,13 @@ export default function Dashboard({
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                     <span style={{ fontSize: '14px', fontWeight: 800, color: '#111827' }}>
-                      Newly Added in {comparisonData.toTask.label} ({comparisonData.newlyAdded.length})
+                      Newly Added in {comparisonData.toTask?.label || 'Target Task'} ({comparisonData.newlyAdded?.length || 0})
                     </span>
                     <span style={{ fontSize: '12px', color: '#6b7280' }}>
-                      Newly taken devices not present in {comparisonData.fromTask.label}
+                      Newly taken devices not present in {comparisonData.fromTask?.label || 'Previous Task'}
                     </span>
                   </div>
-                  {comparisonData.newlyAdded.length === 0 ? (
+                  {(!comparisonData.newlyAdded || comparisonData.newlyAdded.length === 0) ? (
                     <div style={{ fontSize: '13px', color: '#6b7280' }}>No newly added devices.</div>
                   ) : (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -2387,7 +2395,7 @@ export default function Dashboard({
                             borderRadius: '8px'
                           }}
                         >
-                          {item.device_tag} <span style={{ color: '#6b7280', fontWeight: 500, fontSize: '11.5px' }}>({item.emp_name})</span>
+                          {item.device_tag} <span style={{ color: '#6b7280', fontWeight: 500, fontSize: '11.5px' }}>({item.emp_name || '—'})</span>
                         </span>
                       ))}
                     </div>
@@ -2405,13 +2413,13 @@ export default function Dashboard({
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                     <span style={{ fontSize: '14px', fontWeight: 800, color: '#111827' }}>
-                      Previously Available ({comparisonData.previouslyAvailable.length})
+                      Previously Available ({comparisonData.previouslyAvailable?.length || 0})
                     </span>
                     <span style={{ fontSize: '12px', color: '#6b7280' }}>
-                      Devices active in both {comparisonData.fromTask.label} and {comparisonData.toTask.label}
+                      Devices active in both {comparisonData.fromTask?.label || 'Previous Task'} and {comparisonData.toTask?.label || 'Target Task'}
                     </span>
                   </div>
-                  {comparisonData.previouslyAvailable.length === 0 ? (
+                  {(!comparisonData.previouslyAvailable || comparisonData.previouslyAvailable.length === 0) ? (
                     <div style={{ fontSize: '13px', color: '#6b7280' }}>No retained devices.</div>
                   ) : (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -2428,7 +2436,7 @@ export default function Dashboard({
                             borderRadius: '8px'
                           }}
                         >
-                          {item.device_tag} <span style={{ color: '#6b7280', fontWeight: 400, fontSize: '11.5px' }}>({item.emp_name})</span>
+                          {item.device_tag} <span style={{ color: '#6b7280', fontWeight: 400, fontSize: '11.5px' }}>({item.emp_name || '—'})</span>
                         </span>
                       ))}
                     </div>
@@ -2446,13 +2454,13 @@ export default function Dashboard({
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                     <span style={{ fontSize: '14px', fontWeight: 800, color: '#111827' }}>
-                      Names Not Available in System ({comparisonData.notInSystem.length})
+                      Names Not Available in System ({comparisonData.notInSystem?.length || 0})
                     </span>
                     <span style={{ fontSize: '12px', color: '#6b7280' }}>
                       Device names not found in the 241 master inventory list
                     </span>
                   </div>
-                  {comparisonData.notInSystem.length === 0 ? (
+                  {(!comparisonData.notInSystem || comparisonData.notInSystem.length === 0) ? (
                     <div style={{ fontSize: '13px', color: '#15803d', fontWeight: 600 }}>
                       All device names are registered in our system inventory.
                     </div>
@@ -2471,7 +2479,7 @@ export default function Dashboard({
                             borderRadius: '8px'
                           }}
                         >
-                          {item.device_tag} <span style={{ color: '#6b7280', fontWeight: 500, fontSize: '11.5px' }}>(EMP: {item.emp_name} • {item.task_label})</span>
+                          {item.device_tag} <span style={{ color: '#6b7280', fontWeight: 500, fontSize: '11.5px' }}>(EMP: {item.emp_name || '—'} • {item.task_label || ''})</span>
                         </span>
                       ))}
                     </div>

@@ -92,6 +92,7 @@ export default function App() {
   const canViewDevices = hasFullAccess || userPermissions.view_devices !== false;
   const canViewDailyTasks = hasFullAccess || userPermissions.view_daily_tasks !== false;
   const canViewInventory = hasFullAccess || userPermissions.view_inventory !== false;
+  const canViewAttentionRequired = hasFullAccess || Boolean(userPermissions.view_attention_required);
 
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [profileModalTab, setProfileModalTab] = useState('general');
@@ -526,6 +527,7 @@ export default function App() {
               canEdit={canEdit}
               canDelete={canDelete}
               canManageUsers={canManageUsers}
+              canViewAttentionRequired={canViewAttentionRequired}
             />
           )}
 
@@ -594,6 +596,7 @@ export default function App() {
               canEdit={canEdit}
               canDelete={canDelete}
               canManageUsers={canManageUsers}
+              canViewAttentionRequired={canViewAttentionRequired}
             />
           )}
 
@@ -610,6 +613,7 @@ export default function App() {
               canEdit={canEdit}
               canDelete={canDelete}
               canManageUsers={canManageUsers}
+              canViewAttentionRequired={canViewAttentionRequired}
             />
           )}
 

@@ -44,7 +44,8 @@ export default function Dashboard({
   onLogout = () => {},
   canEdit = true,
   canDelete = true,
-  canManageUsers = true
+  canManageUsers = true,
+  canViewAttentionRequired = true
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGroup, setSelectedGroup] = useState('All Groups');
@@ -1869,7 +1870,7 @@ export default function Dashboard({
         {/* ===================================================================== */}
         {/* RED ATTENTION REQUIRED BANNER BELOW TABLE (With Mark All & Minimize)  */}
         {/* ===================================================================== */}
-        {isComparing && comparisonData && comparisonData.notAvailable && comparisonData.notAvailable.length > 0 && (
+        {isComparing && comparisonData && comparisonData.notAvailable && comparisonData.notAvailable.length > 0 && canViewAttentionRequired && (
           <div style={{
             backgroundColor: '#fff5f5',
             border: '1.5px solid #f87171',

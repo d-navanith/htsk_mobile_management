@@ -36,7 +36,8 @@ export default function DailyTaskSection({
   onLogout = () => {},
   canEdit = true,
   canDelete = true,
-  canManageUsers = true
+  canManageUsers = true,
+  canViewAttentionRequired = true
 }) {
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -1649,7 +1650,7 @@ export default function DailyTaskSection({
             </div>
 
             {/* Red Attention Banner for Dropped / Removed Devices in this Round (With Mark All Returned & Minimize) */}
-            {rnd.removed_devices && rnd.removed_devices.length > 0 && (() => {
+            {rnd.removed_devices && rnd.removed_devices.length > 0 && canViewAttentionRequired && (() => {
               const isMin = Boolean(minimizedAttentionRounds[roundKey]);
               const isBulkLoading = bulkResolvingRound === roundKey;
               const allReturned = rnd.removed_devices.every(devTag => {

@@ -339,6 +339,7 @@ export default function UserManageSection({
     { key: 'view_devices', label: 'View Mobile Devices (Only View)' },
     { key: 'view_daily_tasks', label: 'View Daily Tasks (Only View)' },
     { key: 'view_inventory', label: 'View Inventory Stock (Only View)' },
+    { key: 'view_attention_required', label: 'View Attention Required Alerts' },
     { key: 'handover_devices', label: 'Perform Shift Handover' },
     { key: 'return_devices', label: 'Accept Inventory Returns' },
     { key: 'manage_users', label: 'Create & Manage User Accounts' },

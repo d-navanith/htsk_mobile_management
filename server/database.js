@@ -280,6 +280,7 @@ async function initDatabase() {
     { key: 'view_devices', label: 'View Mobile Devices (Only View)', admin: 1, viewer: 1, developer: 1, supervisor: 1, staff: 1 },
     { key: 'view_daily_tasks', label: 'View Daily Tasks (Only View)', admin: 1, viewer: 1, developer: 1, supervisor: 1, staff: 1 },
     { key: 'view_inventory', label: 'View Inventory Stock (Only View)', admin: 1, viewer: 1, developer: 1, supervisor: 1, staff: 1 },
+    { key: 'view_attention_required', label: 'View Attention Required Alerts', admin: 1, viewer: 0, developer: 1, supervisor: 1, staff: 0 },
     { key: 'handover_devices', label: 'Perform Shift Handover', admin: 1, viewer: 0, developer: 1, supervisor: 1, staff: 1 },
     { key: 'return_devices', label: 'Accept Inventory Returns', admin: 1, viewer: 0, developer: 1, supervisor: 1, staff: 0 },
     { key: 'manage_users', label: 'Create & Manage User Accounts', admin: 1, viewer: 0, developer: 1, supervisor: 0, staff: 0 },
@@ -293,6 +294,21 @@ async function initDatabase() {
     await dbRun(`INSERT OR IGNORE INTO user_permissions (role, permission_key, permission_label, is_enabled) VALUES ('Developer', ?, ?, ?)`, [p.key, p.label, p.developer]);
     await dbRun(`INSERT OR IGNORE INTO user_permissions (role, permission_key, permission_label, is_enabled) VALUES ('Supervisor', ?, ?, ?)`, [p.key, p.label, p.supervisor]);
     await dbRun(`INSERT OR IGNORE INTO user_permissions (role, permission_key, permission_label, is_enabled) VALUES ('Staff', ?, ?, ?)`, [p.key, p.label, p.staff]);
+  }
+
+  // Ensure view_attention_required exists in user_permissions for all roles
+  const existingAttentionPerms = await dbAll(`SELECT role, is_enabled FROM user_permissions WHERE permission_key = 'view_attention_required'`);
+  const rolesWithAttention = new Set(existingAttentionPerms.map(p => p.role.toLowerCase()));
+  const allCurrentRoles = ['Admin', 'Viewer', 'Developer', 'Supervisor', 'Staff'];
+  for (const r of allCurrentRoles) {
+    if (!rolesWithAttention.has(r.toLowerCase())) {
+      const isViewer = r.toLowerCase() === 'viewer';
+      const isStaff = r.toLowerCase() === 'staff';
+      await dbRun(
+        `INSERT INTO user_permissions (role, permission_key, permission_label, is_enabled) VALUES (?, 'view_attention_required', 'View Attention Required Alerts', ?)`,
+        [r, (isViewer || isStaff) ? 0 : 1]
+      );
+    }
   }
 
   // Ensure permission_label for manage_groups_shifts matches mockup "Add & Edit Shifts"
@@ -2035,6 +2051,7 @@ async function getUserPermissionsByRole(roleName = 'Admin') {
     view_devices: true,
     view_daily_tasks: true,
     view_inventory: true,
+    view_attention_required: false,
     handover_devices: false,
     return_devices: false,
     manage_users: false,
@@ -2049,6 +2066,7 @@ async function getUserPermissionsByRole(roleName = 'Admin') {
       view_devices: true,
       view_daily_tasks: true,
       view_inventory: true,
+      view_attention_required: true,
       handover_devices: true,
       return_devices: true,
       manage_users: true,
@@ -2084,6 +2102,7 @@ async function togglePermissionByRoleAndKey(role, permission_key, is_enabled) {
     view_devices: 'View Mobile Devices (Only View)',
     view_daily_tasks: 'View Daily Tasks (Only View)',
     view_inventory: 'View Inventory Stock (Only View)',
+    view_attention_required: 'View Attention Required Alerts',
     handover_devices: 'Perform Shift Handover',
     return_devices: 'Accept Inventory Returns',
     manage_users: 'Create & Manage User Accounts',

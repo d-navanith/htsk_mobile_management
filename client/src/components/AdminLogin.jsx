@@ -231,7 +231,7 @@ export default function AdminLogin({ onLogin }) {
 
             <div>
               <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
-                Username
+                Username or Email
               </label>
               <div style={{ position: 'relative' }}>
                 <User size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
@@ -240,7 +240,7 @@ export default function AdminLogin({ onLogin }) {
                   type="text"
                   value={username}
                   onChange={e => { setUsername(e.target.value); setError(''); }}
-                  placeholder="e.g. shanaka"
+                  placeholder="e.g. htskgeneral1@gmail.com or admin"
                   disabled={isSubmitting || lockoutTimer > 0}
                   autoComplete="username"
                   style={{

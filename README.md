@@ -1,10 +1,49 @@
-# HTSK Mobile Management System
+<p align="center">
+  <img src="./docs/images/htsk_logo.png" alt="HTSK Mobile Inventory" width="340" />
+</p>
 
-![Version](https://img.shields.io/badge/version-v1.0.1--alpha%202-84cc16?style=for-the-badge&logo=android&logoColor=black)
-![Platform](https://img.shields.io/badge/platform-Web%20%7C%20Mobile%20PWA-0284c7?style=for-the-badge)
-![Status](https://img.shields.io/badge/status-Production%20Ready-15803d?style=for-the-badge)
+<h1 align="center">HTSK Mobile Management System</h1>
 
-A production-grade, enterprise **Company Mobile Device Inventory, Shift Handover & Daily Task Management Platform** built for high-throughput daily device operations, real-time custody tracking, multi-round shift accountability, and mobile app responsiveness.
+<p align="center">
+  <img src="https://img.shields.io/badge/version-v1.0.1--alpha%202-84cc16?style=for-the-badge&logo=android&logoColor=black" alt="Version" />
+  <img src="https://img.shields.io/badge/platform-Web%20%7C%20Mobile%20PWA-0284c7?style=for-the-badge" alt="Platform" />
+  <img src="https://img.shields.io/badge/status-Production%20Ready-15803d?style=for-the-badge" alt="Status" />
+  <img src="https://img.shields.io/badge/database-SQLite%203NF-7c3aed?style=for-the-badge" alt="Database" />
+</p>
+
+<p align="center">
+  A production-grade, enterprise <strong>Company Mobile Device Inventory, Shift Handover & Daily Task Management Platform</strong> built for high-throughput daily device operations, real-time custody tracking, multi-round shift accountability, and native mobile responsiveness.
+</p>
+
+---
+
+## 📸 Interface & System Screenshots
+
+### 1. Desktop Dashboard & Fleet KPI Hub
+The main operational command center providing real-time fleet counters across 241 mobile devices, intra-day cross-task comparison, and live device assignments.
+
+<p align="center">
+  <img src="./docs/images/dashboard_desktop.png" alt="HTSK Desktop Dashboard" width="100%" style="border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.1);" />
+</p>
+
+---
+
+### 2. Mobile App Experience & Responsive Navigation
+Native-like mobile interface featuring a fixed 5-tab bottom navigation bar, context-aware floating action buttons (FAB `+`), and collapsible workspace drawers.
+
+<p align="center">
+  <img src="./docs/images/mobile_app_view.png" alt="Mobile App View" width="46%" style="border-radius: 14px; margin-right: 3%;" />
+  <img src="./docs/images/mobile_sidebar.png" alt="Mobile Sidebar Drawer" width="46%" style="border-radius: 14px;" />
+</p>
+
+---
+
+### 3. Shift Handover & Multi-Round Task Tracking
+Dense, high-throughput daily auditing table tracking taking devices, return times, custodian handovers, verified employee signatures, and multi-round sweeps.
+
+<p align="center">
+  <img src="./docs/images/daily_task_table.png" alt="Daily Task Handover Table" width="100%" style="border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.1);" />
+</p>
 
 ---
 
@@ -63,6 +102,7 @@ This release delivers a comprehensive **Mobile App-Like Experience & Responsiven
 ---
 
 ## 📑 Table of Contents
+- [📸 Interface & System Screenshots](#-interface--system-screenshots)
 - [Release History & Changelog](#-release-history--changelog)
 - [Key Features](#-key-features)
 - [System Architecture & Modules](#-system-architecture--modules)

@@ -47,6 +47,24 @@ Dense, high-throughput daily auditing table tracking taking devices, return time
 
 ---
 
+### 4. Fleet Inventory & Stock Management
+Complete catalog of 241 pre-cataloged hardware units (PN, NEW, CASS series) with real-time custodian tracking, status tags, and quick-add controls.
+
+<p align="center">
+  <img src="./docs/images/inventory_catalog.png" alt="Fleet Inventory Catalog" width="100%" style="border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.1);" />
+</p>
+
+---
+
+### 5. Fast Bulk Update & Document Ingestion Workspace
+Optimized 2-column mobile and desktop workspace supporting instant list pasting with auto EMP numbering, file uploads (.xlsx, .docx, .pdf, images), and automated OCR parsing.
+
+<p align="center">
+  <img src="./docs/images/update_workspace.png" alt="Fast Update Workspace" width="100%" style="border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.1);" />
+</p>
+
+---
+
 ## 🚀 Release History & Changelog
 
 ### 🟢 `v 1.0.1 - alpha 2` (Current Release — November 2026)

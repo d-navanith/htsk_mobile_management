@@ -2438,22 +2438,18 @@ export default function DailyTaskSection({
         </div>
       )}
 
-      {/* Floating Action Button for Mobile: Quick Add Device */}
+      {/* Floating Action Button for Mobile: Add Task (Unique for Daily Task) */}
       {canEdit && (
         <button
           type="button"
           className="mobile-fab"
           onClick={() => {
-            const firstRound = rounds[0] || {};
-            onOpenAddModal({
-              task_number: selectedDay,
-              task_date: `${currentYear}-${String(currentMonthIndex + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`,
-              round_number: firstRound.round_number || 1,
-              round_id: typeof firstRound.id === 'number' ? firstRound.id : undefined,
-              check_time: firstRound.check_time || '7.30 A.M.'
-            });
+            setNextCheckTime(formatCurrentCheckTime());
+            setNextRawList('');
+            setIsAddNextTaskOpen(true);
           }}
-          title="Add New Device"
+          title="Add Next Task"
+          aria-label="Add Next Task"
         >
           <Plus size={24} strokeWidth={2.5} />
         </button>

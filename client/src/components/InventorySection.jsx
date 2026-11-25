@@ -1872,6 +1872,23 @@ export default function InventorySection({
           </div>
         </div>
       )}
+
+      {/* Floating Action Button for Mobile: Add Device to Inventory (Unique for Inventory) */}
+      {canEdit && (
+        <button
+          type="button"
+          className="mobile-fab"
+          onClick={() => {
+            setFormData({ device_tag: '', phone_type: 'NEW', serial_number: '', status: 'Active', notes: '' });
+            setErrorMsg('');
+            setIsAddOpen(true);
+          }}
+          title="Add Device to Inventory"
+          aria-label="Add Device to Inventory"
+        >
+          <Plus size={24} strokeWidth={2.5} />
+        </button>
+      )}
     </div>
   );
 }

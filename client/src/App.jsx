@@ -463,21 +463,18 @@ export default function App() {
           onClick={() => setIsMobileSidebarOpen(true)}
           title="Open Menu"
         >
-          <Menu size={24} />
+          <Menu size={22} color="#111827" />
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div className="mobile-brand">HTSK</div>
           <span className="mobile-header-tab-pill">
             {activeTab === 'dashboard' ? 'Dashboard' :
              activeTab === 'dailytask' ? 'Daily Task' :
              activeTab === 'inventory' ? 'Inventory' :
              activeTab === 'update' ? 'Update' :
-             activeTab === 'usermanage' ? 'User Manage' :
+             activeTab === 'usermanage' ? 'User manage' :
              activeTab === 'history' ? 'History' :
              activeTab === 'settings' ? 'Settings' : 'Dashboard'}
           </span>
-        </div>
-        <div>
           <UserProfileMenu
             currentUser={currentUser}
             currentUserName={currentUserName}

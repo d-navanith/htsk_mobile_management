@@ -863,28 +863,27 @@ export default function Dashboard({
 
       {/* EXPANDABLE FULL CALENDAR DRAWER (With Snow Animation strictly inside) */}
       {showCalendar && (
-        <div style={{
-          position: 'relative',
-          overflow: 'hidden',
-          backgroundColor: '#ffffff',
-          borderRadius: '20px',
-          border: '1.5px solid #84cc16',
-          padding: '20px 24px',
-          marginBottom: '22px',
-          boxShadow: '0 10px 25px -5px rgba(132, 204, 22, 0.1)',
-          display: 'grid',
-          gridTemplateColumns: 'minmax(310px, 360px) 1fr',
-          gap: '28px',
-          alignItems: 'center',
-          animation: 'fadeIn 0.2s ease-out'
-        }}>
+        <div
+          className="dashboard-calendar-grid"
+          style={{
+            position: 'relative',
+            overflow: 'hidden',
+            backgroundColor: '#ffffff',
+            borderRadius: '20px',
+            border: '1.5px solid #84cc16',
+            padding: '20px 24px',
+            marginBottom: '22px',
+            boxShadow: '0 10px 25px -5px rgba(132, 204, 22, 0.1)',
+            animation: 'fadeIn 0.2s ease-out'
+          }}
+        >
           {/* Ambient Animation strictly inside Calendar Card (Controllable via User Manage) */}
           {animationStatus.allowed && animationStatus.activeAnimation && (
             <SnowEffect count={22} color="#0284c7" secondaryColor="#84cc16" type={animationStatus.activeAnimation} />
           )}
 
           {/* Left Column: Interactive Mini Calendar Grid */}
-          <div style={{ position: 'relative', zIndex: 1, borderRight: '1px solid #f1f5f9', paddingRight: '24px' }}>
+          <div className="dashboard-calendar-left">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <button
@@ -1017,7 +1016,7 @@ export default function Dashboard({
           </div>
 
           {/* Right Column: Selected Date Details & Confirmation */}
-          <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div className="dashboard-calendar-right">
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#65a30d', fontSize: '13px', fontWeight: 700, marginBottom: '6px' }}>
               <Sparkles size={16} />
               <span>Calendar Filter Mode Active</span>

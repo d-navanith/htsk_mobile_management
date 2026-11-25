@@ -1292,16 +1292,60 @@ input, select, textarea {
   }
 }
 
-/* Mobile Header Tab Pill */
+/* Mobile Header Tab Pill matching user mockup */
 .mobile-header-tab-pill {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
-  color: #15803d;
-  background-color: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  padding: 2px 10px;
-  border-radius: 999px;
+  color: #1f2937;
+  background-color: #ffffff;
+  border: 1.5px solid #d1d5db;
+  padding: 5px 14px;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   letter-spacing: 0.01em;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Dashboard Calendar Drawer Responsive Grid */
+.dashboard-calendar-grid {
+  display: grid;
+  grid-template-columns: minmax(310px, 360px) 1fr;
+  gap: 28px;
+  align-items: center;
+}
+
+.dashboard-calendar-left {
+  position: relative;
+  z-index: 1;
+  border-right: 1px solid #f1f5f9;
+  padding-right: 24px;
+}
+
+.dashboard-calendar-right {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+@media screen and (max-width: 900px) {
+  .dashboard-calendar-grid {
+    grid-template-columns: 1fr !important;
+    gap: 20px !important;
+    padding: 16px 14px !important;
+  }
+  .dashboard-calendar-left {
+    border-right: none !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    padding-right: 0 !important;
+    padding-bottom: 20px !important;
+  }
+  .dashboard-calendar-right {
+    padding-left: 0 !important;
+    width: 100% !important;
+  }
 }
 
 /* Mobile Bottom Navigation Bar */

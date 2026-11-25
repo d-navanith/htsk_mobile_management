@@ -1,5 +1,6 @@
 import React from 'react';
 import { LayoutDashboard, Sparkles, History, Settings, LogOut, User, ClipboardCheck, Package, X } from 'lucide-react';
+import htskLogo from '../assets/htsk_logo.png';
 
 export default function Sidebar({
   activeTab,
@@ -36,17 +37,39 @@ export default function Sidebar({
       >
         <div>
           {/* Brand Logo & Mobile Close button */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-            <div className="brand-logo" style={{ marginBottom: 0 }} title="HTSK Mobile Management">
-              HTSK
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '20px', position: 'relative' }}>
+            <div style={{ flex: 1, display: 'flex', justifyContent: 'center', padding: '4px 0' }} title="HTSK Mobile Inventory">
+              <img
+                src={htskLogo}
+                alt="HTSK Mobile Inventory"
+                style={{
+                  maxHeight: '48px',
+                  maxWidth: '175px',
+                  width: 'auto',
+                  objectFit: 'contain',
+                  display: 'block'
+                }}
+              />
             </div>
-            <button
-              className="mobile-close-btn"
-              onClick={() => setIsMobileOpen(false)}
-              title="Close Menu"
-            >
-              <X size={20} />
-            </button>
+            {isMobileOpen && (
+              <button
+                className="mobile-close-btn"
+                onClick={() => setIsMobileOpen(false)}
+                title="Close Menu"
+                style={{
+                  position: 'absolute',
+                  top: '0',
+                  right: '0',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#9ca3af',
+                  padding: '4px'
+                }}
+              >
+                <X size={22} />
+              </button>
+            )}
           </div>
 
           {/* Navigation Menu matching user requested flow */}

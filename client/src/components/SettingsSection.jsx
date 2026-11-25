@@ -275,8 +275,8 @@ export default function SettingsSection({
         />
       </div>
 
-      {/* 2-Column Layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr', gap: '40px', marginBottom: '40px' }}>
+      {/* 2-Column Layout (Responsive) */}
+      <div className="settings-main-grid">
         {/* LEFT COLUMN: System & Shift Settings */}
         <div>
           <div style={{ marginBottom: '22px' }}>
@@ -327,8 +327,8 @@ export default function SettingsSection({
                 </div>
               </div>
 
-              {/* Yellow and Purple Boxes */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '18px' }}>
+              {/* Yellow and Purple Boxes (Responsive) */}
+              <div className="settings-shift-cards-grid">
                 {/* Morning Shift (Day) */}
                 <div style={{
                   backgroundColor: '#fefce8',
@@ -436,8 +436,8 @@ export default function SettingsSection({
                 </div>
               </div>
 
-              {/* Bottom Inputs: Default Duration & Grace Period */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '16px' }}>
+              {/* Bottom Inputs: Default Duration & Grace Period (Responsive) */}
+              <div className="settings-duration-grid">
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
                     Default Shift Duration (Hours)

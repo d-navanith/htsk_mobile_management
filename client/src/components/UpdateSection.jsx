@@ -16,7 +16,8 @@ import {
   Plus,
   Sparkles,
   Search,
-  X
+  X,
+  ArrowRightLeft
 } from 'lucide-react';
 
 const SAMPLE_DEVICE_LIST = `New 68
@@ -495,8 +496,8 @@ export default function UpdateSection({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-          {/* Mode Switcher Tabs */}
-          <div style={{ display: 'flex', gap: '8px', backgroundColor: '#f3f4f6', padding: '4px', borderRadius: '12px' }}>
+          {/* Mode Switcher Tabs (Responsive) */}
+          <div className="update-mode-switcher">
             <button
               type="button"
               onClick={() => { setActiveMode('quick'); setErrorMessage(''); }}
@@ -669,17 +670,17 @@ export default function UpdateSection({
             </p>
           </div>
 
-          {/* Quick List Configuration Controls */}
-          <div style={{
-            backgroundColor: '#ffffff',
-            border: '1px solid #e5e7eb',
-            borderRadius: '16px',
-            padding: '20px',
-            marginBottom: '20px',
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-            gap: '16px'
-          }}>
+          {/* Quick List Configuration Controls (Responsive) */}
+          <div
+            className="update-config-grid"
+            style={{
+              backgroundColor: '#ffffff',
+              border: '1px solid #e5e7eb',
+              borderRadius: '16px',
+              padding: '20px',
+              marginBottom: '20px'
+            }}
+          >
             {/* EMP. Name Start Number */}
             <div>
               <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
@@ -1286,8 +1287,8 @@ export default function UpdateSection({
               </div>
             </div>
 
-            {/* Stat breakdown tiles */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
+            {/* Stat breakdown tiles (Responsive) */}
+            <div className="update-stats-grid">
               {/* Tile 1: Newly Added Taking */}
               <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '12px 14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1361,6 +1362,10 @@ export default function UpdateSection({
         ) : (
           /* Populated Preview Table with Inline Editing */
           <div className="responsive-table-wrapper">
+            <div className="table-scroll-hint">
+              <span>Swipe horizontally to view preview columns</span>
+              <ArrowRightLeft size={13} />
+            </div>
             <table style={{ width: '100%', minWidth: '920px', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1.5px solid #e5e7eb' }}>

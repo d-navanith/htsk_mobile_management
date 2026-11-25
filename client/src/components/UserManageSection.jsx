@@ -18,7 +18,8 @@ import {
   Filter,
   Lock,
   Search,
-  X
+  X,
+  ArrowRightLeft
 } from 'lucide-react';
 
 export default function UserManageSection({
@@ -481,7 +482,8 @@ export default function UserManageSection({
           )}
         </div>
 
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <div className="responsive-table-wrapper" style={{ overflowX: 'auto', borderRadius: '12px' }}>
+        <table style={{ width: '100%', minWidth: '400px', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
             <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
               <th style={{ padding: '12px 16px', fontSize: '13px', fontWeight: 600, color: '#4b5563', width: '45%' }}>
@@ -543,6 +545,7 @@ export default function UserManageSection({
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* SECTION 2: ADMIN USER ACCOUNT MANAGEMENT */}
@@ -597,7 +600,7 @@ export default function UserManageSection({
           </div>
         )}
 
-        <form onSubmit={handleCreateUser} style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr) auto', gap: '12px', alignItems: 'flex-end', marginBottom: '24px' }}>
+        <form onSubmit={handleCreateUser} className="user-create-form">
           <div>
             <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
               Full Name *
@@ -753,7 +756,12 @@ export default function UserManageSection({
         </div>
 
         {/* Existing Users Table */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <div className="responsive-table-wrapper" style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
+          <div className="table-scroll-hint">
+            <span>Swipe horizontally to view all user details</span>
+            <ArrowRightLeft size={13} />
+          </div>
+          <table style={{ width: '100%', minWidth: '650px', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
             <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
               <th style={{ padding: '10px 14px', fontSize: '12.5px', color: '#4b5563' }}>Full Name</th>
@@ -885,6 +893,7 @@ export default function UserManageSection({
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* SECTION 3: USER PERMISSION MANAGEMENT (CAPABILITY MATRIX MATCHING MOCKUP) */}
@@ -934,7 +943,11 @@ export default function UserManageSection({
           </div>
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
+        <div className="responsive-table-wrapper" style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
+          <div className="table-scroll-hint">
+            <span>Swipe horizontally to view all role permissions</span>
+            <ArrowRightLeft size={13} />
+          </div>
           <table style={{ width: '100%', minWidth: '600px', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>

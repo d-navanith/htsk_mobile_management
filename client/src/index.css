@@ -1552,3 +1552,204 @@ input, select, textarea {
   }
 }
 
+/* ========================================================================= */
+/* RESPONSIVE LAYOUT CLASSES FOR USER MANAGE, HISTORY, SETTINGS, UPDATE      */
+/* ========================================================================= */
+
+/* User Management Form */
+.user-create-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) auto;
+  gap: 12px;
+  align-items: flex-end;
+  margin-bottom: 24px;
+}
+
+@media screen and (max-width: 768px) {
+  .user-create-form {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+  .user-create-form button {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 11px !important;
+  }
+}
+
+/* Settings Main 2-Column Grid */
+.settings-main-grid {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr;
+  gap: 40px;
+  margin-bottom: 40px;
+}
+
+@media screen and (max-width: 1023px) {
+  .settings-main-grid {
+    grid-template-columns: 1fr !important;
+    gap: 24px !important;
+  }
+}
+
+/* Settings Shift Cards Grid */
+.settings-shift-cards-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+@media screen and (max-width: 639px) {
+  .settings-shift-cards-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+}
+
+/* Settings Duration & Grace Period Grid */
+.settings-duration-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 16px;
+}
+
+@media screen and (max-width: 639px) {
+  .settings-duration-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+}
+
+/* History Calendar Drawer */
+.history-calendar-grid {
+  display: grid;
+  grid-template-columns: minmax(310px, 360px) 1fr;
+  gap: 28px;
+  align-items: center;
+}
+
+.history-calendar-left {
+  border-right: 1px solid #f1f5f9;
+  padding-right: 24px;
+}
+
+@media screen and (max-width: 900px) {
+  .history-calendar-grid {
+    grid-template-columns: 1fr !important;
+    gap: 20px !important;
+  }
+  .history-calendar-left {
+    border-right: none !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    padding-right: 0 !important;
+    padding-bottom: 20px !important;
+  }
+}
+
+/* History Metrics Quick Strip */
+.history-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media screen and (max-width: 768px) {
+  .history-metrics-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .history-metrics-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+}
+
+/* History Tab Buttons & Search */
+.history-nav-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.history-tab-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.history-search-wrap {
+  width: 300px;
+}
+
+@media screen and (max-width: 768px) {
+  .history-nav-toolbar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  .history-tab-buttons {
+    width: 100% !important;
+    justify-content: flex-start !important;
+  }
+  .history-search-wrap {
+    width: 100% !important;
+  }
+}
+
+/* Update Section Mode Switcher */
+.update-mode-switcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #f3f4f6;
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+@media screen and (max-width: 639px) {
+  .update-mode-switcher {
+    width: 100% !important;
+    flex-direction: column !important;
+  }
+  .update-mode-switcher button {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+}
+
+/* Update Section Config Grid */
+.update-config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+@media screen and (max-width: 639px) {
+  .update-config-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+}
+
+/* Update Section Stat Breakdown Tiles */
+.update-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+@media screen and (max-width: 639px) {
+  .update-stats-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+}
+
+

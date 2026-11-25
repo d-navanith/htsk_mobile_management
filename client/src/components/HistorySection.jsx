@@ -421,20 +421,19 @@ export default function HistorySection({
 
       {/* TOP CALENDAR & DAY SELECTOR DRAWER */}
       {showCalendar && (
-        <div style={{
-          backgroundColor: '#ffffff',
-          borderRadius: '20px',
-          border: '1px solid #e5e7eb',
-          padding: '20px 24px',
-          marginBottom: '24px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
-          display: 'grid',
-          gridTemplateColumns: 'minmax(310px, 360px) 1fr',
-          gap: '28px',
-          alignItems: 'center'
-        }}>
+        <div
+          className="history-calendar-grid"
+          style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '20px',
+            border: '1px solid #e5e7eb',
+            padding: '20px 24px',
+            marginBottom: '24px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
+          }}
+        >
           {/* Left Column: Interactive Mini Calendar */}
-          <div style={{ borderRight: '1px solid #f1f5f9', paddingRight: '24px' }}>
+          <div className="history-calendar-left">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <button
@@ -605,16 +604,16 @@ export default function HistorySection({
               </button>
             </div>
 
-            {/* Day Metrics Quick Strip */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(4, 1fr)',
-              gap: '12px',
-              backgroundColor: '#f8fafc',
-              padding: '14px 16px',
-              borderRadius: '14px',
-              border: '1px solid #e2e8f0'
-            }}>
+            {/* Day Metrics Quick Strip (Responsive) */}
+            <div
+              className="history-metrics-grid"
+              style={{
+                backgroundColor: '#f8fafc',
+                padding: '14px 16px',
+                borderRadius: '14px',
+                border: '1px solid #e2e8f0'
+              }}
+            >
               <div>
                 <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Total Active</div>
                 <div style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a' }}>{dayStats.total}</div>
@@ -636,9 +635,9 @@ export default function HistorySection({
         </div>
       )}
 
-      {/* Main Tabs Navigation */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
-        <div style={{ display: 'flex', gap: '10px' }}>
+      {/* Main Tabs Navigation (Responsive Toolbar) */}
+      <div className="history-nav-toolbar">
+        <div className="history-tab-buttons">
           <button
             onClick={() => setActiveTab('activeDevices')}
             style={{
@@ -701,15 +700,18 @@ export default function HistorySection({
         </div>
 
         {/* Search Input */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          backgroundColor: '#f3f4f6',
-          borderRadius: '9999px',
-          padding: '8px 18px',
-          width: '300px'
-        }}>
+        <div
+          className="history-search-wrap"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            backgroundColor: '#f3f4f6',
+            borderRadius: '9999px',
+            padding: '8px 18px',
+            boxSizing: 'border-box'
+          }}
+        >
           <Search size={15} color="#9ca3af" />
           <input
             type="text"

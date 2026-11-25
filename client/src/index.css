@@ -1750,21 +1750,25 @@ input, select, textarea {
 .update-mode-switcher {
   display: flex;
   align-items: center;
-  gap: 8px;
-  background-color: #f3f4f6;
+  gap: 6px;
+  background-color: #f1f5f9;
   padding: 4px;
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e2e8f0;
 }
 
 @media screen and (max-width: 639px) {
   .update-mode-switcher {
     width: 100% !important;
-    flex-direction: column !important;
+    flex-direction: row !important;
+    gap: 4px !important;
+    padding: 3px !important;
   }
   .update-mode-switcher button {
-    width: 100% !important;
+    flex: 1 !important;
     justify-content: center !important;
+    font-size: 11.5px !important;
+    padding: 8px 4px !important;
   }
 }
 
@@ -1772,13 +1776,14 @@ input, select, textarea {
 .update-config-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 16px;
+  gap: 14px;
 }
 
 @media screen and (max-width: 639px) {
   .update-config-grid {
-    grid-template-columns: 1fr !important;
-    gap: 12px !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+    padding: 12px !important;
   }
 }
 

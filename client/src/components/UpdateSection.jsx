@@ -495,21 +495,23 @@ export default function UpdateSection({
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-          {/* Mode Switcher Tabs (Responsive) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', width: '100%', maxWidth: '440px' }}>
+          {/* Mode Switcher Tabs (Responsive Segmented Control) */}
           <div className="update-mode-switcher">
             <button
               type="button"
               onClick={() => { setActiveMode('quick'); setErrorMessage(''); }}
               style={{
-                padding: '8px 18px',
-                borderRadius: '9px',
+                flex: 1,
+                padding: '8px 12px',
+                borderRadius: '8px',
                 border: 'none',
-                fontSize: '13px',
+                fontSize: '12.5px',
                 fontWeight: 700,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: '6px',
                 backgroundColor: activeMode === 'quick' ? '#ffffff' : 'transparent',
                 color: activeMode === 'quick' ? '#111827' : '#6b7280',
@@ -517,22 +519,24 @@ export default function UpdateSection({
                 transition: 'all 0.15s ease'
               }}
             >
-              <Smartphone size={16} color={activeMode === 'quick' ? '#84cc16' : '#6b7280'} />
-              <span>Quick Daily Mobile List</span>
+              <Smartphone size={15} color={activeMode === 'quick' ? '#84cc16' : '#6b7280'} />
+              <span>Quick Mobile List</span>
             </button>
 
             <button
               type="button"
               onClick={() => { setActiveMode('sheet'); setErrorMessage(''); }}
               style={{
-                padding: '8px 18px',
-                borderRadius: '9px',
+                flex: 1,
+                padding: '8px 12px',
+                borderRadius: '8px',
                 border: 'none',
-                fontSize: '13px',
+                fontSize: '12.5px',
                 fontWeight: 700,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: '6px',
                 backgroundColor: activeMode === 'sheet' ? '#ffffff' : 'transparent',
                 color: activeMode === 'sheet' ? '#111827' : '#6b7280',
@@ -540,23 +544,25 @@ export default function UpdateSection({
                 transition: 'all 0.15s ease'
               }}
             >
-              <FileSpreadsheet size={16} color={activeMode === 'sheet' ? '#2563eb' : '#6b7280'} />
-              <span>Document / Sheet Upload</span>
+              <FileSpreadsheet size={15} color={activeMode === 'sheet' ? '#2563eb' : '#6b7280'} />
+              <span>Document Upload</span>
             </button>
           </div>
 
-          <UserProfileMenu
-            currentUser={currentUser}
-            currentUserName={currentUserName}
-            currentUserRole={currentUserRole}
-            currentUserEmail={currentUserEmail}
-            currentUserAvatar={currentUserAvatar}
-            onOpenProfile={() => onOpenProfile('general')}
-            onOpenSecurity={() => onOpenProfile('security')}
-            onLogout={onLogout}
-            setActiveTab={setActiveTab}
-            onRefresh={() => window.location.reload()}
-          />
+          <div className="desktop-only-profile">
+            <UserProfileMenu
+              currentUser={currentUser}
+              currentUserName={currentUserName}
+              currentUserRole={currentUserRole}
+              currentUserEmail={currentUserEmail}
+              currentUserAvatar={currentUserAvatar}
+              onOpenProfile={() => onOpenProfile('general')}
+              onOpenSecurity={() => onOpenProfile('security')}
+              onLogout={onLogout}
+              setActiveTab={setActiveTab}
+              onRefresh={() => window.location.reload()}
+            />
+          </div>
         </div>
       </div>
 
@@ -649,90 +655,39 @@ export default function UpdateSection({
           MODE A: QUICK DAILY ACTIVE MOBILES LIST (USER'S EXACT FEATURE)
           ============================================================== */}
       {activeMode === 'quick' && (
-        <div style={{ marginBottom: '32px' }}>
-          {/* Info Card */}
+        <div style={{ marginBottom: '28px' }}>
+          {/* Compact Quick Tip Banner */}
           <div style={{
             backgroundColor: '#f8fafc',
-            border: '1.5px solid #e2e8f0',
-            borderRadius: '16px',
-            padding: '18px 22px',
-            marginBottom: '20px'
+            border: '1px solid #e2e8f0',
+            borderRadius: '12px',
+            padding: '10px 14px',
+            marginBottom: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
           }}>
-            <div style={{ fontSize: '15px', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-              <Smartphone size={18} color="#84cc16" />
-              <span>Daily Active Mobiles Entry</span>
-            </div>
-            <p style={{ fontSize: '13px', color: '#64748b', margin: 0, lineHeight: 1.5 }}>
-              Paste your list of mobile devices (e.g. <code>New 68, Pn 27, New 37...</code>).
-              Each phone is assigned as a <strong>Taking Device</strong>.
-              The <strong>EMP. Name</strong> is automatically added as a sequential number (from <code>01</code>, <code>1</code> to infinity).
-              You can review and edit every row in the <strong>Preview Section</strong> below before confirming.
-            </p>
+            <Smartphone size={16} color="#84cc16" style={{ flexShrink: 0 }} />
+            <span style={{ fontSize: '12.5px', color: '#475569', lineHeight: 1.4 }}>
+              Paste active mobile tags below (e.g. <strong>New 68, Pn 27</strong>). Sequential EMP numbers and Taking rows are assigned automatically.
+            </span>
           </div>
 
-          {/* Quick List Configuration Controls (Responsive) */}
+          {/* Quick List Configuration Controls (Clean 2-Column Responsive Grid) */}
           <div
             className="update-config-grid"
             style={{
               backgroundColor: '#ffffff',
               border: '1px solid #e5e7eb',
               borderRadius: '16px',
-              padding: '20px',
-              marginBottom: '20px'
+              padding: '16px',
+              marginBottom: '16px'
             }}
           >
-            {/* EMP. Name Start Number */}
+            {/* Target Daily Task # */}
             <div>
-              <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
-                EMP. Name Start Number
-              </label>
-              <input
-                type="number"
-                min="1"
-                value={startNumber}
-                onChange={e => setStartNumber(parseInt(e.target.value, 10) || 1)}
-                style={{
-                  width: '100%',
-                  padding: '9px 12px',
-                  borderRadius: '8px',
-                  border: '1.5px solid #d1d5db',
-                  fontSize: '13.5px',
-                  fontWeight: 600,
-                  boxSizing: 'border-box'
-                }}
-              />
-              <span style={{ fontSize: '11px', color: '#9ca3af' }}>Number added for first EMP</span>
-            </div>
-
-            {/* Number Format (01 vs 1) */}
-            <div>
-              <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
-                EMP. Name Format
-              </label>
-              <select
-                value={padZero ? 'padded' : 'plain'}
-                onChange={e => setPadZero(e.target.value === 'padded')}
-                style={{
-                  width: '100%',
-                  padding: '9px 12px',
-                  borderRadius: '8px',
-                  border: '1.5px solid #d1d5db',
-                  fontSize: '13.5px',
-                  fontWeight: 600,
-                  boxSizing: 'border-box',
-                  backgroundColor: '#ffffff'
-                }}
-              >
-                <option value="padded">Two Digits (01, 02, 03...)</option>
-                <option value="plain">Plain Digits (1, 2, 3...)</option>
-              </select>
-              <span style={{ fontSize: '11px', color: '#9ca3af' }}>Format shown in EMP. Name</span>
-            </div>
-
-            {/* Daily Task / Day Number */}
-            <div>
-              <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
-                Target Daily Task #
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#374151', marginBottom: '4px' }}>
+                Target Task #
               </label>
               <input
                 type="number"
@@ -742,21 +697,20 @@ export default function UpdateSection({
                 onChange={e => handleTaskNumberChange(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '9px 12px',
+                  padding: '8px 10px',
                   borderRadius: '8px',
                   border: '1.5px solid #d1d5db',
-                  fontSize: '13.5px',
+                  fontSize: '13px',
                   fontWeight: 700,
                   color: '#7c3aed',
                   boxSizing: 'border-box'
                 }}
               />
-              <span style={{ fontSize: '11px', color: '#9ca3af' }}>Task Day (e.g. Task {targetTaskNumber})</span>
             </div>
 
             {/* Task Date */}
             <div>
-              <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#374151', marginBottom: '4px' }}>
                 Task Date
               </label>
               <input
@@ -765,31 +719,30 @@ export default function UpdateSection({
                 onChange={e => handleTaskDateChange(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '8.5px 12px',
+                  padding: '7.5px 10px',
                   borderRadius: '8px',
                   border: '1.5px solid #d1d5db',
-                  fontSize: '13px',
+                  fontSize: '12.5px',
                   fontWeight: 600,
                   boxSizing: 'border-box'
                 }}
               />
-              <span style={{ fontSize: '11px', color: '#84cc16', fontWeight: 600 }}>Syncs Task #{targetTaskNumber}</span>
             </div>
 
             {/* Shift */}
             <div>
-              <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
-                Default Shift
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#374151', marginBottom: '4px' }}>
+                Shift
               </label>
               <select
                 value={defaultShift}
                 onChange={e => setDefaultShift(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '9px 12px',
+                  padding: '8px 10px',
                   borderRadius: '8px',
                   border: '1.5px solid #d1d5db',
-                  fontSize: '13.5px',
+                  fontSize: '13px',
                   fontWeight: 600,
                   boxSizing: 'border-box',
                   backgroundColor: '#ffffff'
@@ -800,20 +753,89 @@ export default function UpdateSection({
               </select>
             </div>
 
+            {/* List Checked Time */}
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#374151', marginBottom: '4px' }}>
+                Checked Time
+              </label>
+              <input
+                type="text"
+                value={checkTime}
+                onChange={e => setCheckTime(e.target.value)}
+                placeholder="e.g. 8.30 A.M."
+                style={{
+                  width: '100%',
+                  padding: '8px 10px',
+                  borderRadius: '8px',
+                  border: '1.5px solid #d1d5db',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  color: '#0f766e',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            {/* EMP. Name Start Number */}
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#374151', marginBottom: '4px' }}>
+                EMP Start #
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={startNumber}
+                onChange={e => setStartNumber(parseInt(e.target.value, 10) || 1)}
+                style={{
+                  width: '100%',
+                  padding: '8px 10px',
+                  borderRadius: '8px',
+                  border: '1.5px solid #d1d5db',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            {/* Number Format (01 vs 1) */}
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#374151', marginBottom: '4px' }}>
+                EMP Format
+              </label>
+              <select
+                value={padZero ? 'padded' : 'plain'}
+                onChange={e => setPadZero(e.target.value === 'padded')}
+                style={{
+                  width: '100%',
+                  padding: '8px 10px',
+                  borderRadius: '8px',
+                  border: '1.5px solid #d1d5db',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  boxSizing: 'border-box',
+                  backgroundColor: '#ffffff'
+                }}
+              >
+                <option value="padded">Two Digits (01, 02...)</option>
+                <option value="plain">Plain Digits (1, 2...)</option>
+              </select>
+            </div>
+
             {/* Group */}
             <div>
-              <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
-                Default Group
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#374151', marginBottom: '4px' }}>
+                Group
               </label>
               <select
                 value={defaultGroup}
                 onChange={e => setDefaultGroup(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '9px 12px',
+                  padding: '8px 10px',
                   borderRadius: '8px',
                   border: '1.5px solid #d1d5db',
-                  fontSize: '13.5px',
+                  fontSize: '12.5px',
                   fontWeight: 600,
                   boxSizing: 'border-box',
                   backgroundColor: '#ffffff'
@@ -830,89 +852,62 @@ export default function UpdateSection({
 
             {/* Import Mode */}
             <div>
-              <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
-                Daily Task Action
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#374151', marginBottom: '4px' }}>
+                Action
               </label>
               <select
                 value={replaceMode ? 'replace' : 'append'}
                 onChange={e => setReplaceMode(e.target.value === 'replace')}
                 style={{
                   width: '100%',
-                  padding: '9px 12px',
+                  padding: '8px 10px',
                   borderRadius: '8px',
                   border: '1.5px solid #d1d5db',
-                  fontSize: '13px',
+                  fontSize: '12px',
                   fontWeight: 700,
                   color: replaceMode ? '#0284c7' : '#15803d',
                   boxSizing: 'border-box',
                   backgroundColor: '#ffffff'
                 }}
               >
-                <option value="replace">Set / Replace Task {targetTaskNumber} Active List</option>
-                <option value="append">Append to Task {targetTaskNumber} List</option>
+                <option value="replace">Set / Replace List</option>
+                <option value="append">Append to List</option>
               </select>
-              <span style={{ fontSize: '11px', color: '#9ca3af' }}>
-                {replaceMode ? 'Clears previous day records and sets new' : 'Adds to current list'}
-              </span>
-            </div>
-
-            {/* List Checked Time matching user mockup (e.g. 8.30 A.M., 02.00 P.M.) */}
-            <div>
-              <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
-                List Checked Time
-              </label>
-              <input
-                type="text"
-                value={checkTime}
-                onChange={e => setCheckTime(e.target.value)}
-                placeholder="e.g. 8.30 A.M."
-                style={{
-                  width: '100%',
-                  padding: '9px 12px',
-                  borderRadius: '8px',
-                  border: '1.5px solid #d1d5db',
-                  fontSize: '13.5px',
-                  fontWeight: 700,
-                  color: '#0f766e',
-                  boxSizing: 'border-box'
-                }}
-              />
-              <span style={{ fontSize: '11px', color: '#9ca3af' }}>Time checked (e.g. 8.30 A.M.)</span>
             </div>
 
             {/* Live Intra-day Round Tracking Status Indicator */}
             <div style={{
               gridColumn: '1 / -1',
               backgroundColor: '#f0fdf4',
-              border: '1.5px solid #84cc16',
-              borderRadius: '12px',
-              padding: '12px 18px',
+              border: '1px solid #84cc16',
+              borderRadius: '10px',
+              padding: '10px 14px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               flexWrap: 'wrap',
-              gap: '10px'
+              gap: '8px'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#16a34a', display: 'inline-block' }} />
-                <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#166534' }}>
-                  Intra-day Task #{targetTaskNumber} ({targetTaskDate}) Round Status
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#16a34a', display: 'inline-block' }} />
+                <span style={{ fontSize: '12.5px', fontWeight: 800, color: '#166534' }}>
+                  Task #{targetTaskNumber} Status
                 </span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}>
                 {taskRounds.length > 0 ? (
                   <>
                     <span style={{ color: '#4b5563' }}>
-                      Current: <strong>Task {targetTaskNumber}.{latestRound?.round_number || 1} : Time {latestRound?.check_time || '8.30 A.M.'} ({latestRound?.total_devices || 0} Mobiles)</strong>
+                      Current: <strong>Task {targetTaskNumber}.{latestRound?.round_number || 1} ({latestRound?.total_devices || 0} Mobiles)</strong>
                     </span>
                     <span style={{ color: '#84cc16', fontWeight: 800 }}>➔</span>
-                    <span style={{ backgroundColor: '#15803d', color: '#ffffff', padding: '3px 10px', borderRadius: '6px', fontWeight: 800, fontSize: '11.5px' }}>
-                      Next: Task {targetTaskNumber}.{(latestRound?.round_number || 1) + 1} : Time {checkTime}
+                    <span style={{ backgroundColor: '#15803d', color: '#ffffff', padding: '2px 8px', borderRadius: '6px', fontWeight: 800, fontSize: '11px' }}>
+                      Next: Task {targetTaskNumber}.{(latestRound?.round_number || 1) + 1} ({checkTime})
                     </span>
                   </>
                 ) : (
-                  <span style={{ backgroundColor: '#dcfce7', color: '#15803d', padding: '3px 10px', borderRadius: '6px', fontWeight: 700 }}>
-                    Initial Round: Task {targetTaskNumber}.1 : Time {checkTime}
+                  <span style={{ backgroundColor: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                    Initial Round: Task {targetTaskNumber}.1 ({checkTime})
                   </span>
                 )}
               </div>

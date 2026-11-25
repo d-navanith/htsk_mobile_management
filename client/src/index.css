@@ -1609,15 +1609,45 @@ input, select, textarea {
   margin-bottom: 24px;
 }
 
-@media screen and (max-width: 768px) {
+@media screen and (max-width: 1023px) {
   .user-create-form {
-    grid-template-columns: 1fr !important;
-    gap: 14px !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px !important;
   }
-  .user-create-form button {
+  .user-create-submit-wrap {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+  }
+  .user-create-submit-wrap button {
     width: 100% !important;
     justify-content: center !important;
-    padding: 11px !important;
+    padding: 10px 16px !important;
+  }
+}
+
+@media screen and (max-width: 520px) {
+  .user-create-form {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+}
+
+/* User Management Desktop Table vs Mobile Cards */
+.desktop-user-table-wrap {
+  display: block;
+}
+.mobile-user-cards-container {
+  display: none;
+}
+
+@media screen and (max-width: 768px) {
+  .desktop-user-table-wrap {
+    display: none !important;
+  }
+  .mobile-user-cards-container {
+    display: flex !important;
+    flex-direction: column;
+    gap: 10px;
   }
 }
 
@@ -1724,8 +1754,40 @@ input, select, textarea {
 
 .history-tab-buttons {
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+  gap: 8px;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.history-tab-buttons::-webkit-scrollbar {
+  display: none;
+}
+
+.history-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  border: 1px solid #e5e7eb;
+  background-color: #ffffff;
+  color: #4b5563;
+  transition: all 0.15s ease;
+}
+
+.history-tab-btn.active {
+  background-color: #84cc16;
+  color: #000000;
+  border-color: #84cc16;
+  box-shadow: 0 2px 6px rgba(132, 204, 22, 0.25);
 }
 
 .history-search-wrap {
@@ -1736,6 +1798,7 @@ input, select, textarea {
   .history-nav-toolbar {
     flex-direction: column !important;
     align-items: stretch !important;
+    gap: 12px !important;
   }
   .history-tab-buttons {
     width: 100% !important;

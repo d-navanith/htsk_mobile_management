@@ -49,7 +49,7 @@ export default function HistorySection({
   const [selectedDay, setSelectedDay] = useState(17);
   const [currentMonthIndex, setCurrentMonthIndex] = useState(10); // November (0-indexed: 10)
   const [currentYear, setCurrentYear] = useState(2026);
-  const [showCalendar, setShowCalendar] = useState(true);
+  const [showCalendar, setShowCalendar] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 768 : true);
 
   // View & Category filters
   const [viewMode, setViewMode] = useState('cards'); // 'cards' (card grid), 'grouped' (series grouped list), 'table'
@@ -403,19 +403,21 @@ export default function HistorySection({
             <span>Refresh</span>
           </button>
 
-          <UserProfileMenu
-            currentUser={currentUser}
-            currentUserName={currentUserName}
-            currentUserRole={currentUserRole}
-            currentUserEmail={currentUserEmail}
-            currentUserAvatar={currentUserAvatar}
-            onOpenProfile={() => onOpenProfile('general')}
-            onOpenSecurity={() => onOpenProfile('security')}
-            onLogout={onLogout}
-            setActiveTab={setAppTab}
-            onRefresh={() => window.location.reload()}
-            canManageUsers={canManageUsers}
-          />
+          <div className="desktop-only-profile">
+            <UserProfileMenu
+              currentUser={currentUser}
+              currentUserName={currentUserName}
+              currentUserRole={currentUserRole}
+              currentUserEmail={currentUserEmail}
+              currentUserAvatar={currentUserAvatar}
+              onOpenProfile={() => onOpenProfile('general')}
+              onOpenSecurity={() => onOpenProfile('security')}
+              onLogout={onLogout}
+              setActiveTab={setAppTab}
+              onRefresh={() => window.location.reload()}
+              canManageUsers={canManageUsers}
+            />
+          </div>
         </div>
       </div>
 
@@ -639,62 +641,29 @@ export default function HistorySection({
       <div className="history-nav-toolbar">
         <div className="history-tab-buttons">
           <button
+            type="button"
             onClick={() => setActiveTab('activeDevices')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '10px 18px',
-              borderRadius: '9999px',
-              fontSize: '13.5px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              border: activeTab === 'activeDevices' ? 'none' : '1px solid #e5e7eb',
-              backgroundColor: activeTab === 'activeDevices' ? '#a3e635' : '#ffffff',
-              color: activeTab === 'activeDevices' ? '#000000' : '#4b5563'
-            }}
+            className={`history-tab-btn ${activeTab === 'activeDevices' ? 'active' : ''}`}
           >
-            <Smartphone size={16} />
-            <span>Active Mobile Phones ({activeDevices.length})</span>
+            <Smartphone size={15} />
+            <span>Active Phones ({activeDevices.length})</span>
           </button>
 
           <button
+            type="button"
             onClick={() => setActiveTab('activityHistory')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '10px 18px',
-              borderRadius: '9999px',
-              fontSize: '13.5px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              border: activeTab === 'activityHistory' ? 'none' : '1px solid #e5e7eb',
-              backgroundColor: activeTab === 'activityHistory' ? '#a3e635' : '#ffffff',
-              color: activeTab === 'activityHistory' ? '#000000' : '#4b5563'
-            }}
+            className={`history-tab-btn ${activeTab === 'activityHistory' ? 'active' : ''}`}
           >
-            <History size={16} />
-            <span>Audit Activity History ({historyLogs.length})</span>
+            <History size={15} />
+            <span>Activity History ({historyLogs.length})</span>
           </button>
 
           <button
+            type="button"
             onClick={() => setActiveTab('auditLogins')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '10px 18px',
-              borderRadius: '9999px',
-              fontSize: '13.5px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              border: activeTab === 'auditLogins' ? 'none' : '1px solid #e5e7eb',
-              backgroundColor: activeTab === 'auditLogins' ? '#a3e635' : '#ffffff',
-              color: activeTab === 'auditLogins' ? '#000000' : '#4b5563'
-            }}
+            className={`history-tab-btn ${activeTab === 'auditLogins' ? 'active' : ''}`}
           >
-            <ShieldCheck size={16} />
+            <ShieldCheck size={15} />
             <span>Audit Logins ({auditLogins.length})</span>
           </button>
         </div>

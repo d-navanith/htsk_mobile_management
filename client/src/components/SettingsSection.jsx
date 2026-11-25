@@ -260,19 +260,21 @@ export default function SettingsSection({
           </p>
         </div>
 
-        <UserProfileMenu
-          currentUser={currentUser}
-          currentUserName={currentUserName}
-          currentUserRole={currentUserRole}
-          currentUserEmail={currentUserEmail}
-          currentUserAvatar={currentUserAvatar}
-          onOpenProfile={() => onOpenProfile('general')}
-          onOpenSecurity={() => onOpenProfile('security')}
-          onLogout={onLogout}
-          setActiveTab={setActiveTab}
-          onRefresh={() => window.location.reload()}
-          canManageUsers={canManageUsers}
-        />
+        <div className="desktop-only-profile">
+          <UserProfileMenu
+            currentUser={currentUser}
+            currentUserName={currentUserName}
+            currentUserRole={currentUserRole}
+            currentUserEmail={currentUserEmail}
+            currentUserAvatar={currentUserAvatar}
+            onOpenProfile={() => onOpenProfile('general')}
+            onOpenSecurity={() => onOpenProfile('security')}
+            onLogout={onLogout}
+            setActiveTab={setActiveTab}
+            onRefresh={() => window.location.reload()}
+            canManageUsers={canManageUsers}
+          />
+        </div>
       </div>
 
       {/* 2-Column Layout (Responsive) */}

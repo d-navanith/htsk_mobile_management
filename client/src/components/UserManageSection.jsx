@@ -445,18 +445,20 @@ export default function UserManageSection({
           </p>
         </div>
 
-        <UserProfileMenu
-          currentUser={currentUser}
-          currentUserName={currentUserName}
-          currentUserRole={currentUserRole}
-          currentUserEmail={currentUserEmail}
-          currentUserAvatar={currentUserAvatar}
-          onOpenProfile={() => onOpenProfile('general')}
-          onOpenSecurity={() => onOpenProfile('security')}
-          onLogout={onLogout}
-          setActiveTab={setActiveTab}
-          onRefresh={() => window.location.reload()}
-        />
+        <div className="desktop-only-profile">
+          <UserProfileMenu
+            currentUser={currentUser}
+            currentUserName={currentUserName}
+            currentUserRole={currentUserRole}
+            currentUserEmail={currentUserEmail}
+            currentUserAvatar={currentUserAvatar}
+            onOpenProfile={() => onOpenProfile('general')}
+            onOpenSecurity={() => onOpenProfile('security')}
+            onLogout={onLogout}
+            setActiveTab={setActiveTab}
+            onRefresh={() => window.location.reload()}
+          />
+        </div>
       </div>
 
       {/* SECTION 1: DASHBOARD ANIMATION MANAGEMENT (Matching user screenshot) */}
@@ -709,10 +711,11 @@ export default function UserManageSection({
             </div>
           </div>
 
-          <div>
+          <div className="user-create-submit-wrap">
             <button
               type="submit"
               className="btn-primary-lime"
+              style={{ width: '100%', padding: '10px 20px', fontWeight: 800 }}
             >
               Create User
             </button>
@@ -755,8 +758,8 @@ export default function UserManageSection({
           </div>
         </div>
 
-        {/* Existing Users Table */}
-        <div className="responsive-table-wrapper" style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
+        {/* Desktop View: Existing Users Table */}
+        <div className="desktop-user-table-wrap responsive-table-wrapper" style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
           <div className="table-scroll-hint">
             <span>Swipe horizontally to view all user details</span>
             <ArrowRightLeft size={13} />
@@ -893,6 +896,159 @@ export default function UserManageSection({
             })}
           </tbody>
         </table>
+        </div>
+
+        {/* Mobile View: Clean User Cards (< 768px) */}
+        <div className="mobile-user-cards-container">
+          {users
+            .filter(u => {
+              const term = userTableSearch.trim().toLowerCase();
+              if (!term) return true;
+              return (
+                (u.full_name || '').toLowerCase().includes(term) ||
+                (u.username || '').toLowerCase().includes(term) ||
+                (u.email || '').toLowerCase().includes(term) ||
+                (u.role || '').toLowerCase().includes(term)
+              );
+            })
+            .map(u => {
+              const isAnimAllowed = u.animation_enabled === 1 || u.animation_enabled === true;
+              const isAdmin = u.role?.toLowerCase() === 'admin' || u.username?.toLowerCase() === 'shanaka';
+              return (
+                <div
+                  key={u.id}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '12px',
+                    padding: '14px 16px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                    marginBottom: '10px'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                    <div>
+                      <div style={{ fontSize: '14.5px', fontWeight: 800, color: '#111827' }}>{u.full_name}</div>
+                      <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '1px' }}>@{u.username}</div>
+                    </div>
+                    {isAdmin ? (
+                      <span style={{
+                        backgroundColor: '#dcfce7',
+                        color: '#15803d',
+                        padding: '3px 10px',
+                        borderRadius: '9999px',
+                        fontSize: '11.5px',
+                        fontWeight: 700,
+                        border: '1px solid #bbf7d0',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px'
+                      }}>
+                        <Lock size={10} /> Active
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleUser(u.id, u.is_active)}
+                        style={{
+                          backgroundColor: u.is_active ? '#dcfce7' : '#fee2e2',
+                          color: u.is_active ? '#15803d' : '#b91c1c',
+                          padding: '3px 10px',
+                          borderRadius: '9999px',
+                          fontSize: '11.5px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          border: 'none'
+                        }}
+                      >
+                        {u.is_active ? 'Active' : 'Inactive'}
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '6px' }}>
+                    <span style={{ fontSize: '12.5px', color: '#4b5563' }}>{u.email || 'No email provided'}</span>
+                    <span style={{
+                      backgroundColor: '#f3f4f6',
+                      color: '#1f2937',
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      fontSize: '11.5px',
+                      fontWeight: 700
+                    }}>
+                      {u.role}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid #f3f4f6' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '11.5px', color: '#6b7280' }}>Animation:</span>
+                      <span style={{
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: isAnimAllowed ? '#15803d' : '#6b7280',
+                        backgroundColor: isAnimAllowed ? '#dcfce7' : '#f3f4f6',
+                        padding: '1px 6px',
+                        borderRadius: '4px'
+                      }}>
+                        {isAnimAllowed ? 'Allowed' : 'Disabled'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleUserAnimation(u.id, !isAnimAllowed)}
+                        style={{
+                          width: '34px',
+                          height: '18px',
+                          borderRadius: '9px',
+                          backgroundColor: isAnimAllowed ? '#84cc16' : '#e5e7eb',
+                          border: 'none',
+                          cursor: 'pointer',
+                          position: 'relative',
+                          padding: 0,
+                          transition: 'background-color 0.2s ease',
+                          display: 'inline-flex',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <span style={{
+                          width: '14px',
+                          height: '14px',
+                          borderRadius: '50%',
+                          backgroundColor: '#ffffff',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                          transform: isAnimAllowed ? 'translateX(17px)' : 'translateX(2px)',
+                          transition: 'transform 0.2s ease'
+                        }} />
+                      </button>
+                    </div>
+
+                    {u.username !== 'shanaka' && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteUser(u.id)}
+                        style={{
+                          color: '#ef4444',
+                          cursor: 'pointer',
+                          padding: '4px 8px',
+                          background: '#fee2e2',
+                          border: 'none',
+                          borderRadius: '6px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          fontSize: '11.5px',
+                          fontWeight: 700
+                        }}
+                        title="Delete User"
+                      >
+                        <Trash2 size={13} />
+                        <span>Delete</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
         </div>
       </div>
 

@@ -1,10 +1,69 @@
 # HTSK Mobile Management System
 
-A production-grade, enterprise **Company Mobile Device Inventory, Shift Handover & Daily Task Management Platform** built for high-throughput daily device operations, real-time custody tracking, and multi-round shift accountability.
+![Version](https://img.shields.io/badge/version-v1.0.1--alpha%202-84cc16?style=for-the-badge&logo=android&logoColor=black)
+![Platform](https://img.shields.io/badge/platform-Web%20%7C%20Mobile%20PWA-0284c7?style=for-the-badge)
+![Status](https://img.shields.io/badge/status-Production%20Ready-15803d?style=for-the-badge)
+
+A production-grade, enterprise **Company Mobile Device Inventory, Shift Handover & Daily Task Management Platform** built for high-throughput daily device operations, real-time custody tracking, multi-round shift accountability, and mobile app responsiveness.
+
+---
+
+## 🚀 Release History & Changelog
+
+### 🟢 `v 1.0.1 - alpha 2` (Current Release — November 2026)
+This release delivers a comprehensive **Mobile App-Like Experience & Responsiveness Overhaul**, visual branding updates, bug fixes, and streamlined workflows across all modules:
+
+1. **Brand Identity & Header Redesign:**
+   - Integrated the official **HTSK Mobile Inventory** logo into the sidebar drawer with responsive scaling and centered positioning.
+   - Removed cluttered button pills from the top mobile header, leaving a clean native-app bar featuring the menu hamburger button `[ ☰ ]` and user profile avatar.
+
+2. **Mobile App Navigation System:**
+   - Added a fixed 5-tab **Mobile Bottom Navigation Bar** (`Dashboard`, `Daily Task`, `Inventory`, `Update`, `More`) with native iOS/Android haptic styling.
+   - Built an interactive slide-up **More** bottom sheet providing 1-tap access to *User manage*, *History*, *Settings*, and *Logout*.
+
+3. **Page-Unique Floating Action Buttons (FAB `+`):**
+   - Resolved the `Uncaught ReferenceError: rounds is not defined` crash in Daily Task.
+   - Implemented context-aware, unique actions for the floating `(+)` button:
+     - **Dashboard:** Direct *Add Device to Active Table* dialog.
+     - **Daily Task:** Direct *+ Add Next Task (Round Check)* modal with auto-formatted check time.
+     - **Inventory:** Direct *+ Add Device to Inventory* modal with phone type selector.
+
+4. **Dashboard Calendar Responsiveness:**
+   - Fixed the 2-column drawer overflow bug where task summary cards clipped off-screen on mobile.
+   - Automatically collapses into a 100% full-width calendar grid on mobile with KPI stat cards stacked cleanly below.
+
+5. **Update Workspace Overhaul:**
+   - Replaced bulky stacked buttons with a sleek, horizontal **Segmented Mode Switcher** (`Quick Mobile List` | `Document Upload`).
+   - Redesigned the configuration form from 8 tall stacked rows into a compact **2-Column Form Grid** (`Target Task #`, `Date`, `Shift`, `Time`, `EMP Start #`, `Format`, `Group`, `Action`).
+   - Compacted intra-day task status indicator to minimize vertical scrolling.
+
+6. **User Account Management Mobile Cards:**
+   - Replaced the wide, cut-off desktop table with dedicated **Mobile User Cards** on mobile viewports ($\le 768\text{px}$).
+   - Includes bold name headers, username handles, role pills, active/inactive badges, inline animation permission switches, and touch-friendly delete buttons.
+   - Fixed the user creation form to use a spacious 2-column / 1-column layout so inputs never squeeze into single-line cut-offs.
+
+7. **History Section Tab Chips & Collapsible Calendar:**
+   - Fixed the bug where tab buttons wrapped into deformed giant circles on mobile viewports.
+   - Implemented sleek, non-wrapping horizontal tab chips (`Active Phones`, `Activity History`, `Audit Logins`) with smooth horizontal scrolling.
+   - Collapsed the large 350px calendar drawer by default on mobile so users immediately view active devices upon loading.
+
+8. **Security & Access Control:**
+   - Updated primary administrator credentials and enforced strict view-only capability enforcement for `Viewer` roles.
+   - Anti-brute force lockout after 5 failed attempts with audit login logging.
+
+---
+
+### ⚪ `v 1.0.0 - alpha 1` (Initial Release — November 2026)
+- **3NF Relational Architecture:** SQLite database engine (`mobile_management.sqlite`) tracking 241 pre-cataloged devices (`NEW`, `PN`, `CASS`).
+- **Dashboard & KPIs:** 4 real-time stat cards, date-specific task filtering, and ambient card particle effects (Snow, Rain, Sparkle).
+- **Daily Task & Intra-Day Tracking:** Multiple intra-day device checks (`Task X.1`, `Task X.2`) with attention banners for dropped or missing devices.
+- **Smart File Ingestion:** Automated OCR and spreadsheet ingestion supporting `.xlsx`, `.csv`, `.docx`, `.pdf`, and `.png`.
+- **RBAC & Capability Matrix:** Admin capability matrix permitting granular permission toggling for 5 system roles.
 
 ---
 
 ## 📑 Table of Contents
+- [Release History & Changelog](#-release-history--changelog)
 - [Key Features](#-key-features)
 - [System Architecture & Modules](#-system-architecture--modules)
 - [Operational Logic & Workflows](#-operational-logic--workflows)

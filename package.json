@@ -1,6 +1,6 @@
 {
   "name": "htsk-mobile-management",
-  "version": "1.0.0",
+  "version": "1.0.1-alpha.2",
   "description": "HTSK Mobile Management System with 3NF Relational Database and Sheet Auto-Import",
   "scripts": {
     "install:all": "cd server && npm install && cd ../client && npm install",

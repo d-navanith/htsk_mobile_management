@@ -191,7 +191,7 @@ export default function Sidebar({
               letterSpacing: '0.02em',
               fontFamily: 'system-ui, -apple-system, sans-serif'
             }}>
-              V 1.0.0 - alpha 1
+              V 1.0.1 - alpha 2
             </span>
           </div>
         </div>

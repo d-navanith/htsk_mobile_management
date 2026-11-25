@@ -1,0 +1,18 @@
+{
+  "short_name": "HTSK",
+  "name": "HTSK Mobile Management",
+  "description": "HTSK Mobile Device and Inventory Management System",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#8fe022",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

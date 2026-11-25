@@ -12,6 +12,7 @@ import DailyTaskSection from './components/DailyTaskSection';
 import InventorySection from './components/InventorySection';
 import ProfileModal from './components/ProfileModal';
 import UserProfileMenu from './components/UserProfileMenu';
+import MobileBottomNav from './components/MobileBottomNav';
 import { Menu } from 'lucide-react';
 
 class ErrorBoundary extends React.Component {
@@ -464,7 +465,18 @@ export default function App() {
         >
           <Menu size={24} />
         </button>
-        <div className="mobile-brand">HTSK</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="mobile-brand">HTSK</div>
+          <span className="mobile-header-tab-pill">
+            {activeTab === 'dashboard' ? 'Dashboard' :
+             activeTab === 'dailytask' ? 'Daily Task' :
+             activeTab === 'inventory' ? 'Inventory' :
+             activeTab === 'update' ? 'Update' :
+             activeTab === 'usermanage' ? 'User Manage' :
+             activeTab === 'history' ? 'History' :
+             activeTab === 'settings' ? 'Settings' : 'Dashboard'}
+          </span>
+        </div>
         <div>
           <UserProfileMenu
             currentUser={currentUser}
@@ -633,6 +645,25 @@ export default function App() {
           )}
         </ErrorBoundary>
       </main>
+
+      {/* Mobile Bottom Navigation Bar & More Sheet */}
+      <MobileBottomNav
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onLogout={handleAdminLogout}
+        onOpenProfile={handleOpenProfile}
+        canManageUsers={canManageUsers}
+        canAccessUpdate={canAccessUpdate}
+        canAccessHistory={canAccessHistory}
+        canAccessSettings={canAccessSettings}
+        canViewDevices={canViewDevices}
+        canViewDailyTasks={canViewDailyTasks}
+        canViewInventory={canViewInventory}
+        currentUser={currentUser}
+        currentUserName={currentUserName}
+        currentUserRole={currentUserRole}
+        currentUserAvatar={currentUserAvatar}
+      />
 
       {/* Profile Management Modal */}
       <ProfileModal

@@ -20,7 +20,10 @@ import {
   ArrowUpRight,
   X,
   AlertTriangle,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Plus,
+  Grid,
+  Table
 } from 'lucide-react';
 import SnowEffect from './SnowEffect';
 
@@ -86,6 +89,14 @@ export default function Dashboard({
   // Attention Required Minimize & Bulk Mark All Returned State
   const [isAttentionMinimized, setIsAttentionMinimized] = useState(false);
   const [bulkResolving, setBulkResolving] = useState(false);
+
+  // Responsive View Mode: 'cards' on mobile (<768px), 'table' on desktop
+  const [viewMode, setViewMode] = useState(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return 'cards';
+    }
+    return 'table';
+  });
 
   const [kpis, setKpis] = useState({
     totalMobilePhones: 241,
@@ -1601,12 +1612,256 @@ export default function Dashboard({
                 <span>Delete Table</span>
               </button>
             )}
+
+            {/* Responsive View Mode Switcher: Cards vs Table */}
+            <div style={{
+              display: 'inline-flex',
+              backgroundColor: '#f3f4f6',
+              borderRadius: '8px',
+              padding: '2px',
+              border: '1px solid #e5e7eb'
+            }}>
+              <button
+                type="button"
+                onClick={() => setViewMode('cards')}
+                style={{
+                  padding: '6px 10px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  borderRadius: '6px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  backgroundColor: viewMode === 'cards' ? '#ffffff' : 'transparent',
+                  color: viewMode === 'cards' ? '#15803d' : '#6b7280',
+                  boxShadow: viewMode === 'cards' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                }}
+                title="Switch to Mobile Card View"
+              >
+                <Grid size={14} />
+                <span>Cards</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                style={{
+                  padding: '6px 10px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  borderRadius: '6px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  backgroundColor: viewMode === 'table' ? '#ffffff' : 'transparent',
+                  color: viewMode === 'table' ? '#15803d' : '#6b7280',
+                  boxShadow: viewMode === 'table' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                }}
+                title="Switch to Full Table View"
+              >
+                <Table size={14} />
+                <span>Table</span>
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Scrollable Table Container */}
-        <div className="responsive-table-wrapper" style={{ maxHeight: '540px', overflowY: 'auto', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
-          <table style={{ width: '100%', minWidth: '960px', borderCollapse: 'collapse', textAlign: 'left' }}>
+        {/* ===================================================================== */}
+        {/* VIEW 1: MOBILE CARDS VIEW (Clean, touch-friendly, app-like)           */}
+        {/* ===================================================================== */}
+        {viewMode === 'cards' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {filteredRecords.length === 0 ? (
+              <div style={{
+                padding: '36px 20px',
+                textAlign: 'center',
+                color: '#9ca3af',
+                fontSize: '14px',
+                backgroundColor: '#f9fafb',
+                borderRadius: '12px',
+                border: '1px dashed #d1d5db'
+              }}>
+                {loading || comparisonLoading
+                  ? 'Loading records...'
+                  : searchTerm
+                  ? `No matching device or employee found for "${searchTerm}".`
+                  : selectedDeviceFilter !== 'All Devices'
+                  ? `No ${selectedDeviceFilter.toLowerCase()} found in this table.`
+                  : `No records found.`}
+              </div>
+            ) : (
+              filteredRecords.map((r, index) => {
+                const isDone = (r.sign || '').toLowerCase() === 'done';
+                const isMissing = (r.sign || '').toLowerCase() === 'missing';
+                const isNewInRound = r.is_new_in_round === 1 || r.is_newly_added;
+                const displayIndex = r._originalIndex !== undefined ? r._originalIndex : index;
+
+                return (
+                  <div
+                    key={r.id || `card-${displayIndex}`}
+                    className="mobile-record-card"
+                  >
+                    {/* Top Row: Rec #, Name, Sign Status */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '12.5px', fontWeight: 800, color: '#166534', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '6px' }}>
+                          #{displayIndex + 1}
+                        </span>
+                        <span style={{ fontSize: '15px', fontWeight: 700, color: '#111827' }}>
+                          {r.name}
+                        </span>
+                      </div>
+                      <span style={{
+                        fontWeight: 700,
+                        fontSize: '12px',
+                        padding: '3px 10px',
+                        borderRadius: '6px',
+                        backgroundColor: isMissing ? '#fef2f2' : (isDone ? '#f0fdf4' : '#fff7ed'),
+                        color: isMissing ? '#dc2626' : (isDone ? '#16a34a' : '#ea580c'),
+                        border: `1px solid ${isMissing ? '#fecaca' : (isDone ? '#bbf7d0' : '#fed7aa')}`
+                      }}>
+                        {r.sign || 'Done'}
+                      </span>
+                    </div>
+
+                    {/* Shift & Group */}
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: '#4b5563', backgroundColor: '#f3f4f6', padding: '2px 8px', borderRadius: '6px' }}>
+                        Shift: {r.shift || 'Day'}
+                      </span>
+                      {r.group_name && (
+                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#4b5563', backgroundColor: '#f3f4f6', padding: '2px 8px', borderRadius: '6px' }}>
+                          {r.group_name}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Device Details Area */}
+                    <div style={{
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '10px',
+                      padding: '10px 12px',
+                      border: '1px solid #f3f4f6',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px'
+                    }}>
+                      {r.taking_device ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                          <span style={{ color: '#4b5563', fontWeight: 600, minWidth: '55px' }}>Taking:</span>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+                            {r.taking_device.split(/[,+&/]/).map(d => d.trim()).filter(Boolean).map((dev, i) => (
+                              <span key={i} style={{ backgroundColor: '#ffffff', color: '#15803d', fontWeight: 700, border: '1.5px solid #84cc16', padding: '2px 8px', borderRadius: '6px', fontSize: '12px' }}>
+                                {dev}
+                              </span>
+                            ))}
+                            {isNewInRound && (
+                              <span style={{ backgroundColor: '#15803d', color: '#ffffff', fontSize: '10px', fontWeight: 800, padding: '2px 6px', borderRadius: '4px' }}>
+                                + NEW TAKING
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {r.return_device ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                          <span style={{ color: '#4b5563', fontWeight: 600, minWidth: '55px' }}>Return:</span>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                            {r.return_device.split(/[,+&/]/).map(d => d.trim()).filter(Boolean).map((dev, i) => (
+                              <span key={i} style={{ backgroundColor: '#ffffff', color: '#374151', fontWeight: 600, border: '1px solid #d1d5db', padding: '2px 8px', borderRadius: '6px', fontSize: '12px' }}>
+                                {dev}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {!r.taking_device && !r.return_device && (
+                        <span style={{ color: '#9ca3af', fontSize: '12.5px' }}>— No device assigned</span>
+                      )}
+                    </div>
+
+                    {/* Issued at & Return Time & Handover To */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#6b7280', flexWrap: 'wrap', gap: '6px' }}>
+                      <div>Issued: <strong style={{ color: '#374151' }}>{r.issued_at || '7.30 A.M.'}</strong></div>
+                      {r.return_time && <div>Return: <strong style={{ color: '#374151' }}>{r.return_time}</strong></div>}
+                      {r.handover_to && <div>Handover: <strong style={{ color: '#374151' }}>{r.handover_to}</strong></div>}
+                    </div>
+
+                    {/* Actions: Edit & Delete */}
+                    {(canEdit || canDelete) && (
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '4px', paddingTop: '8px', borderTop: '1px solid #f3f4f6' }}>
+                        {canEdit && (
+                          <button
+                            type="button"
+                            onClick={() => onOpenEditModal(r)}
+                            style={{
+                              flex: 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                              padding: '8px 12px',
+                              borderRadius: '8px',
+                              backgroundColor: '#fefce8',
+                              border: '1px solid #fef08a',
+                              color: '#a16207',
+                              fontSize: '13px',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <Edit2 size={14} color="#a16207" />
+                            <span>Edit</span>
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDashboardRow(r, index)}
+                            style={{
+                              flex: 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                              padding: '8px 12px',
+                              borderRadius: '8px',
+                              backgroundColor: '#fef2f2',
+                              border: '1px solid #fee2e2',
+                              color: '#dc2626',
+                              fontSize: '13px',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <Trash2 size={14} color="#dc2626" />
+                            <span>Delete</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* ===================================================================== */}
+        {/* VIEW 2: DESKTOP TABLE VIEW (Preserved exactly with horizontal scroll)  */}
+        {/* ===================================================================== */}
+        {viewMode === 'table' && (
+          <div className="responsive-table-wrapper" style={{ maxHeight: '540px', overflowY: 'auto', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
+            <div className="table-scroll-hint">
+              <span>Swipe horizontally to view all columns</span>
+              <ArrowRightLeft size={13} />
+            </div>
+            <table style={{ width: '100%', minWidth: '960px', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
               <tr style={{ backgroundColor: '#f3f4f6', borderBottom: '1px solid #e5e7eb' }}>
                 <th style={{ padding: '16px 14px', fontSize: '13px', fontWeight: 700, color: '#111827', width: '70px', textAlign: 'center', borderRight: '1px solid #e5e7eb' }}>
@@ -1866,6 +2121,7 @@ export default function Dashboard({
             </tbody>
           </table>
         </div>
+      )}
 
         {/* ===================================================================== */}
         {/* RED ATTENTION REQUIRED BANNER BELOW TABLE (With Mark All & Minimize)  */}
@@ -2681,6 +2937,23 @@ export default function Dashboard({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Floating Action Button for Mobile: Quick Add Device */}
+      {canEdit && (
+        <button
+          type="button"
+          className="mobile-fab"
+          onClick={() => onOpenAddModal({
+            task_number: comparisonData?.toTask?.task_number || selectedTaskNumber || kpis.activeTaskNumber,
+            task_date: comparisonData?.toTask?.task_date || selectedDateStr || kpis.activeTaskDate,
+            round_number: comparisonData?.toTask?.round_number || 1,
+            check_time: comparisonData?.toTask?.check_time || '7.30 A.M.'
+          })}
+          title="Add New Device"
+        >
+          <Plus size={24} strokeWidth={2.5} />
+        </button>
       )}
     </div>
   );

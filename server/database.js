@@ -451,32 +451,63 @@ async function initDatabase() {
   await seedMockupRecords();
 }
 
-// Seed the exact 241 inventory items (PN 1-122, NEW 1-90, CASS 1-29)
+// Seed the exact standard inventory items (PN 1-123, NEW 1-104, CASS 1-30 -> 257 Total)
 async function seedDefaultInventory241() {
   const countRow = await dbGet(`SELECT COUNT(*) as count FROM inventory_items`);
   if (!countRow || countRow.count === 0) {
-    // Seed PN 1 - 122 (122 phones)
-    for (let i = 1; i <= 122; i++) {
+    // Seed PN 1 - 123 (123 phones)
+    for (let i = 1; i <= 123; i++) {
       await dbRun(
         `INSERT INTO inventory_items (device_tag, series, model_name, storage_location, condition_status, manual_status, notes) VALUES (?, 'PN Series', 'Samsung / Android Mobile Unit', 'Charging Station A', 'Good', 'Auto', '')`,
         [`Pn ${i}`]
       );
     }
-    // Seed NEW 1 - 90 (90 phones)
-    for (let i = 1; i <= 90; i++) {
+    // Seed NEW 1 - 104 (104 phones)
+    for (let i = 1; i <= 104; i++) {
       await dbRun(
         `INSERT INTO inventory_items (device_tag, series, model_name, storage_location, condition_status, manual_status, notes) VALUES (?, 'NEW Series', 'Samsung / Android Mobile Unit', 'Storage Rack B-1', 'Good', 'Auto', '')`,
         [`New ${i}`]
       );
     }
-    // Seed CASS 1 - 29 (29 phones)
-    for (let i = 1; i <= 29; i++) {
+    // Seed CASS 1 - 30 (30 phones)
+    for (let i = 1; i <= 30; i++) {
       await dbRun(
         `INSERT INTO inventory_items (device_tag, series, model_name, storage_location, condition_status, manual_status, notes) VALUES (?, 'CASS Series', 'Samsung / Android Mobile Unit', 'Charging Station B', 'Good', 'Auto', '')`,
         [`Cass ${i}`]
       );
     }
-    await dbRun(`UPDATE shift_settings SET total_inventory_stock = 241`);
+    await dbRun(`UPDATE shift_settings SET total_inventory_stock = 257`);
+  } else {
+    // Safely ensure units up to standard catalog (PN 123, NEW 104, CASS 30) are present without duplicates
+    const allItems = await dbAll(`SELECT device_tag FROM inventory_items`);
+    const existingTags = new Set(allItems.map(r => normalizeDeviceKey(r.device_tag)));
+
+    for (let i = 1; i <= 123; i++) {
+      if (!existingTags.has(`pn${i}`)) {
+        await dbRun(
+          `INSERT INTO inventory_items (device_tag, series, model_name, storage_location, condition_status, manual_status, notes) VALUES (?, 'PN Series', 'Samsung / Android Mobile Unit', 'Charging Station A', 'Good', 'Auto', '')`,
+          [`Pn ${i}`]
+        );
+      }
+    }
+    for (let i = 1; i <= 104; i++) {
+      if (!existingTags.has(`new${i}`)) {
+        await dbRun(
+          `INSERT INTO inventory_items (device_tag, series, model_name, storage_location, condition_status, manual_status, notes) VALUES (?, 'NEW Series', 'Samsung / Android Mobile Unit', 'Storage Rack B-1', 'Good', 'Auto', '')`,
+          [`New ${i}`]
+        );
+      }
+    }
+    for (let i = 1; i <= 30; i++) {
+      if (!existingTags.has(`cass${i}`)) {
+        await dbRun(
+          `INSERT INTO inventory_items (device_tag, series, model_name, storage_location, condition_status, manual_status, notes) VALUES (?, 'CASS Series', 'Samsung / Android Mobile Unit', 'Charging Station B', 'Good', 'Auto', '')`,
+          [`Cass ${i}`]
+        );
+      }
+    }
+    const finalCount = await dbGet(`SELECT COUNT(*) as count FROM inventory_items`);
+    await dbRun(`UPDATE shift_settings SET total_inventory_stock = ?`, [finalCount.count]);
   }
 }
 
@@ -1501,7 +1532,8 @@ function normalizeDeviceKey(str) {
 // Dashboard KPIs calculation (Supports specific date/task calendar filtering or defaults to current active)
 async function getDashboardKPIs(taskNumber, taskDate) {
   const settings = await dbGet(`SELECT * FROM shift_settings ORDER BY id ASC LIMIT 1`);
-  const totalStock = (settings && settings.total_inventory_stock) ? settings.total_inventory_stock : 241;
+  const invCountRow = await dbGet(`SELECT COUNT(*) as count FROM inventory_items`);
+  const totalStock = (invCountRow && invCountRow.count > 0) ? invCountRow.count : ((settings && settings.total_inventory_stock) ? settings.total_inventory_stock : 257);
 
   // Find latest active task number and date
   const latestTaskRow = await dbGet(`SELECT MAX(task_number) as latestTask, MAX(task_date) as latestDate FROM device_records`);
@@ -2240,11 +2272,11 @@ async function getAllInventoryItems(filter = {}) {
   // Load all items in catalog
   let items = await dbAll(`SELECT * FROM inventory_items ORDER BY series ASC, id ASC`);
 
-  // 4. Compute status & KPIs with full series counts
+  // 4. Compute status & KPIs with full series counts and dynamic ranges
   let maintenance = 0, missing = 0;
-  let pnTotal = 0, pnInUse = 0;
-  let newTotal = 0, newInUse = 0;
-  let cassTotal = 0, cassInUse = 0;
+  let pnTotal = 0, pnInUse = 0, pnMin = null, pnMax = null;
+  let newTotal = 0, newInUse = 0, newMin = null, newMax = null;
+  let cassTotal = 0, cassInUse = 0, cassMin = null, cassMax = null;
 
   const catalog = items.map(item => {
     const key = normalizeDeviceKey(item.device_tag);
@@ -2263,9 +2295,28 @@ async function getAllInventoryItems(filter = {}) {
     const isNew = s.includes('NEW') || key.startsWith('new');
     const isCass = s.includes('CASS') || key.startsWith('cass');
 
-    if (isPn) pnTotal++;
-    else if (isNew) newTotal++;
-    else if (isCass) cassTotal++;
+    const numMatch = (item.device_tag || '').match(/\d+/);
+    const num = numMatch ? parseInt(numMatch[0], 10) : null;
+
+    if (isPn) {
+      pnTotal++;
+      if (num !== null) {
+        if (pnMin === null || num < pnMin) pnMin = num;
+        if (pnMax === null || num > pnMax) pnMax = num;
+      }
+    } else if (isNew) {
+      newTotal++;
+      if (num !== null) {
+        if (newMin === null || num < newMin) newMin = num;
+        if (newMax === null || num > newMax) newMax = num;
+      }
+    } else if (isCass) {
+      cassTotal++;
+      if (num !== null) {
+        if (cassMin === null || num < cassMin) cassMin = num;
+        if (cassMax === null || num > cassMax) cassMax = num;
+      }
+    }
 
     if (item.manual_status && item.manual_status !== 'Auto') {
       status = item.manual_status;
@@ -2344,21 +2395,21 @@ async function getAllInventoryItems(filter = {}) {
           total: pnTotal,
           inUse: pnInUse,
           available: Math.max(0, pnTotal - pnInUse),
-          label: 'PN 1 - 122',
+          label: (pnMin !== null && pnMax !== null) ? `PN ${pnMin} - ${pnMax}` : `PN 1 - ${pnTotal || 123}`,
           name: 'PN Series'
         },
         new: {
           total: newTotal,
           inUse: newInUse,
           available: Math.max(0, newTotal - newInUse),
-          label: 'NEW 1 - 90',
+          label: (newMin !== null && newMax !== null) ? `NEW ${newMin} - ${newMax}` : `NEW 1 - ${newTotal || 104}`,
           name: 'NEW Series'
         },
         cass: {
           total: cassTotal,
           inUse: cassInUse,
           available: Math.max(0, cassTotal - cassInUse),
-          label: 'CASS 1 - 29',
+          label: (cassMin !== null && cassMax !== null) ? `CASS ${cassMin} - ${cassMax}` : `CASS 1 - ${cassTotal || 30}`,
           name: 'CASS Series'
         }
       }

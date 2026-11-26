@@ -99,9 +99,9 @@ export default function Dashboard({
   });
 
   const [kpis, setKpis] = useState({
-    totalMobilePhones: 241,
+    totalMobilePhones: 257,
     activeMobilePhones: 78,
-    availableInStock: 163,
+    availableInStock: 179,
     needAnUpdate: 0,
     activeTaskNumber: 19,
     activeTaskDate: '2026-11-19',
@@ -747,7 +747,7 @@ export default function Dashboard({
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
           <div className="stock-badge-pill">
             <Package size={17} color="#65a30d" />
-            <span>Total Stock: {kpis.totalMobilePhones || 241} Phones</span>
+            <span>Total Stock: {kpis.totalMobilePhones || 257} Phones</span>
           </div>
 
           <UserProfileMenu
@@ -1120,11 +1120,11 @@ export default function Dashboard({
               Total Mobile Phones
             </div>
             <div style={{ fontSize: '42px', fontWeight: 800, color: '#84cc16', lineHeight: 1.1, marginBottom: '10px' }}>
-              {kpis.totalMobilePhones || 241}
+              {kpis.totalMobilePhones || 257}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ fontSize: '12.5px', color: '#9ca3af', fontWeight: 400 }}>
-                {kpis.totalMobilePhones || 241} Mobile phones available in stock
+                {kpis.totalMobilePhones || 257} Mobile phones available in stock
               </div>
               <div className="card-arrow-btn" title="View Inventory">
                 <ArrowUpRight size={17} strokeWidth={2.2} />
@@ -2713,7 +2713,7 @@ export default function Dashboard({
                       Names Not Available in System ({comparisonData.notInSystem?.length || 0})
                     </span>
                     <span style={{ fontSize: '12px', color: '#6b7280' }}>
-                      Device names not found in the 241 master inventory list
+                      Device names not found in the master inventory list
                     </span>
                   </div>
                   {(!comparisonData.notInSystem || comparisonData.notInSystem.length === 0) ? (

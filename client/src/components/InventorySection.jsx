@@ -43,15 +43,15 @@ export default function InventorySection({
 }) {
   const [inventory, setInventory] = useState([]);
   const [kpis, setKpis] = useState({
-    totalStock: 241,
-    availableStock: 177,
-    inUseStock: 64,
+    totalStock: 257,
+    availableStock: 184,
+    inUseStock: 73,
     maintenanceStock: 0,
     missingStock: 0,
     seriesStats: {
-      pn: { total: 122, inUse: 35, available: 87, label: 'PN 1 - 122', name: 'PN Series' },
-      new: { total: 90, inUse: 25, available: 65, label: 'NEW 1 - 90', name: 'NEW Series' },
-      cass: { total: 29, inUse: 4, available: 25, label: 'CASS 1 - 29', name: 'CASS Series' }
+      pn: { total: 123, inUse: 35, available: 88, label: 'PN 1 - 123', name: 'PN Series' },
+      new: { total: 104, inUse: 25, available: 79, label: 'NEW 1 - 104', name: 'NEW Series' },
+      cass: { total: 30, inUse: 4, available: 26, label: 'CASS 1 - 30', name: 'CASS Series' }
     }
   });
 
@@ -160,21 +160,21 @@ export default function InventorySection({
       setFormLocation('Storage Rack B-1');
       // Auto suggest next NEW number if tag is empty or starting with other
       if (!formTag || formTag.startsWith('Pn') || formTag.startsWith('Cass')) {
-        const nextNum = (kpis.seriesStats?.new?.total || 90) + 1;
+        const nextNum = (kpis.seriesStats?.new?.total || 104) + 1;
         setFormTag(`New ${nextNum}`);
       }
     } else if (type === 'PN') {
       setFormSeries('PN Series');
       setFormLocation('Charging Station A');
       if (!formTag || formTag.startsWith('New') || formTag.startsWith('Cass')) {
-        const nextNum = (kpis.seriesStats?.pn?.total || 122) + 1;
+        const nextNum = (kpis.seriesStats?.pn?.total || 123) + 1;
         setFormTag(`Pn ${nextNum}`);
       }
     } else if (type === 'CASS') {
       setFormSeries('CASS Series');
       setFormLocation('Charging Station B');
       if (!formTag || formTag.startsWith('New') || formTag.startsWith('Pn')) {
-        const nextNum = (kpis.seriesStats?.cass?.total || 29) + 1;
+        const nextNum = (kpis.seriesStats?.cass?.total || 30) + 1;
         setFormTag(`Cass ${nextNum}`);
       }
     } else {
@@ -345,7 +345,7 @@ export default function InventorySection({
         badgeText: '#065f46',
         cardBorder: '#bbf7d0',
         primary: '#10b981',
-        label: 'NEW Series (1-90)'
+        label: `NEW Series (${seriesStats.new?.label ? seriesStats.new.label.replace(/^NEW\s*/i, '') : '1-104'})`
       };
     }
     if (s.includes('PN')) {
@@ -355,7 +355,7 @@ export default function InventorySection({
         badgeText: '#1e40af',
         cardBorder: '#bfdbfe',
         primary: '#3b82f6',
-        label: 'PN Series (1-122)'
+        label: `PN Series (${seriesStats.pn?.label ? seriesStats.pn.label.replace(/^PN\s*/i, '') : '1-123'})`
       };
     }
     if (s.includes('CASS')) {
@@ -365,7 +365,7 @@ export default function InventorySection({
         badgeText: '#86198f',
         cardBorder: '#f5d0fe',
         primary: '#a855f7',
-        label: 'CASS Series (1-29)'
+        label: `CASS Series (${seriesStats.cass?.label ? seriesStats.cass.label.replace(/^CASS\s*/i, '') : '1-30'})`
       };
     }
     return {
@@ -462,11 +462,48 @@ export default function InventorySection({
     }
   };
 
-  const seriesStats = kpis.seriesStats || {
-    pn: { total: 122, inUse: 35, available: 87, label: 'PN 1 - 122' },
-    new: { total: 90, inUse: 25, available: 65, label: 'NEW 1 - 90' },
-    cass: { total: 29, inUse: 4, available: 25, label: 'CASS 1 - 29' }
-  };
+  const dynamicSeriesStats = useMemo(() => {
+    const pnItems = inventory.filter(i => (i.series || '').toUpperCase().includes('PN') || (i.device_tag || '').toLowerCase().startsWith('pn'));
+    const newItems = inventory.filter(i => (i.series || '').toUpperCase().includes('NEW') || (i.device_tag || '').toLowerCase().startsWith('new'));
+    const cassItems = inventory.filter(i => (i.series || '').toUpperCase().includes('CASS') || (i.device_tag || '').toLowerCase().startsWith('cass'));
+
+    const getRange = (items, prefix, defaultTotal) => {
+      const nums = items.map(i => {
+        const m = (i.device_tag || '').match(/\d+/);
+        return m ? parseInt(m[0], 10) : null;
+      }).filter(n => n !== null);
+      if (nums.length === 0) return `${prefix} 1 - ${defaultTotal}`;
+      const min = Math.min(...nums);
+      const max = Math.max(...nums);
+      return `${prefix} ${min} - ${max}`;
+    };
+
+    return {
+      pn: {
+        total: kpis.seriesStats?.pn?.total ?? (pnItems.length || 123),
+        inUse: kpis.seriesStats?.pn?.inUse ?? 35,
+        available: kpis.seriesStats?.pn?.available ?? 88,
+        label: kpis.seriesStats?.pn?.label || getRange(pnItems, 'PN', 123),
+        name: 'PN Series'
+      },
+      new: {
+        total: kpis.seriesStats?.new?.total ?? (newItems.length || 104),
+        inUse: kpis.seriesStats?.new?.inUse ?? 25,
+        available: kpis.seriesStats?.new?.available ?? 79,
+        label: kpis.seriesStats?.new?.label || getRange(newItems, 'NEW', 104),
+        name: 'NEW Series'
+      },
+      cass: {
+        total: kpis.seriesStats?.cass?.total ?? (cassItems.length || 30),
+        inUse: kpis.seriesStats?.cass?.inUse ?? 4,
+        available: kpis.seriesStats?.cass?.available ?? 26,
+        label: kpis.seriesStats?.cass?.label || getRange(cassItems, 'CASS', 30),
+        name: 'CASS Series'
+      }
+    };
+  }, [inventory, kpis.seriesStats]);
+
+  const seriesStats = dynamicSeriesStats;
 
   return (
     <div className="responsive-section-container">
@@ -643,7 +680,7 @@ export default function InventorySection({
               PN Series Phones
             </span>
             <span style={{ fontSize: '11px', fontWeight: 800, color: '#1d4ed8', backgroundColor: '#eff6ff', padding: '3px 8px', borderRadius: '6px' }}>
-              PN 1 - 122
+              {seriesStats.pn?.label || 'PN 1 - 123'}
             </span>
           </div>
           <div style={{ fontSize: '42px', fontWeight: 900, color: '#3b82f6', lineHeight: 1.1, marginBottom: '8px' }}>
@@ -659,7 +696,7 @@ export default function InventorySection({
           </div>
         </div>
 
-        {/* Card 3: NEW Series (NEW 1 to 90 -> 90 Devices) */}
+        {/* Card 3: NEW Series (NEW 1 to 104 -> 104 Devices) */}
         <div
           className="clickable-kpi-card"
           onClick={() => setSelectedSeries('NEW Series')}
@@ -677,7 +714,7 @@ export default function InventorySection({
               NEW Series Phones
             </span>
             <span style={{ fontSize: '11px', fontWeight: 800, color: '#047857', backgroundColor: '#ecfdf5', padding: '3px 8px', borderRadius: '6px' }}>
-              NEW 1 - 90
+              {seriesStats.new?.label || 'NEW 1 - 104'}
             </span>
           </div>
           <div style={{ fontSize: '42px', fontWeight: 900, color: '#10b981', lineHeight: 1.1, marginBottom: '8px' }}>
@@ -693,7 +730,7 @@ export default function InventorySection({
           </div>
         </div>
 
-        {/* Card 4: CASS Series (CASS 1 to 29 -> 29 Devices) */}
+        {/* Card 4: CASS Series (CASS 1 to 30 -> 30 Devices) */}
         <div
           className="clickable-kpi-card"
           onClick={() => setSelectedSeries('CASS Series')}
@@ -711,7 +748,7 @@ export default function InventorySection({
               CASS Series Phones
             </span>
             <span style={{ fontSize: '11px', fontWeight: 800, color: '#7e22ce', backgroundColor: '#fdf4ff', padding: '3px 8px', borderRadius: '6px' }}>
-              CASS 1 - 29
+              {seriesStats.cass?.label || 'CASS 1 - 30'}
             </span>
           </div>
           <div style={{ fontSize: '42px', fontWeight: 900, color: '#a855f7', lineHeight: 1.1, marginBottom: '8px' }}>
@@ -1384,7 +1421,9 @@ export default function InventorySection({
                   >
                     <Smartphone size={18} color={formSeries === 'NEW Series' ? '#10b981' : '#6b7280'} style={{ margin: '0 auto 4px', display: 'block' }} />
                     NEW Series
-                    <div style={{ fontSize: '11px', color: '#6b7280', fontWeight: 500, marginTop: '2px' }}>1 - 90</div>
+                    <div style={{ fontSize: '11px', color: '#6b7280', fontWeight: 500, marginTop: '2px' }}>
+                      {seriesStats.new?.label ? seriesStats.new.label.replace(/^NEW\s*/i, '') : '1 - 104'}
+                    </div>
                   </button>
 
                   <button
@@ -1404,7 +1443,9 @@ export default function InventorySection({
                   >
                     <Smartphone size={18} color={formSeries === 'PN Series' ? '#3b82f6' : '#6b7280'} style={{ margin: '0 auto 4px', display: 'block' }} />
                     PN Series
-                    <div style={{ fontSize: '11px', color: '#6b7280', fontWeight: 500, marginTop: '2px' }}>1 - 122</div>
+                    <div style={{ fontSize: '11px', color: '#6b7280', fontWeight: 500, marginTop: '2px' }}>
+                      {seriesStats.pn?.label ? seriesStats.pn.label.replace(/^PN\s*/i, '') : '1 - 123'}
+                    </div>
                   </button>
 
                   <button
@@ -1424,7 +1465,9 @@ export default function InventorySection({
                   >
                     <Smartphone size={18} color={formSeries === 'CASS Series' ? '#a855f7' : '#6b7280'} style={{ margin: '0 auto 4px', display: 'block' }} />
                     CASS Series
-                    <div style={{ fontSize: '11px', color: '#6b7280', fontWeight: 500, marginTop: '2px' }}>1 - 29</div>
+                    <div style={{ fontSize: '11px', color: '#6b7280', fontWeight: 500, marginTop: '2px' }}>
+                      {seriesStats.cass?.label ? seriesStats.cass.label.replace(/^CASS\s*/i, '') : '1 - 30'}
+                    </div>
                   </button>
                 </div>
               </div>
@@ -1436,7 +1479,7 @@ export default function InventorySection({
                 </label>
                 <input
                   type="text"
-                  placeholder='e.g. "New 91", "Pn 123", "Cass 30"'
+                  placeholder='e.g. "New 105", "Pn 124", "Cass 31"'
                   value={formTag}
                   onChange={e => setFormTag(e.target.value)}
                   style={{
@@ -1656,9 +1699,9 @@ export default function InventorySection({
                       backgroundColor: '#ffffff'
                     }}
                   >
-                    <option value="PN Series">PN Series (PN 1 - 122)</option>
-                    <option value="NEW Series">NEW Series (NEW 1 - 90)</option>
-                    <option value="CASS Series">CASS Series (CASS 1 - 29)</option>
+                    <option value="PN Series">PN Series ({seriesStats.pn?.label || 'PN 1 - 123'})</option>
+                    <option value="NEW Series">NEW Series ({seriesStats.new?.label || 'NEW 1 - 104'})</option>
+                    <option value="CASS Series">CASS Series ({seriesStats.cass?.label || 'CASS 1 - 30'})</option>
                     <option value="Other Series">Other Series</option>
                   </select>
                 </div>

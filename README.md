@@ -151,10 +151,11 @@ This release delivers a comprehensive **Mobile App-Like Experience & Responsiven
 - **Accurate Return Accounting:** Accurately accounts for repeated device return events (e.g., PN 34 returned across multiple shifts/employees on the same day).
 
 ### 3. Comprehensive Inventory Management
-- **241 Pre-Cataloged Devices:**
-  - **PN Series (122 Units):** `PN 1` to `PN 122` (Charging Station A)
-  - **NEW Series (90 Units):** `NEW 1` to `NEW 90` (Rack B-1)
-  - **CASS Series (29 Units):** `CASS 1` to `CASS 29` (Station B)
+- **257 Pre-Cataloged Devices:**
+  - **PN Series (123 Units):** `PN 1` to `PN 123` (Charging Station A)
+  - **NEW Series (104 Units):** `NEW 1` to `NEW 104` (Rack B-1)
+  - **CASS Series (30 Units):** `CASS 1` to `CASS 30` (Station B)
+- **Dynamic Series Range Calculation:** Range badges automatically update whenever new hardware units are added to inventory.
 - **Live Custodian Syncing:** Real-time linkage showing which employee currently holds each device.
 - **Card & Table Views:** Switch between visual device cards and dense tabular data with search and status filtering.
 

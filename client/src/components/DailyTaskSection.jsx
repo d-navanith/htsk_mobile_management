@@ -18,7 +18,8 @@ import {
   RotateCcw,
   ArrowUpRight,
   Grid,
-  Table
+  Table,
+  ListPlus
 } from 'lucide-react';
 
 export default function DailyTaskSection({
@@ -71,8 +72,12 @@ export default function DailyTaskSection({
   };
 
   const [isAddNextTaskOpen, setIsAddNextTaskOpen] = useState(false);
+  const [targetModalRound, setTargetModalRound] = useState(1);
   const [nextCheckTime, setNextCheckTime] = useState(() => formatCurrentCheckTime());
   const [nextRawList, setNextRawList] = useState(''); // EMPTY BY DEFAULT - NO DEMO DATA
+  const [nextShift, setNextShift] = useState('Day');
+  const [nextEmpStartNumber, setNextEmpStartNumber] = useState(1);
+  const [nextEmpFormat, setNextEmpFormat] = useState('two_digit');
   const [addingNextTask, setAddingNextTask] = useState(false);
 
   const [taskRecords, setTaskRecords] = useState([]);
@@ -176,30 +181,66 @@ export default function DailyTaskSection({
     }
   };
 
-  // Handle adding next task check (Intra-day Round)
+  // Check whether any task records or rounds already exist for selectedDay
+  const hasExistingTasks = Boolean(
+    (kpis.rounds && kpis.rounds.length > 0 && kpis.rounds.some(r => r.records && r.records.length > 0)) ||
+    (taskRecords && taskRecords.length > 0)
+  );
+  const currentRoundsCount = (kpis.rounds && kpis.rounds.length > 0)
+    ? kpis.rounds.length
+    : (taskRecords && taskRecords.length > 0 ? 1 : 0);
+  const nextTargetRoundNum = currentRoundsCount === 0 ? 1 : currentRoundsCount + 1;
+
+  // Open Add Task Modal (Round 1 for first task, or Round N for next task)
+  const openAddRoundModal = (targetRound = null) => {
+    if (!canEdit) {
+      alert('You do not have permission to add tasks (View only).');
+      return;
+    }
+    const resolvedRound = targetRound !== null ? targetRound : nextTargetRoundNum;
+    setTargetModalRound(resolvedRound);
+    setNextCheckTime(formatCurrentCheckTime());
+    setNextRawList('');
+    setNextShift('Day');
+    setNextEmpStartNumber(1);
+    setIsAddNextTaskOpen(true);
+  };
+
+  // Live parsed device tags (supports both newlines and comma separation)
+  const parsedNextDevices = useMemo(() => {
+    if (!nextRawList.trim()) return [];
+    const items = [];
+    const lines = nextRawList.split(/\r?\n/);
+    for (const line of lines) {
+      const parts = line.split(',').map(s => s.trim()).filter(Boolean);
+      items.push(...parts);
+    }
+    return items;
+  }, [nextRawList]);
+
+  // Handle adding task check (Round 1 First Task or Intra-day Round)
   const handleConfirmNextTask = async () => {
     if (!canEdit) {
       alert('You do not have permission to add task rounds (View only).');
       return;
     }
-    if (!nextRawList.trim()) {
-      alert('Please enter or paste at least one device tag for this check.');
+    if (parsedNextDevices.length === 0) {
+      alert('Please enter or paste at least one device tag (e.g. New 68, Pn 27, New 37).');
       return;
     }
     setAddingNextTask(true);
     try {
-      const lines = nextRawList
-        .split(/\r?\n/)
-        .map(l => l.trim())
-        .filter(Boolean);
+      const startNum = parseInt(nextEmpStartNumber, 10) || 1;
+      const rows = parsedNextDevices.map((tag, idx) => {
+        const empSeq = startNum + idx;
+        const formattedName = nextEmpFormat === 'two_digit'
+          ? (empSeq < 100 ? String(empSeq).padStart(2, '0') : String(empSeq))
+          : String(empSeq);
 
-      const rows = lines.map((tag, idx) => {
-        const num = idx + 1;
-        const formatted = num < 100 ? String(num).padStart(2, '0') : String(num);
         return {
-          emp_number: num,
-          name: formatted,
-          shift: 'Day',
+          emp_number: empSeq,
+          name: formattedName,
+          shift: nextShift || 'Day',
           group_name: '',
           issued_at: nextCheckTime || '7.30 A.M.',
           return_time: '',
@@ -211,7 +252,7 @@ export default function DailyTaskSection({
         };
       });
 
-      const nextRoundNum = (kpis.rounds?.length || 1) + 1;
+      const assignedRound = targetModalRound || (currentRoundsCount === 0 ? 1 : currentRoundsCount + 1);
       const monthStr = String(currentMonthIndex + 1).padStart(2, '0');
       const dayStr = String(selectedDay).padStart(2, '0');
       const dateStr = `${currentYear}-${monthStr}-${dayStr}`;
@@ -223,7 +264,7 @@ export default function DailyTaskSection({
           rows,
           task_number: selectedDay,
           task_date: dateStr,
-          round_number: nextRoundNum,
+          round_number: assignedRound,
           check_time: nextCheckTime,
           raw_list: nextRawList,
           replaceMode: false
@@ -237,11 +278,11 @@ export default function DailyTaskSection({
         fetchTaskData();
         refreshRecords();
       } else {
-        alert(result.error || 'Failed to save next check');
+        alert(result.error || 'Failed to save task check');
       }
     } catch (e) {
-      console.error('Error adding next task:', e);
-      alert('Error creating next task');
+      console.error('Error saving task check:', e);
+      alert('Network or server error while saving task check');
     } finally {
       setAddingNextTask(false);
     }
@@ -1313,18 +1354,43 @@ export default function DailyTaskSection({
                   </div>
 
                   {canEdit && (
-                    <button
-                      onClick={() => onOpenAddModal({
-                        task_number: selectedDay,
-                        task_date: `${currentYear}-${String(currentMonthIndex + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`,
-                        round_number: rnd.round_number,
-                        round_id: typeof rnd.id === 'number' ? rnd.id : undefined,
-                        check_time: rnd.check_time || '7.30 A.M.'
-                      })}
-                      className="btn-primary-lime"
-                    >
-                      <span>Add</span>
-                    </button>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      <button
+                        type="button"
+                        onClick={() => openAddRoundModal(rnd.round_number || 1)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          backgroundColor: '#ecfccb',
+                          color: '#365314',
+                          border: '1px solid #d9f99d',
+                          borderRadius: '8px',
+                          padding: '7px 12px',
+                          fontSize: '12.5px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                        title="Paste bulk device list for this task"
+                      >
+                        <ListPlus size={15} />
+                        <span>Paste List</span>
+                      </button>
+                      <button
+                        onClick={() => onOpenAddModal({
+                          task_number: selectedDay,
+                          task_date: `${currentYear}-${String(currentMonthIndex + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`,
+                          round_number: rnd.round_number,
+                          round_id: typeof rnd.id === 'number' ? rnd.id : undefined,
+                          check_time: rnd.check_time || '7.30 A.M.'
+                        })}
+                        className="btn-primary-lime"
+                        title="Add a single device manually"
+                      >
+                        <span>Single Device</span>
+                      </button>
+                    </div>
                   )}
 
                   {/* Responsive View Mode Switcher: Cards vs Table */}
@@ -1394,13 +1460,87 @@ export default function DailyTaskSection({
                       fontSize: '14px',
                       backgroundColor: '#f9fafb',
                       borderRadius: '12px',
-                      border: '1px dashed #d1d5db'
+                      border: '1.5px dashed #d1d5db'
                     }}>
-                      {curFilter.search
-                        ? `No matching device or employee found for "${curFilter.search}".`
-                        : curFilter.deviceFilter && curFilter.deviceFilter !== 'All Devices'
-                        ? `No ${curFilter.deviceFilter.toLowerCase()} in this round.`
-                        : `No records in this check round.`}
+                      {curFilter.search ? (
+                        <div>No matching device or employee found for "{curFilter.search}".</div>
+                      ) : curFilter.deviceFilter && curFilter.deviceFilter !== 'All Devices' ? (
+                        <div>No {curFilter.deviceFilter.toLowerCase()} in this round.</div>
+                      ) : (
+                        <div>
+                          <div style={{
+                            width: '46px',
+                            height: '46px',
+                            borderRadius: '50%',
+                            backgroundColor: '#ecfccb',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 10px',
+                            color: '#4d7c0f'
+                          }}>
+                            <ListPlus size={24} />
+                          </div>
+                          <div style={{ fontSize: '15px', fontWeight: 800, color: '#111827', marginBottom: '4px' }}>
+                            {rnd.round_number === 1 ? `No First Task Records for Task ${selectedDay}` : `No Records in Task ${selectedDay}.${rnd.round_number}`}
+                          </div>
+                          <p style={{ margin: '0 auto 16px', fontSize: '12.5px', color: '#6b7280', maxWidth: '380px' }}>
+                            {rnd.round_number === 1
+                              ? 'Paste your active mobile list in bulk to start this day, or add single devices one-by-one.'
+                              : 'Paste your list of active devices found in this check round.'}
+                          </p>
+                          {canEdit && (
+                            <div style={{ display: 'inline-flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                              <button
+                                type="button"
+                                onClick={() => openAddRoundModal(rnd.round_number || 1)}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  backgroundColor: '#84cc16',
+                                  color: '#000000',
+                                  fontWeight: 800,
+                                  fontSize: '12.5px',
+                                  padding: '8px 16px',
+                                  borderRadius: '8px',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  boxShadow: '0 2px 6px rgba(132, 204, 22, 0.3)'
+                                }}
+                              >
+                                <ListPlus size={15} />
+                                <span>{rnd.round_number === 1 ? '+ Add First Task (Paste List)' : `+ Paste List (Round ${rnd.round_number})`}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onOpenAddModal({
+                                  task_number: selectedDay,
+                                  task_date: `${currentYear}-${String(currentMonthIndex + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`,
+                                  round_number: rnd.round_number,
+                                  check_time: rnd.check_time || '7.30 A.M.'
+                                })}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  backgroundColor: '#ffffff',
+                                  color: '#374151',
+                                  fontWeight: 700,
+                                  fontSize: '12.5px',
+                                  padding: '8px 14px',
+                                  borderRadius: '8px',
+                                  border: '1px solid #d1d5db',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                <Plus size={14} />
+                                <span>Single Device</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     rndFilteredRecords.map((r, index) => {
@@ -1607,14 +1747,88 @@ export default function DailyTaskSection({
                 <tbody>
                   {rndFilteredRecords.length === 0 ? (
                     <tr>
-                      <td colSpan={10} style={{ padding: '40px', textAlign: 'center', color: '#9ca3af', fontSize: '14px' }}>
-                        {loading
-                          ? 'Loading task records...'
-                          : curFilter.search
-                          ? `No matching device or employee found for "${curFilter.search}" in Task ${selectedDay}.${rnd.round_number}.`
-                          : curFilter.deviceFilter && curFilter.deviceFilter !== 'All Devices'
-                          ? `No ${curFilter.deviceFilter.toLowerCase()} found in Task ${selectedDay}.${rnd.round_number}.`
-                          : `No records logged for Task ${selectedDay}.${rnd.round_number} (${formatDayString(selectedDay)}). Click '+ Add' to assign devices.`}
+                      <td colSpan={10} style={{ padding: '40px 20px', textAlign: 'center', color: '#9ca3af', fontSize: '14px' }}>
+                        {loading ? (
+                          'Loading task records...'
+                        ) : curFilter.search ? (
+                          `No matching device or employee found for "${curFilter.search}" in Task ${selectedDay}.${rnd.round_number}.`
+                        ) : curFilter.deviceFilter && curFilter.deviceFilter !== 'All Devices' ? (
+                          `No ${curFilter.deviceFilter.toLowerCase()} found in Task ${selectedDay}.${rnd.round_number}.`
+                        ) : (
+                          <div style={{ padding: '10px 0' }}>
+                            <div style={{
+                              width: '46px',
+                              height: '46px',
+                              borderRadius: '50%',
+                              backgroundColor: '#ecfccb',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              margin: '0 auto 10px',
+                              color: '#4d7c0f'
+                            }}>
+                              <ListPlus size={24} />
+                            </div>
+                            <div style={{ fontSize: '15px', fontWeight: 800, color: '#111827', marginBottom: '4px' }}>
+                              {rnd.round_number === 1 ? `No First Task Records for Task ${selectedDay} (${formatDayString(selectedDay)})` : `No Records in Task ${selectedDay}.${rnd.round_number}`}
+                            </div>
+                            <p style={{ margin: '0 auto 16px', fontSize: '13px', color: '#6b7280', maxWidth: '440px' }}>
+                              {rnd.round_number === 1
+                                ? 'Add your active mobile list in bulk (copy and paste like Update page) to start this day, or add single devices one-by-one.'
+                                : `Paste your list of active devices found in this check round.`}
+                            </p>
+                            {canEdit && (
+                              <div style={{ display: 'inline-flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => openAddRoundModal(rnd.round_number || 1)}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '7px',
+                                    backgroundColor: '#84cc16',
+                                    color: '#000000',
+                                    fontWeight: 800,
+                                    fontSize: '13px',
+                                    padding: '9px 18px',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 6px rgba(132, 204, 22, 0.3)'
+                                  }}
+                                >
+                                  <ListPlus size={16} />
+                                  <span>{rnd.round_number === 1 ? '+ Add First Task (Paste List)' : `+ Paste List (Round ${rnd.round_number})`}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => onOpenAddModal({
+                                    task_number: selectedDay,
+                                    task_date: `${currentYear}-${String(currentMonthIndex + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`,
+                                    round_number: rnd.round_number,
+                                    check_time: rnd.check_time || '7.30 A.M.'
+                                  })}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    backgroundColor: '#ffffff',
+                                    color: '#374151',
+                                    fontWeight: 700,
+                                    fontSize: '13px',
+                                    padding: '9px 16px',
+                                    borderRadius: '8px',
+                                    border: '1px solid #d1d5db',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  <Plus size={15} />
+                                  <span>Single Device</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ) : (
@@ -2096,15 +2310,11 @@ export default function DailyTaskSection({
         );
       })}
 
-      {/* Centered '+ Add Next Task' button matching Image 2 mockup (hidden for View only / non-editors) */}
+      {/* Centered '+ Add First Task' / '+ Add Next Task' button (hidden for View only / non-editors) */}
       {canEdit && (
         <div style={{ display: 'flex', justifyContent: 'center', marginTop: '32px', marginBottom: '40px' }}>
           <button
-            onClick={() => {
-              setNextCheckTime(formatCurrentCheckTime());
-              setNextRawList(''); // NO DEMO DATA
-              setIsAddNextTaskOpen(true);
-            }}
+            onClick={() => openAddRoundModal(hasExistingTasks ? nextTargetRoundNum : 1)}
             style={{
               backgroundColor: '#84cc16',
               color: '#000000',
@@ -2122,12 +2332,14 @@ export default function DailyTaskSection({
             }}
           >
             <Plus size={18} strokeWidth={2.8} />
-            <span>+ Add Next Task</span>
+            <span>
+              {hasExistingTasks ? `+ Add Next Task (Round ${nextTargetRoundNum})` : `+ Add First Task (Round 1)`}
+            </span>
           </button>
         </div>
       )}
 
-      {/* Add Next Task Modal (Clean - No Demo Data) */}
+      {/* Add Task Modal (Supports First Task Round 1 & Next Task Intra-day Checks) */}
       {isAddNextTaskOpen && (
         <div style={{
           position: 'fixed',
@@ -2135,7 +2347,8 @@ export default function DailyTaskSection({
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.45)',
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          backdropFilter: 'blur(3px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -2146,9 +2359,12 @@ export default function DailyTaskSection({
             backgroundColor: '#ffffff',
             borderRadius: '16px',
             width: '100%',
-            maxWidth: '520px',
-            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)',
-            overflow: 'hidden'
+            maxWidth: '560px',
+            boxShadow: '0 20px 30px -5px rgba(0,0,0,0.25)',
+            overflow: 'hidden',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column'
           }}>
             {/* Modal Header */}
             <div style={{
@@ -2160,56 +2376,165 @@ export default function DailyTaskSection({
               backgroundColor: '#f9fafb'
             }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 800, color: '#111827' }}>
-                  Add Next Task (Round {(kpis.rounds?.length || 1) + 1})
+                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 800, color: '#111827', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ListPlus size={20} color="#65a30d" />
+                  <span>{targetModalRound === 1 ? 'Add First Task (Round 1)' : `Add Next Task (Round ${targetModalRound})`}</span>
                 </h3>
                 <p style={{ margin: '3px 0 0 0', fontSize: '12.5px', color: '#6b7280' }}>
-                  Task {selectedDay}.{(kpis.rounds?.length || 1) + 1} • {formatDayString(selectedDay)}
+                  Task {selectedDay}.{targetModalRound} {targetModalRound === 1 ? '(Initial Daily Snapshot)' : '(Intra-day Check)'} • {formatDayString(selectedDay)}
                 </p>
               </div>
               <button
                 onClick={() => setIsAddNextTaskOpen(false)}
-                style={{ backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: '#6b7280' }}
+                style={{ backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: '#6b7280', padding: '4px' }}
               >
                 <X size={20} />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div style={{ padding: '22px 24px' }}>
-              {/* Check Time */}
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
-                  List Checked Time
-                </label>
-                <input
-                  type="text"
-                  value={nextCheckTime}
-                  onChange={e => setNextCheckTime(e.target.value)}
-                  placeholder="e.g. 05.00 P.M."
-                  style={{
-                    width: '100%',
-                    padding: '9px 12px',
-                    borderRadius: '8px',
-                    border: '1.5px solid #d1d5db',
-                    fontSize: '13.5px',
-                    fontWeight: 700,
-                    color: '#0f766e',
-                    boxSizing: 'border-box'
-                  }}
-                />
+            <div style={{ padding: '20px 24px', overflowY: 'auto' }}>
+              {/* EMP Configuration Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#374151', marginBottom: '5px' }}>
+                    EMP. Name Start Number
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={nextEmpStartNumber}
+                    onChange={e => setNextEmpStartNumber(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '1.5px solid #d1d5db',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                  <span style={{ fontSize: '11px', color: '#6b7280', display: 'block', marginTop: '2px' }}>
+                    First employee sequential number
+                  </span>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#374151', marginBottom: '5px' }}>
+                    EMP. Name Format
+                  </label>
+                  <select
+                    value={nextEmpFormat}
+                    onChange={e => setNextEmpFormat(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '1.5px solid #d1d5db',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      backgroundColor: '#ffffff',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <option value="two_digit">Two Digits (01, 02, 03...)</option>
+                    <option value="standard">Standard (1, 2, 3...)</option>
+                  </select>
+                  <span style={{ fontSize: '11px', color: '#6b7280', display: 'block', marginTop: '2px' }}>
+                    Leading zero padding style
+                  </span>
+                </div>
               </div>
 
-              {/* Device List Textarea (No demo data) */}
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
-                  Enter or Paste Mobile Device List (One per line)
-                </label>
+              {/* Shift and Check Time Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#374151', marginBottom: '5px' }}>
+                    Shift
+                  </label>
+                  <select
+                    value={nextShift}
+                    onChange={e => setNextShift(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '1.5px solid #d1d5db',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      backgroundColor: '#ffffff',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <option value="Day">Day Shift</option>
+                    <option value="Night">Night Shift</option>
+                  </select>
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                    <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#374151' }}>
+                      List Checked Time
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setNextCheckTime(formatCurrentCheckTime())}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        fontSize: '11.5px',
+                        color: '#65a30d',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        textDecoration: 'underline'
+                      }}
+                    >
+                      Use Current Time
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={nextCheckTime}
+                    onChange={e => setNextCheckTime(e.target.value)}
+                    placeholder="e.g. 8.30 A.M."
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '1.5px solid #d1d5db',
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      color: '#0f766e',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Device List Textarea with Comma and Newline Support */}
+              <div style={{ marginBottom: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#374151' }}>
+                    Paste Mobile Device List (Comma or Newline Separated)
+                  </label>
+                  <span style={{
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    padding: '2px 8px',
+                    borderRadius: '9999px',
+                    backgroundColor: parsedNextDevices.length > 0 ? '#ecfccb' : '#f3f4f6',
+                    color: parsedNextDevices.length > 0 ? '#3f6212' : '#6b7280'
+                  }}>
+                    {parsedNextDevices.length} devices detected
+                  </span>
+                </div>
                 <textarea
-                  rows={8}
+                  rows={7}
                   value={nextRawList}
                   onChange={e => setNextRawList(e.target.value)}
-                  placeholder="Paste devices found in this check (e.g.&#10;Pn 81&#10;New 25&#10;...)"
+                  placeholder="Paste active devices (e.g. New 68, Pn 27, New 37, CASS 12... or one per line)"
                   style={{
                     width: '100%',
                     padding: '10px 12px',
@@ -2221,10 +2546,54 @@ export default function DailyTaskSection({
                     resize: 'vertical'
                   }}
                 />
-                <span style={{ fontSize: '11.5px', color: '#6b7280', display: 'block', marginTop: '4px' }}>
-                  {nextRawList.trim() ? `${nextRawList.split(/\r?\n/).filter(Boolean).length} device tags entered` : 'Ready for device tags input.'}
-                </span>
               </div>
+
+              {/* Live Preview Chips */}
+              {parsedNextDevices.length > 0 && (
+                <div style={{
+                  padding: '10px 12px',
+                  backgroundColor: '#f9fafb',
+                  borderRadius: '8px',
+                  border: '1px solid #e5e7eb'
+                }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '6px' }}>
+                    Preview (First {Math.min(parsedNextDevices.length, 6)} devices):
+                  </span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {parsedNextDevices.slice(0, 6).map((tag, idx) => {
+                      const seq = (parseInt(nextEmpStartNumber, 10) || 1) + idx;
+                      const empFormatted = nextEmpFormat === 'two_digit'
+                        ? (seq < 100 ? String(seq).padStart(2, '0') : String(seq))
+                        : String(seq);
+                      return (
+                        <span
+                          key={idx}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            backgroundColor: '#ffffff',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '6px',
+                            padding: '3px 8px',
+                            fontSize: '11.5px',
+                            fontWeight: 600,
+                            color: '#111827'
+                          }}
+                        >
+                          <span style={{ color: '#65a30d', fontWeight: 700 }}>EMP {empFormatted}:</span>
+                          <span>{tag}</span>
+                        </span>
+                      );
+                    })}
+                    {parsedNextDevices.length > 6 && (
+                      <span style={{ fontSize: '11.5px', color: '#6b7280', alignSelf: 'center', fontWeight: 600 }}>
+                        +{parsedNextDevices.length - 6} more
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Modal Footer */}
@@ -2254,20 +2623,30 @@ export default function DailyTaskSection({
               </button>
               <button
                 type="button"
-                disabled={!nextRawList.trim() || addingNextTask}
+                disabled={parsedNextDevices.length === 0 || addingNextTask}
                 onClick={handleConfirmNextTask}
                 style={{
                   padding: '9px 22px',
                   borderRadius: '8px',
                   border: 'none',
-                  backgroundColor: !nextRawList.trim() || addingNextTask ? '#d9f99d' : '#84cc16',
+                  backgroundColor: parsedNextDevices.length === 0 || addingNextTask ? '#d9f99d' : '#84cc16',
                   color: '#000000',
                   fontSize: '13px',
                   fontWeight: 800,
-                  cursor: !nextRawList.trim() || addingNextTask ? 'not-allowed' : 'pointer'
+                  cursor: parsedNextDevices.length === 0 || addingNextTask ? 'not-allowed' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
                 }}
               >
-                {addingNextTask ? 'Saving Check...' : `Save & Run Task ${selectedDay}.${(kpis.rounds?.length || 1) + 1}`}
+                <Plus size={16} strokeWidth={2.8} />
+                <span>
+                  {addingNextTask
+                    ? 'Saving Check...'
+                    : (targetModalRound === 1
+                        ? `Save & Create First Task ${selectedDay}.1`
+                        : `Save & Run Task ${selectedDay}.${targetModalRound}`)}
+                </span>
               </button>
             </div>
           </div>
@@ -2443,13 +2822,9 @@ export default function DailyTaskSection({
         <button
           type="button"
           className="mobile-fab"
-          onClick={() => {
-            setNextCheckTime(formatCurrentCheckTime());
-            setNextRawList('');
-            setIsAddNextTaskOpen(true);
-          }}
-          title="Add Next Task"
-          aria-label="Add Next Task"
+          onClick={() => openAddRoundModal()}
+          title={hasExistingTasks ? `Add Next Task (Round ${nextTargetRoundNum})` : 'Add First Task (Round 1)'}
+          aria-label={hasExistingTasks ? `Add Next Task (Round ${nextTargetRoundNum})` : 'Add First Task (Round 1)'}
         >
           <Plus size={24} strokeWidth={2.5} />
         </button>

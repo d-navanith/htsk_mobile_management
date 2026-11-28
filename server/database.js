@@ -2532,6 +2532,30 @@ function formatDeviceTag(tag) {
   return s;
 }
 
+function expandResolutionAliases(targetMap, rawKey, val) {
+  if (!targetMap || !val) return;
+  const k = String(rawKey || '').trim();
+  if (!k) return;
+  targetMap[k] = val;
+  const rawLower = k.toLowerCase();
+  targetMap[rawLower] = val;
+  const noSpace = rawLower.replace(/\s+/g, '');
+  targetMap[noSpace] = val;
+  const norm = normalizeDeviceTag(k);
+  if (norm) targetMap[norm] = val;
+  const m = noSpace.match(/^([a-z]+)0*(\d+)$/i);
+  if (m) {
+    const pfx = m[1];
+    const n = parseInt(m[2], 10);
+    targetMap[`${pfx}${n}`] = val;
+    targetMap[`${pfx}${String(n).padStart(2, '0')}`] = val;
+    targetMap[`${pfx} ${n}`] = val;
+    targetMap[`${pfx} ${String(n).padStart(2, '0')}`] = val;
+    const formatted = formatDeviceTag(`${pfx} ${n}`);
+    if (formatted) targetMap[formatted] = val;
+  }
+}
+
 function compareDeviceLists(prevTags = [], newTags = []) {
   const prevNormMap = new Map();
   for (const t of prevTags) {
@@ -2624,7 +2648,9 @@ async function getTaskRounds(taskNumber, taskDate) {
     if (r.resolutions_json) {
       try {
         const parsed = JSON.parse(r.resolutions_json);
-        Object.assign(allResolutions, parsed);
+        for (const [k, v] of Object.entries(parsed)) {
+          expandResolutionAliases(allResolutions, k, v);
+        }
       } catch (e) {}
     }
   }
@@ -2642,23 +2668,17 @@ async function getTaskRounds(taskNumber, taskDate) {
       `, [tNumInt]);
       for (const d of dbDevs) {
         if (d.return_device && d.return_device.trim() !== '') {
-          const norm = normalizeDeviceTag(d.return_device);
-          if (norm && !allResolutions[norm]) {
-            allResolutions[norm] = {
-              status: 'returned',
-              device_tag: d.return_device,
-              check_time: d.return_time || 'Office Returned'
-            };
-          }
+          expandResolutionAliases(allResolutions, d.return_device, {
+            status: 'returned',
+            device_tag: d.return_device,
+            check_time: d.return_time || 'Office Returned'
+          });
         }
         if (d.sign && d.sign.toLowerCase() === 'missing') {
-          const norm = normalizeDeviceTag(d.taking_device);
-          if (norm && !allResolutions[norm]) {
-            allResolutions[norm] = {
-              status: 'missing',
-              device_tag: d.taking_device
-            };
-          }
+          expandResolutionAliases(allResolutions, d.taking_device, {
+            status: 'missing',
+            device_tag: d.taking_device
+          });
         }
       }
     }
@@ -2709,14 +2729,17 @@ async function getTaskRounds(taskNumber, taskDate) {
     let parsedResolutions = {};
     if (r.resolutions_json) {
       try {
-        parsedResolutions = JSON.parse(r.resolutions_json);
+        const p = JSON.parse(r.resolutions_json);
+        for (const [k, v] of Object.entries(p)) {
+          expandResolutionAliases(parsedResolutions, k, v);
+        }
       } catch (e) {}
     }
 
     // Apply resolutions so that previous task / round records show returned or missing status in their row
     records = records.map(rec => {
       const normTaking = normalizeDeviceTag(rec.taking_device);
-      const res = allResolutions[normTaking];
+      const res = allResolutions[normTaking] || parsedResolutions[normTaking];
       if (res) {
         if (res.status === 'returned') {
           return {
@@ -2748,7 +2771,7 @@ async function getTaskRounds(taskNumber, taskDate) {
       records,
       added_devices: r.round_number === 1 ? [] : (r.added_devices ? JSON.parse(r.added_devices) : []),
       removed_devices: r.removed_devices ? JSON.parse(r.removed_devices) : [],
-      resolutions: parsedResolutions
+      resolutions: { ...allResolutions, ...parsedResolutions }
     };
   });
 }
@@ -3016,7 +3039,7 @@ async function resolveDroppedDevice({ task_number = 19, round_number, device_tag
     } catch (e) {}
   }
 
-  resolutions[normTag] = {
+  const resolutionEntry = {
     status: action, // 'returned' or 'missing'
     device_tag: cleanTag,
     resolved_at: new Date().toISOString(),
@@ -3024,26 +3047,24 @@ async function resolveDroppedDevice({ task_number = 19, round_number, device_tag
     check_time: resolutionCheckTime
   };
 
+  expandResolutionAliases(resolutions, cleanTag, resolutionEntry);
+
   // 2. Update daily_task_rounds resolutions_json
   await dbRun(`UPDATE daily_task_rounds SET resolutions_json = ? WHERE id = ?`, [JSON.stringify(resolutions), round.id]);
 
-  // 3. Find any existing device_record matching this device in this task (checking taking_device OR return_device)
-  const existingMatches = await dbAll(`
-    SELECT id, taking_device, return_device FROM device_records 
-    WHERE task_number = ? AND (
-      LOWER(REPLACE(taking_device, ' ', '')) = ? OR
-      LOWER(REPLACE(return_device, ' ', '')) = ?
-    )
-  `, [tNum, normTag, normTag]);
+  // 3. Find any existing device_record matching this device in this task (checking taking_device OR return_device with normalization)
+  const allTaskRecs = await dbAll(`SELECT id, taking_device, return_device FROM device_records WHERE task_number = ?`, [tNum]);
+  const existingMatches = allTaskRecs.filter(r => 
+    normalizeDeviceTag(r.taking_device) === normTag || 
+    normalizeDeviceTag(r.return_device) === normTag
+  );
 
   // Also check previous tasks (e.g. task_number = tNum - 1)
-  const prevMatches = await dbAll(`
-    SELECT id, taking_device, return_device FROM device_records 
-    WHERE task_number = ? AND (
-      LOWER(REPLACE(taking_device, ' ', '')) = ? OR
-      LOWER(REPLACE(return_device, ' ', '')) = ?
-    )
-  `, [tNum - 1, normTag, normTag]);
+  const allPrevRecs = await dbAll(`SELECT id, taking_device, return_device FROM device_records WHERE task_number = ?`, [tNum - 1]);
+  const prevMatches = allPrevRecs.filter(r => 
+    normalizeDeviceTag(r.taking_device) === normTag || 
+    normalizeDeviceTag(r.return_device) === normTag
+  );
 
   if (action === 'returned') {
     if (existingMatches.length > 0) {
@@ -3441,7 +3462,9 @@ async function compareTwoTasks(fromKey = '20.1', toKey = '21.1') {
     if (r.resolutions_json) {
       try {
         const parsed = JSON.parse(r.resolutions_json);
-        Object.assign(resolutions, parsed);
+        for (const [k, v] of Object.entries(parsed)) {
+          expandResolutionAliases(resolutions, k, v);
+        }
       } catch (e) {}
     }
   }

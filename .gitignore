@@ -5,6 +5,7 @@ server/public/
 .vite/
 
 # Deployment packages & archives
+*.zip
 monsterasp_deploy.zip
 publish_monsterasp/
 eng.traineddata

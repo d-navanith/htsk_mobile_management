@@ -114,6 +114,31 @@ export default function DailyTaskSection({
     return 'table';
   });
 
+  // Robust device resolution lookup supporting leading zeros and any formatting variations
+  const getDeviceResolution = (resolutionsObj, devTag) => {
+    if (!resolutionsObj || !devTag) return null;
+    const raw = String(devTag).trim();
+    if (resolutionsObj[raw]) return resolutionsObj[raw];
+    const rawLower = raw.toLowerCase();
+    if (resolutionsObj[rawLower]) return resolutionsObj[rawLower];
+    const noSpace = rawLower.replace(/\s+/g, '');
+    if (resolutionsObj[noSpace]) return resolutionsObj[noSpace];
+    const m = noSpace.match(/^([a-z]+)0*(\d+)$/i);
+    if (m) {
+      const pfx = m[1];
+      const numInt = parseInt(m[2], 10);
+      const unpadded = `${pfx}${numInt}`;
+      if (resolutionsObj[unpadded]) return resolutionsObj[unpadded];
+      const padded = `${pfx}${String(numInt).padStart(2, '0')}`;
+      if (resolutionsObj[padded]) return resolutionsObj[padded];
+      const spaced = `${pfx} ${numInt}`;
+      if (resolutionsObj[spaced]) return resolutionsObj[spaced];
+      const spacedPadded = `${pfx} ${String(numInt).padStart(2, '0')}`;
+      if (resolutionsObj[spacedPadded]) return resolutionsObj[spacedPadded];
+    }
+    return null;
+  };
+
   const handleResolveDevice = async (taskNumber, roundNumber, deviceTag, action) => {
     if (!canEdit) return;
     const key = `${roundNumber}-${deviceTag}`;
@@ -2117,13 +2142,11 @@ export default function DailyTaskSection({
               const isMin = Boolean(minimizedAttentionRounds[roundKey]);
               const isBulkLoading = bulkResolvingRound === roundKey;
               const allReturned = rnd.removed_devices.every(devTag => {
-                const norm = devTag.toLowerCase().replace(/\s+/g, '');
-                const res = (rnd.resolutions && (rnd.resolutions[norm] || rnd.resolutions[devTag])) || null;
+                const res = getDeviceResolution(rnd.resolutions, devTag);
                 return res?.status === 'returned';
               });
               const unreturnedTags = rnd.removed_devices.filter(devTag => {
-                const norm = devTag.toLowerCase().replace(/\s+/g, '');
-                const res = (rnd.resolutions && (rnd.resolutions[norm] || rnd.resolutions[devTag])) || null;
+                const res = getDeviceResolution(rnd.resolutions, devTag);
                 return res?.status !== 'returned';
               });
 
@@ -2219,8 +2242,7 @@ export default function DailyTaskSection({
                   {!isMin && (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '8px' }}>
                       {rnd.removed_devices.map((devTag, dIdx) => {
-                        const norm = devTag.toLowerCase().replace(/\s+/g, '');
-                        const resolution = (rnd.resolutions && (rnd.resolutions[norm] || rnd.resolutions[devTag])) || null;
+                        const resolution = getDeviceResolution(rnd.resolutions, devTag);
 
                         return (
                           <div

@@ -1349,24 +1349,30 @@ export default function InventorySection({
 
       {/* MODAL 1: ADD NEW DEVICE WITH PHONE TYPE SELECTOR & NOTES */}
       {isAddOpen && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: '16px'
-        }}>
-          <div style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '20px',
-            width: '100%',
-            maxWidth: '560px',
-            overflow: 'hidden',
-            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'
-          }}>
+        <div
+          className="modal-overlay"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            padding: '16px'
+          }}
+        >
+          <div
+            className="modal-card"
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '20px',
+              width: '100%',
+              maxWidth: '560px',
+              overflow: 'hidden',
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'
+            }}
+          >
             <div style={{
               padding: '20px 24px',
               borderBottom: '1px solid #e5e7eb',
@@ -1612,24 +1618,30 @@ export default function InventorySection({
 
       {/* MODAL 2: EDIT DEVICE DETAILS & NOTE */}
       {editingItem && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: '16px'
-        }}>
-          <div style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '20px',
-            width: '100%',
-            maxWidth: '540px',
-            overflow: 'hidden',
-            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'
-          }}>
+        <div
+          className="modal-overlay"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            padding: '16px'
+          }}
+        >
+          <div
+            className="modal-card"
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '20px',
+              width: '100%',
+              maxWidth: '540px',
+              overflow: 'hidden',
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'
+            }}
+          >
             <div style={{
               padding: '20px 24px',
               borderBottom: '1px solid #e5e7eb',
@@ -1814,24 +1826,30 @@ export default function InventorySection({
 
       {/* MODAL 3: QUICK NOTE EDITING MODAL */}
       {quickNoteItem && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: '16px'
-        }}>
-          <div style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '16px',
-            width: '100%',
-            maxWidth: '460px',
-            overflow: 'hidden',
-            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'
-          }}>
+        <div
+          className="modal-overlay"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            padding: '16px'
+          }}
+        >
+          <div
+            className="modal-card"
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '16px',
+              width: '100%',
+              maxWidth: '460px',
+              overflow: 'hidden',
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'
+            }}
+          >
             <div style={{
               padding: '16px 20px',
               borderBottom: '1px solid #e5e7eb',

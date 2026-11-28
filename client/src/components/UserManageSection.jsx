@@ -1187,26 +1187,32 @@ export default function UserManageSection({
 
       {/* Modal: Add Custom Role */}
       {isAddingRole && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.45)',
-          zIndex: 99999,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '16px',
-          backdropFilter: 'blur(3px)'
-        }}>
-          <div style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '16px',
-            padding: '24px',
-            width: '100%',
-            maxWidth: '420px',
-            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.15)',
-            border: '1px solid #e5e7eb'
-          }}>
+        <div
+          className="modal-overlay"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.45)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+            backdropFilter: 'blur(3px)'
+          }}
+        >
+          <div
+            className="modal-card"
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '16px',
+              padding: '24px',
+              width: '100%',
+              maxWidth: '420px',
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.15)',
+              border: '1px solid #e5e7eb'
+            }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
               <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#ecfccb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Users size={20} color="#65a30d" />

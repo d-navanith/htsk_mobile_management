@@ -2314,7 +2314,7 @@ export default function Dashboard({
             inset: 0,
             backgroundColor: 'rgba(17, 24, 39, 0.45)',
             backdropFilter: 'blur(2px)',
-            zIndex: 9999,
+            zIndex: 99999,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -2383,7 +2383,7 @@ export default function Dashboard({
               backgroundColor: '#ffffff',
               borderBottom: '1px solid #f3f4f6'
             }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))', gap: '12px' }}>
+              <div className="comparison-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))', gap: '12px' }}>
                 {/* Card 1: Previously Available */}
                 <div
                   onClick={() => setPopupActiveTab('previously_available')}
@@ -2786,7 +2786,7 @@ export default function Dashboard({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 1000,
+            zIndex: 99999,
             padding: '20px'
           }}
         >

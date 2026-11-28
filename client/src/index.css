@@ -523,12 +523,12 @@ input, select, textarea {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background-color: rgba(17, 24, 39, 0.45);
+  background-color: rgba(17, 24, 39, 0.5);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 50;
+  z-index: 99999;
   padding: 16px;
   animation: fadeIn 0.15s ease-out;
 }
@@ -541,6 +541,66 @@ input, select, textarea {
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   overflow: hidden;
   animation: scaleUp 0.15s ease-out;
+}
+
+/* ========================================================================= */
+/* TOAST NOTIFICATION POPUP - HIGH VISIBILITY & RESPONSIVE UX                */
+/* ========================================================================= */
+.app-toast-popup {
+  position: fixed;
+  top: 24px;
+  right: 28px;
+  z-index: 999999 !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.12);
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  background-color: #111827;
+  letter-spacing: 0.01em;
+  animation: toastSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  max-width: 480px;
+  pointer-events: auto;
+}
+
+.app-toast-popup.app-toast-error {
+  background-color: #ef4444;
+}
+
+.app-toast-popup.app-toast-info {
+  background-color: #0284c7;
+}
+
+.app-toast-popup.app-toast-success {
+  background-color: #111827;
+}
+
+.app-toast-icon {
+  font-size: 15px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-toast-text {
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .modal-header {
@@ -1262,12 +1322,73 @@ input, select, textarea {
     gap: 12px !important;
   }
 
+  .modal-overlay {
+    padding: 12px !important;
+    z-index: 99999 !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
   .modal-card {
-    width: 95vw !important;
-    max-width: 95vw !important;
-    max-height: 92vh !important;
-    padding: 18px 16px !important;
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: 88vh !important;
+    padding: 0 !important;
     border-radius: 16px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    box-shadow: 0 20px 35px -5px rgba(0, 0, 0, 0.25) !important;
+  }
+
+  .modal-header {
+    padding: 14px 16px !important;
+  }
+
+  .modal-header h3 {
+    font-size: 16px !important;
+  }
+
+  .modal-body {
+    padding: 14px 16px !important;
+    max-height: calc(88vh - 120px) !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    gap: 12px !important;
+  }
+
+  .modal-footer {
+    padding: 12px 16px !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  .modal-footer button {
+    flex: 1 1 auto !important;
+    min-height: 40px !important;
+  }
+
+  /* Toast notification on mobile screens - perfectly positioned below header and centered */
+  .app-toast-popup {
+    top: 70px !important;
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%) !important;
+    width: calc(100vw - 32px) !important;
+    max-width: 420px !important;
+    padding: 11px 16px !important;
+    font-size: 13.5px !important;
+    justify-content: center !important;
+    text-align: center !important;
+    border-radius: 12px !important;
+    box-shadow: 0 14px 35px rgba(0, 0, 0, 0.32) !important;
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  }
+
+  /* Task comparison popup summary cards on mobile */
+  .comparison-summary-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
   }
 }
 

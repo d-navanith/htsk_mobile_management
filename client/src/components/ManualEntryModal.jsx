@@ -157,7 +157,7 @@ export default function ManualEntryModal({ isOpen, onClose, onSave, groups = [],
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 1000,
+      zIndex: 99999,
       padding: '20px'
     }}>
       <div

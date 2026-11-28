@@ -2363,28 +2363,33 @@ export default function DailyTaskSection({
 
       {/* Add Task Modal (Supports First Task Round 1 & Next Task Intra-day Checks) */}
       {isAddNextTaskOpen && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          backdropFilter: 'blur(3px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-          padding: '16px'
-        }}>
-          <div style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '16px',
-            width: '100%',
-            maxWidth: '560px',
-            boxShadow: '0 20px 30px -5px rgba(0,0,0,0.25)',
-            overflow: 'hidden',
-            maxHeight: '90vh',
+        <div
+          className="modal-overlay"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            padding: '16px'
+          }}
+        >
+          <div
+            className="modal-card"
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '16px',
+              width: '100%',
+              maxWidth: '560px',
+              boxShadow: '0 20px 30px -5px rgba(0,0,0,0.25)',
+              overflow: 'hidden',
+              maxHeight: '90vh',
             display: 'flex',
             flexDirection: 'column'
           }}>
@@ -2690,7 +2695,7 @@ export default function DailyTaskSection({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 1000,
+            zIndex: 99999,
             padding: '20px'
           }}
         >

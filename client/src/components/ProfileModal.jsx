@@ -211,12 +211,13 @@ export default function ProfileModal({
 
   return (
     <div
+      className="modal-overlay"
       style={{
         position: 'fixed',
         inset: 0,
         backgroundColor: 'rgba(15, 23, 42, 0.45)',
         backdropFilter: 'blur(5px)',
-        zIndex: 9999,
+        zIndex: 99999,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -227,6 +228,7 @@ export default function ProfileModal({
       }}
     >
       <div
+        className="modal-card"
         style={{
           width: '100%',
           maxWidth: '560px',

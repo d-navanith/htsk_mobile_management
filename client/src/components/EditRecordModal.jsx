@@ -87,7 +87,7 @@ export default function EditRecordModal({ isOpen, onClose, onUpdate, onDelete, r
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 1000,
+      zIndex: 99999,
       padding: '20px'
     }}>
       <div

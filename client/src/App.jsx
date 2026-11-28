@@ -434,25 +434,14 @@ export default function App() {
       {/* Toast Notification */}
       {toastMessage && (
         <div
-          style={{
-            position: 'fixed',
-            top: '20px',
-            right: '24px',
-            zIndex: 100,
-            backgroundColor: toastMessage.type === 'error' ? '#ef4444' : '#111827',
-            color: '#ffffff',
-            padding: '12px 20px',
-            borderRadius: '10px',
-            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.15)',
-            fontSize: '14px',
-            fontWeight: 500,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            animation: 'fadeIn 0.2s ease-out'
-          }}
+          className={`app-toast-popup app-toast-${toastMessage.type || 'success'}`}
+          role="alert"
+          aria-live="polite"
         >
-          <span>{toastMessage.text}</span>
+          <span className="app-toast-icon">
+            {toastMessage.type === 'error' ? '⚠️' : '✓'}
+          </span>
+          <span className="app-toast-text">{toastMessage.text}</span>
         </div>
       )}
 

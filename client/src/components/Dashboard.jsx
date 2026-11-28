@@ -2322,7 +2322,7 @@ export default function Dashboard({
           }}
         >
           <div
-            className="modal-card"
+            className="modal-card comparison-modal-card"
             onClick={e => e.stopPropagation()}
             style={{
               backgroundColor: '#ffffff',
@@ -2330,7 +2330,7 @@ export default function Dashboard({
               border: '1px solid #e5e7eb',
               width: '100%',
               maxWidth: '860px',
-              maxHeight: '86vh',
+              maxHeight: '88vh',
               display: 'flex',
               flexDirection: 'column',
               boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
@@ -2338,20 +2338,21 @@ export default function Dashboard({
             }}
           >
             {/* Modal Header matching EditRecordModal & System Theme */}
-            <div style={{
-              padding: '20px 24px',
+            <div className="comparison-modal-header" style={{
+              padding: '18px 24px',
               borderBottom: '1px solid #e5e7eb',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              backgroundColor: '#f9fafb'
+              backgroundColor: '#f9fafb',
+              flexShrink: 0
             }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#111827', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h3 className="comparison-modal-title" style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#111827', display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <ArrowRightLeft size={18} color="#65a30d" />
                   <span>Task Comparison: {comparisonData.fromTask?.label || 'Previous Task'} vs {comparisonData.toTask?.label || 'Current Task'}</span>
                 </h3>
-                <p style={{ margin: '4px 0 0 0', fontSize: '12.5px', color: '#6b7280' }}>
+                <p className="comparison-modal-subtitle" style={{ margin: '4px 0 0 0', fontSize: '12.5px', color: '#6b7280' }}>
                   Comparing {comparisonData.summary?.fromTotal || 0} active mobile phones in {comparisonData.fromTask?.label || 'Previous Task'} with {comparisonData.summary?.toTotal || 0} mobile phones in {comparisonData.toTask?.label || 'Current Task'}
                 </p>
               </div>
@@ -2369,7 +2370,8 @@ export default function Dashboard({
                   alignItems: 'center',
                   justifyContent: 'center',
                   cursor: 'pointer',
-                  color: '#6b7280'
+                  color: '#6b7280',
+                  flexShrink: 0
                 }}
                 title="Close"
               >
@@ -2378,14 +2380,16 @@ export default function Dashboard({
             </div>
 
             {/* 4 Theme-Matched Summary Cards inside Popup (Matching Dashboard 4-Card Palette) */}
-            <div style={{
-              padding: '18px 24px 12px 24px',
+            <div className="comparison-modal-stats" style={{
+              padding: '16px 24px 12px 24px',
               backgroundColor: '#ffffff',
-              borderBottom: '1px solid #f3f4f6'
+              borderBottom: '1px solid #f3f4f6',
+              flexShrink: 0
             }}>
               <div className="comparison-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))', gap: '12px' }}>
                 {/* Card 1: Previously Available */}
                 <div
+                  className="comparison-stat-card"
                   onClick={() => setPopupActiveTab('previously_available')}
                   style={{
                     backgroundColor: '#ffffff',
@@ -2396,17 +2400,18 @@ export default function Dashboard({
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#4b5563' }}>Previously Available</div>
-                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#06b6d4', lineHeight: 1.2, margin: '4px 0' }}>
+                  <div className="comparison-stat-title" style={{ fontSize: '12.5px', fontWeight: 600, color: '#4b5563' }}>Previously Available</div>
+                  <div className="comparison-stat-value" style={{ fontSize: '28px', fontWeight: 800, color: '#06b6d4', lineHeight: 1.2, margin: '4px 0' }}>
                     {comparisonData.summary?.previouslyAvailableCount ?? 0}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#9ca3af' }}>
+                  <div className="comparison-stat-sub" style={{ fontSize: '11px', color: '#9ca3af' }}>
                     Active in both tasks
                   </div>
                 </div>
 
                 {/* Card 2: Newly Added */}
                 <div
+                  className="comparison-stat-card"
                   onClick={() => setPopupActiveTab('newly_added')}
                   style={{
                     backgroundColor: '#ffffff',
@@ -2417,17 +2422,18 @@ export default function Dashboard({
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#4b5563' }}>Newly Added</div>
-                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#84cc16', lineHeight: 1.2, margin: '4px 0' }}>
+                  <div className="comparison-stat-title" style={{ fontSize: '12.5px', fontWeight: 600, color: '#4b5563' }}>Newly Added</div>
+                  <div className="comparison-stat-value" style={{ fontSize: '28px', fontWeight: 800, color: '#84cc16', lineHeight: 1.2, margin: '4px 0' }}>
                     +{comparisonData.summary?.newlyAddedCount ?? 0}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#9ca3af' }}>
+                  <div className="comparison-stat-sub" style={{ fontSize: '11px', color: '#9ca3af' }}>
                     New in {comparisonData.toTask?.label || 'Target Task'}
                   </div>
                 </div>
 
                 {/* Card 3: Not Available / Missing from List */}
                 <div
+                  className="comparison-stat-card"
                   onClick={() => setPopupActiveTab('not_available')}
                   style={{
                     backgroundColor: '#ffffff',
@@ -2438,17 +2444,18 @@ export default function Dashboard({
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#4b5563' }}>Not Available</div>
-                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#ef4444', lineHeight: 1.2, margin: '4px 0' }}>
+                  <div className="comparison-stat-title" style={{ fontSize: '12.5px', fontWeight: 600, color: '#4b5563' }}>Not Available</div>
+                  <div className="comparison-stat-value" style={{ fontSize: '28px', fontWeight: 800, color: '#ef4444', lineHeight: 1.2, margin: '4px 0' }}>
                     {comparisonData.summary?.notAvailableCount ?? 0}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#9ca3af' }}>
+                  <div className="comparison-stat-sub" style={{ fontSize: '11px', color: '#9ca3af' }}>
                     Not in {comparisonData.toTask?.label || 'Target Task'} list
                   </div>
                 </div>
 
                 {/* Card 4: Names Not in System */}
                 <div
+                  className="comparison-stat-card"
                   onClick={() => setPopupActiveTab('not_in_system')}
                   style={{
                     backgroundColor: '#ffffff',
@@ -2459,18 +2466,18 @@ export default function Dashboard({
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#4b5563' }}>Not in System</div>
-                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#eab308', lineHeight: 1.2, margin: '4px 0' }}>
+                  <div className="comparison-stat-title" style={{ fontSize: '12.5px', fontWeight: 600, color: '#4b5563' }}>Not in System</div>
+                  <div className="comparison-stat-value" style={{ fontSize: '28px', fontWeight: 800, color: '#eab308', lineHeight: 1.2, margin: '4px 0' }}>
                     {comparisonData.summary?.notInSystemCount ?? 0}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#9ca3af' }}>
+                  <div className="comparison-stat-sub" style={{ fontSize: '11px', color: '#9ca3af' }}>
                     Unregistered device names
                   </div>
                 </div>
               </div>
 
               {/* Clean Filter Tabs */}
-              <div style={{ display: 'flex', gap: '8px', marginTop: '14px', flexWrap: 'wrap' }}>
+              <div className="comparison-tabs-container" style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
                 {[
                   { id: 'overview', label: 'All Summary' },
                   { id: 'not_available', label: `Not Available (${comparisonData.summary?.notAvailableCount ?? 0})` },
@@ -2481,6 +2488,7 @@ export default function Dashboard({
                   <button
                     key={tab.id}
                     type="button"
+                    className="comparison-tab-btn"
                     onClick={() => setPopupActiveTab(tab.id)}
                     style={{
                       padding: '6px 14px',
@@ -2490,7 +2498,8 @@ export default function Dashboard({
                       cursor: 'pointer',
                       border: popupActiveTab === tab.id ? '1.5px solid #84cc16' : '1px solid #e5e7eb',
                       backgroundColor: popupActiveTab === tab.id ? '#f7fee7' : '#f9fafb',
-                      color: popupActiveTab === tab.id ? '#365314' : '#4b5563'
+                      color: popupActiveTab === tab.id ? '#365314' : '#4b5563',
+                      whiteSpace: 'nowrap'
                     }}
                   >
                     {tab.label}
@@ -2499,8 +2508,16 @@ export default function Dashboard({
               </div>
             </div>
 
-            {/* Modal Body */}
-            <div style={{ padding: '18px 24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Modal Body - CRITICAL: flex 1 1 auto and minHeight 0 for seamless scrolling */}
+            <div className="comparison-modal-body" style={{
+              padding: '18px 24px',
+              overflowY: 'auto',
+              flex: '1 1 auto',
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
               {/* 1. Not Available (Attention Required) */}
               {(popupActiveTab === 'overview' || popupActiveTab === 'not_available') && (
                 <div style={{
@@ -2626,7 +2643,7 @@ export default function Dashboard({
                   borderRadius: '14px',
                   padding: '16px'
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '4px', marginBottom: '12px' }}>
                     <span style={{ fontSize: '14px', fontWeight: 800, color: '#111827' }}>
                       Newly Added in {comparisonData.toTask?.label || 'Target Task'} ({comparisonData.newlyAdded?.length || 0})
                     </span>
@@ -2667,7 +2684,7 @@ export default function Dashboard({
                   borderRadius: '14px',
                   padding: '16px'
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '4px', marginBottom: '12px' }}>
                     <span style={{ fontSize: '14px', fontWeight: 800, color: '#111827' }}>
                       Previously Available ({comparisonData.previouslyAvailable?.length || 0})
                     </span>
@@ -2708,7 +2725,7 @@ export default function Dashboard({
                   borderRadius: '14px',
                   padding: '16px'
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '4px', marginBottom: '12px' }}>
                     <span style={{ fontSize: '14px', fontWeight: 800, color: '#111827' }}>
                       Names Not Available in System ({comparisonData.notInSystem?.length || 0})
                     </span>
@@ -2745,18 +2762,19 @@ export default function Dashboard({
             </div>
 
             {/* Modal Footer */}
-            <div style={{
-              padding: '14px 24px',
+            <div className="comparison-modal-footer" style={{
+              padding: '12px 24px',
               borderTop: '1px solid #e5e7eb',
               backgroundColor: '#f9fafb',
               display: 'flex',
               justifyContent: 'flex-end',
-              alignItems: 'center'
+              alignItems: 'center',
+              flexShrink: 0
             }}>
               <button
                 type="button"
                 onClick={() => setShowComparisonPopup(false)}
-                className="btn-primary-lime"
+                className="btn-primary-lime comparison-done-btn"
                 style={{
                   padding: '9px 24px',
                   fontSize: '13px',
